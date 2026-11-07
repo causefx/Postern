@@ -1,0 +1,10 @@
+# Windows build output from `go build`
+postern.exe
+*.exe
+
+# Runtime store: upstream URLs, API keys, and access tokens
+postern-data.json
+
+# Go test and coverage leftovers
+*.test
+*.out

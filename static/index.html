@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Postern</title>
+<style>
+  :root { --bg:#fff; --fg:#1a1a1a; --muted:#666; --line:#ddd; --card:#f7f7f8; --accent:#2563eb; --bad:#c62828; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#16171a; --fg:#e8e8ea; --muted:#9a9aa2; --line:#2e3036; --card:#1e2024; --accent:#6b9bff; --bad:#ef7b7b; }
+  }
+  * { box-sizing: border-box; }
+  body { font:15px/1.5 system-ui,sans-serif; background:var(--bg); color:var(--fg); margin:0; padding:0 16px 48px; }
+  main { max-width:760px; margin:0 auto; }
+  h1 { font-size:20px; margin:28px 0 4px; }
+  p.sub { color:var(--muted); margin:0 0 20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin-bottom:14px; }
+  label { display:block; font-size:12px; color:var(--muted); margin:10px 0 3px; }
+  input[type=text], input[type=password] { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--fg); font:inherit; }
+  button { padding:7px 12px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--fg); font:inherit; cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button.danger { color:var(--bad); }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .row > * { flex:0 0 auto; }
+  .grow { flex:1 1 200px !important; }
+  code { font:13px ui-monospace,Consolas,monospace; word-break:break-all; }
+  .head { display:flex; justify-content:space-between; gap:8px; align-items:baseline; flex-wrap:wrap; }
+  .name { font-weight:600; font-size:16px; }
+  .off { color:var(--muted); }
+  .err { color:var(--bad); margin-top:8px; min-height:1em; }
+  .kv { margin:8px 0 0; font-size:13px; }
+  .kv span { color:var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Postern</h1>
+  <p class="sub">Expose internal services through this app. Upstream API keys stay on the server.</p>
+
+  <form id="add" class="card">
+    <strong>Add service</strong>
+    <div class="row">
+      <div class="grow"><label for="n">Name (route slug)</label><input id="n" type="text" placeholder="sonarr" required pattern="[a-z0-9][a-z0-9\-]{0,31}"></div>
+      <div class="grow"><label for="u">Upstream URL</label><input id="u" type="text" placeholder="http://192.168.1.10:8989" required></div>
+    </div>
+    <div class="row">
+      <div class="grow"><label for="k">Upstream API key</label><input id="k" type="password" autocomplete="off"></div>
+      <div class="grow"><label for="h">Key header</label><input id="h" type="text" value="X-Api-Key"></div>
+    </div>
+    <div class="row" style="margin-top:12px"><button class="primary">Add</button></div>
+    <div id="addErr" class="err"></div>
+  </form>
+
+  <div id="list"></div>
+</main>
+
+<script>
+const api = (path, opts = {}) =>
+  fetch('/admin/api/' + path, {
+    ...opts,
+    headers: { 'Content-Type': 'application/json', 'X-Postern-Admin': '1' },
+  }).then(async r => {
+    if (r.status === 204) return null;
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || r.statusText);
+    return j;
+  });
+
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+async function load() {
+  const list = await api('services');
+  $('list').innerHTML = list.length ? list.map(card).join('') : '<p class="sub">No services yet.</p>';
+}
+
+function card(s) {
+  const base = location.origin + '/p/' + s.name;
+  return `
+  <div class="card" data-name="${esc(s.name)}">
+    <div class="head">
+      <span class="name">${esc(s.name)} ${s.enabled ? '' : '<span class="off">(disabled)</span>'}</span>
+      <span class="row">
+        <button data-act="toggle">${s.enabled ? 'Disable' : 'Enable'}</button>
+        <button data-act="edit">Edit upstream</button>
+        <button data-act="regen">New token</button>
+        <button data-act="del" class="danger">Delete</button>
+      </span>
+    </div>
+    <div class="kv"><span>Upstream:</span> <code>${esc(s.url)}</code> ${s.hasKey ? '' : '<span class="off">(no API key set)</span>'}</div>
+    <div class="kv"><span>Public base:</span> <code>${esc(base)}/</code></div>
+    <div class="kv"><span>Token:</span> <code>${esc(s.token)}</code> <button data-act="copy">Copy</button></div>
+    <div class="kv"><span>Example:</span> <code>curl -H "Authorization: Bearer ${esc(s.token)}" ${esc(base)}/api/v3/system/status</code></div>
+  </div>`;
+}
+
+$('add').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('addErr').textContent = '';
+  try {
+    await api('services', { method: 'POST', body: JSON.stringify({
+      name: $('n').value, url: $('u').value, apiKey: $('k').value, keyHeader: $('h').value,
+    })});
+    $('add').reset(); $('h').value = 'X-Api-Key';
+    load();
+  } catch (err) { $('addErr').textContent = err.message; }
+});
+
+$('list').addEventListener('click', async e => {
+  const act = e.target.dataset.act;
+  if (!act) return;
+  const name = e.target.closest('.card').dataset.name;
+  const cur = (await api('services')).find(s => s.name === name);
+  const put = body => api('services/' + name, { method: 'PUT', body: JSON.stringify({ url: cur.url, enabled: cur.enabled, keyHeader: cur.keyHeader, ...body }) });
+  try {
+    if (act === 'copy') { await navigator.clipboard.writeText(cur.token); e.target.textContent = 'Copied'; return; }
+    if (act === 'del') { if (!confirm('Delete ' + name + '?')) return; await api('services/' + name, { method: 'DELETE' }); }
+    if (act === 'toggle') await put({ enabled: !cur.enabled });
+    if (act === 'regen') { if (!confirm('Old token stops working immediately. Continue?')) return; await put({ regenToken: true }); }
+    if (act === 'edit') {
+      const url = prompt('Upstream URL', cur.url); if (url === null) return;
+      const key = prompt('New upstream API key (leave blank to keep current)', '');
+      await put({ url, apiKey: key || '' });
+    }
+    load();
+  } catch (err) { alert(err.message); }
+});
+
+load();
+</script>
+</body>
+</html>
