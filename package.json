@@ -1,0 +1,14 @@
+{
+  "name": "postern",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i ./static/input.css -o ./static/app.css --minify"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "4.3.5",
+    "@tailwindcss/oxide-win32-x64-msvc": "4.3.5",
+    "daisyui": "5.7.50",
+    "lightningcss-win32-x64-msvc": "1.33.0",
+    "tailwindcss": "4.3.5"
+  }
+}

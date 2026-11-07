@@ -2,8 +2,9 @@ package main
 
 import (
 	"crypto/subtle"
-	_ "embed"
+	"embed"
 	"encoding/json"
+	"html/template"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -13,8 +14,18 @@ import (
 	"time"
 )
 
-//go:embed static/index.html
-var indexHTML []byte
+//go:generate npm run build:css
+
+//go:embed static/*.html static/components/*.html
+var pageFS embed.FS
+
+//go:embed static/app.css
+var appCSS []byte
+
+//go:embed static/admin.js
+var adminJS []byte
+
+var pages = template.Must(template.ParseFS(pageFS, "static/*.html", "static/components/*.html"))
 
 type App struct {
 	store     *Store
@@ -45,6 +56,8 @@ func main() {
 
 	adminMux := http.NewServeMux()
 	adminMux.HandleFunc("GET /admin/{$}", app.ui)
+	adminMux.HandleFunc("GET /admin/app.css", app.css)
+	adminMux.HandleFunc("GET /admin/admin.js", app.script)
 	adminMux.HandleFunc("GET /admin/api/services", app.listServices)
 	adminMux.HandleFunc("POST /admin/api/services", app.createService)
 	adminMux.HandleFunc("PUT /admin/api/services/{name}", app.updateService)
@@ -107,7 +120,21 @@ func (a *App) adminAuth(next http.Handler) http.Handler {
 func (a *App) ui(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	w.Write(indexHTML)
+	if err := pages.ExecuteTemplate(w, "index.html", nil); err != nil {
+		log.Printf("admin ui: %v", err)
+	}
+}
+
+func (a *App) script(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Write(adminJS)
+}
+
+func (a *App) css(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/css; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Write(appCSS)
 }
 
 // view hides the upstream API key from the browser.

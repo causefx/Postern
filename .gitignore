@@ -8,3 +8,6 @@ postern.exe
 # Go test and coverage leftovers
 *.test
 *.out
+
+# Tailwind / daisyUI install. The built stylesheet (static/app.css) is embedded.
+node_modules/

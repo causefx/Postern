@@ -1,0 +1,22 @@
+<template id="service-card">
+  <div class="card card-border bg-base-100 shadow-sm" data-name="">
+    <div class="card-body gap-3">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="card-title">
+          <span data-field="name"></span>
+          <span data-field="badge" class="badge badge-ghost hidden">disabled</span>
+        </h2>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" class="btn btn-sm" data-act="toggle" data-field="toggle"></button>
+          <button type="button" class="btn btn-sm" data-act="edit">Edit upstream</button>
+          <button type="button" class="btn btn-sm" data-act="regen">New token</button>
+          <button type="button" class="btn btn-sm btn-error btn-outline" data-act="del">Delete</button>
+        </div>
+      </div>
+      <p class="text-sm"><span class="text-base-content/60">Upstream:</span> <code class="break-all" data-field="url"></code> <span data-field="nokey" class="text-base-content/60 hidden">(no API key set)</span></p>
+      <p class="text-sm"><span class="text-base-content/60">Public base:</span> <code class="break-all" data-field="base"></code></p>
+      <p class="text-sm"><span class="text-base-content/60">Token:</span> <code class="break-all" data-field="token"></code> <button type="button" class="btn btn-xs btn-ghost" data-act="copy">Copy</button></p>
+      <p class="text-sm"><span class="text-base-content/60">Example:</span> <code class="break-all text-xs" data-field="example"></code></p>
+    </div>
+  </div>
+</template>
