@@ -3,7 +3,7 @@ postern.exe
 *.exe
 
 # Runtime store: upstream URLs, API keys, and access tokens
-postern-data.json
+/data/
 
 # Go test and coverage leftovers
 *.test

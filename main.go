@@ -30,7 +30,7 @@ func env(k, def string) string {
 }
 
 func main() {
-	store, err := OpenStore(env("POSTERN_DATA", "postern-data.json"))
+	store, err := OpenStore(env("POSTERN_DATA", "data/postern-data.json"))
 	if err != nil {
 		log.Fatal(err)
 	}

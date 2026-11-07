@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -82,6 +83,11 @@ func (s *Store) saveLocked() error {
 	b, err := json.MarshalIndent(list, "", "  ")
 	if err != nil {
 		return err
+	}
+	if dir := filepath.Dir(s.path); dir != "." {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return err
+		}
 	}
 	tmp := s.path + ".tmp"
 	if err := os.WriteFile(tmp, b, 0o600); err != nil {
