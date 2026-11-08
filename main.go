@@ -79,7 +79,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	adminMux.Handle("GET /admin/js/", http.StripPrefix("/admin/js/", http.FileServer(http.FS(jsRoot))))
+	// no-store: ES module graphs are easy to serve stale after image upgrades
+	adminMux.Handle("GET /admin/js/", http.StripPrefix("/admin/js/", noStore(http.FileServer(http.FS(jsRoot)))))
 
 	fontsRoot, err := fs.Sub(fontsFS, "static/fonts")
 	if err != nil {
@@ -185,7 +186,7 @@ func (a *App) loginPage(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	w.Write(bytes.ReplaceAll(loginHTML, []byte("{{VERSION}}"), []byte(Version)))
+	w.Write(withVersion(loginHTML))
 }
 
 func (a *App) login(w http.ResponseWriter, r *http.Request) {
@@ -224,10 +225,21 @@ func (a *App) logout(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"ok": true})
 }
 
+func noStore(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func withVersion(b []byte) []byte {
+	return bytes.ReplaceAll(b, []byte("{{VERSION}}"), []byte(Version))
+}
+
 func (a *App) ui(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	w.Write(indexHTML)
+	w.Write(withVersion(indexHTML))
 }
 
 func (a *App) css(w http.ResponseWriter, r *http.Request) {
