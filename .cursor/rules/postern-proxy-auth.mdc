@@ -1,0 +1,19 @@
+---
+description: Postern proxy upstream-auth model (header / query / bearer / basic / none) and secret handling
+globs: **/*.go
+alwaysApply: false
+---
+
+# Postern upstream auth rules
+
+Full spec: `HANDOFF.md` §3–4.
+
+- A service's upstream credential is an `UpstreamAuth{Type, Name, Username, Secret}` with `Type` ∈ `none | header | query | bearer | basic`. Don't add per-type fields to `Service`; extend `UpstreamAuth`.
+- **Every outbound request path** (normal proxy, streaming, websocket upgrade, test-connection) must go through one function, `UpstreamAuth.Apply(*http.Request)`. Never inject credentials anywhere else.
+- `Apply` order: (1) delete caller `Authorization` (Postern token) → (2) delete caller-supplied copy of the configured header/query param → (3) inject stored credential → forward.
+- Legacy config (old api-key + key-header fields) must migrate on load to `{type:"header"}` (or `{type:"none"}` when no key) and keep working unchanged.
+- Validate per type on create/update (HANDOFF §3.3); return field errors as `{"errors":{"auth.name":"…"}}`.
+- **Secrets never leave the server:** admin API responses expose `auth.type`, `auth.name`, `auth.username`, `auth.hasSecret` only. Empty `secret` on update = keep existing.
+- **Never log secrets.** Redact the configured query param in any logged URL; never log `Authorization` or the configured header. Don't echo upstream request URLs in error bodies.
+- Tests required for each auth type, override-stripping, websocket path, migration, and redaction (use `httptest.Server` upstreams).
+- Standard library only (Postern has no external deps); keep it that way.

@@ -1,20 +1,13 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="postern">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Postern</title>
 <link rel="stylesheet" href="/admin/app.css">
 </head>
-<body class="bg-base-200 text-base-content min-h-screen">
-<main class="mx-auto max-w-3xl px-4 py-10">
-  <h1 class="text-2xl font-semibold">Postern</h1>
-  <p class="mb-6 text-base-content/70">Expose internal services through this app. Upstream API keys stay on the server.</p>
-  {{template "add-form.html" .}}
-  <div id="list" class="flex flex-col gap-4"></div>
-</main>
-{{template "service-card.html" .}}
-{{template "empty-state.html" .}}
-<script src="/admin/admin.js"></script>
+<body class="bg-base-100 text-base-content min-h-screen font-sans antialiased">
+<div id="app"></div>
+<script type="module" src="/admin/js/app.js"></script>
 </body>
 </html>

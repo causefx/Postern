@@ -14,19 +14,31 @@ import (
 	"sync"
 )
 
-// Service is one upstream (e.g. Sonarr) exposed through Postern.
+// Service is one upstream exposed through Postern.
 type Service struct {
-	Name      string `json:"name"`      // route slug: /p/<name>/...
-	URL       string `json:"url"`       // upstream base URL, e.g. http://192.168.1.10:8989
-	APIKey    string `json:"apiKey"`    // injected server-side, never sent to clients
-	KeyHeader string `json:"keyHeader"` // header carrying the key, default X-Api-Key
-	Token     string `json:"token"`     // token callers must present to Postern
-	Enabled   bool   `json:"enabled"`
+	Name    string       `json:"name"`
+	URL     string       `json:"url"`
+	Auth    UpstreamAuth `json:"auth"`
+	Access  AccessMode   `json:"access,omitempty"` // postern (default) | upstream
+	Token   string       `json:"token"`
+	Enabled bool         `json:"enabled"`
+}
+
+// legacyService is used only when reading old configs that store apiKey/keyHeader.
+type legacyService struct {
+	Name      string          `json:"name"`
+	URL       string          `json:"url"`
+	Auth      json.RawMessage `json:"auth"`
+	Access    AccessMode      `json:"access"`
+	APIKey    string          `json:"apiKey"`
+	KeyHeader string          `json:"keyHeader"`
+	Token     string          `json:"token"`
+	Enabled   bool            `json:"enabled"`
 }
 
 var nameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,31}$`)
 
-func (s *Service) validate() error {
+func (s *Service) validate(requireAuthSecret bool) error {
 	if !nameRe.MatchString(s.Name) {
 		return errors.New("name must be 1-32 chars: a-z, 0-9, dash")
 	}
@@ -34,8 +46,12 @@ func (s *Service) validate() error {
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return errors.New("url must be a valid http(s) URL")
 	}
-	if s.KeyHeader == "" {
-		s.KeyHeader = "X-Api-Key"
+	s.Access = normalizeAccess(s.Access)
+	if err := s.Auth.Validate(requireAuthSecret); err != nil {
+		return err
+	}
+	if s.Access == AccessUpstream && s.Auth.Type == AuthNone {
+		return FieldError{"access": "upstream access requires an upstream auth method (header, query, bearer, or basic)"}
 	}
 	return nil
 }
@@ -63,12 +79,39 @@ func OpenStore(path string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	var list []Service
-	if err := json.Unmarshal(b, &list); err != nil {
+	var raw []legacyService
+	if err := json.Unmarshal(b, &raw); err != nil {
 		return nil, err
 	}
-	for _, svc := range list {
+	migrated := false
+	for _, leg := range raw {
+		svc := Service{
+			Name:    leg.Name,
+			URL:     leg.URL,
+			Access:  normalizeAccess(leg.Access),
+			Token:   leg.Token,
+			Enabled: leg.Enabled,
+		}
+		if len(leg.Auth) > 0 && string(leg.Auth) != "null" {
+			var auth UpstreamAuth
+			if err := json.Unmarshal(leg.Auth, &auth); err != nil {
+				return nil, err
+			}
+			svc.Auth = auth
+		}
+		if svc.Auth.Type == "" {
+			svc.Auth = migrateLegacy(leg.APIKey, leg.KeyHeader)
+			migrated = true
+		}
 		s.data[svc.Name] = svc
+	}
+	if migrated {
+		s.mu.Lock()
+		err := s.saveLocked()
+		s.mu.Unlock()
+		if err != nil {
+			return nil, err
+		}
 	}
 	return s, nil
 }
@@ -117,7 +160,11 @@ func (s *Store) List() []Service {
 func (s *Store) Create(svc Service) (Service, error) {
 	svc.Name = strings.ToLower(strings.TrimSpace(svc.Name))
 	svc.URL = strings.TrimRight(strings.TrimSpace(svc.URL), "/")
-	if err := svc.validate(); err != nil {
+	if svc.Auth.Type == "" {
+		svc.Auth.Type = AuthNone
+	}
+	svc.Access = normalizeAccess(svc.Access)
+	if err := svc.validate(authNeedsSecret(svc.Auth.Type)); err != nil {
 		return svc, err
 	}
 	s.mu.Lock()
@@ -130,28 +177,54 @@ func (s *Store) Create(svc Service) (Service, error) {
 	return svc, s.saveLocked()
 }
 
-// Update patches an existing service. Empty APIKey keeps the stored key.
-func (s *Store) Update(name string, in Service, regenToken bool) (Service, error) {
+// Update patches an existing service. Empty auth.secret keeps the stored secret.
+func (s *Store) Update(name string, in Service) (Service, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	cur, ok := s.data[name]
 	if !ok {
-		return cur, errors.New("not found")
+		return cur, errNotFound
 	}
 	cur.URL = strings.TrimRight(strings.TrimSpace(in.URL), "/")
+	if u, err := url.Parse(cur.URL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return cur, errors.New("url must be a valid http(s) URL")
+	}
 	cur.Enabled = in.Enabled
-	if in.KeyHeader != "" {
-		cur.KeyHeader = in.KeyHeader
+	if in.Access != "" {
+		cur.Access = normalizeAccess(in.Access)
 	}
-	if in.APIKey != "" {
-		cur.APIKey = in.APIKey
-	}
-	if regenToken {
-		cur.Token = newToken()
-	}
-	if err := cur.validate(); err != nil {
+	auth, err := mergeAuth(cur.Auth, in.Auth)
+	if err != nil {
 		return cur, err
 	}
+	cur.Auth = auth
+	if err := cur.validate(false); err != nil {
+		return cur, err
+	}
+	s.data[name] = cur
+	return cur, s.saveLocked()
+}
+
+func (s *Store) SetEnabled(name string, enabled bool) (Service, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cur, ok := s.data[name]
+	if !ok {
+		return cur, errNotFound
+	}
+	cur.Enabled = enabled
+	s.data[name] = cur
+	return cur, s.saveLocked()
+}
+
+func (s *Store) RotateToken(name string) (Service, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cur, ok := s.data[name]
+	if !ok {
+		return cur, errNotFound
+	}
+	cur.Token = newToken()
 	s.data[name] = cur
 	return cur, s.saveLocked()
 }
@@ -160,7 +233,7 @@ func (s *Store) Delete(name string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := s.data[name]; !ok {
-		return errors.New("not found")
+		return errNotFound
 	}
 	delete(s.data, name)
 	return s.saveLocked()

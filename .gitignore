@@ -9,5 +9,8 @@ postern.exe
 *.test
 *.out
 
+# Runtime logs
+*.log
+
 # Tailwind / daisyUI install. The built stylesheet (static/app.css) is embedded.
 node_modules/

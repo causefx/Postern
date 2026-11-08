@@ -1,0 +1,44 @@
+---
+description: Postern admin UI — component structure, styling and design-system rules
+globs: ui/**, web/**, static/**, assets/**, **/*.html, **/*.css, **/*.js, **/*.ts, **/*.tmpl
+alwaysApply: false
+---
+
+# Postern UI rules
+
+Full brief: `HANDOFF.md` (sections 1, 2, 6). Visual reference: `design/mockups/*.dc.html` (read markup/CSS only; ignore `{{…}}`, `<sc-for>`, `<sc-if>`, `DCLogic` — mockup-tool syntax).
+
+## Components — keep UI in its own components
+- **One component per file**, named after the component (`ServiceRow`, `AuthMethodPicker`, …). A file that renders more than one distinct UI piece should be split.
+- **Screens/pages only compose components.** No large inline markup blocks in the app shell or in Go handlers.
+- **Presentational vs. stateful:** components receive data + callbacks and render; state (services list, filter, search, open row, modal state) lives in `state` / the app root. Components never call `fetch` directly — all admin-API calls go through the single `api` module.
+- **Shared primitives live in `components/common/`** (Button, IconButton, CopyButton, SecretField, CodeBlock, Modal, Toast, Icon). Reuse them; don't re-implement copy buttons or modals per screen.
+- **Icons:** one `Icon` registry (inline stroke SVG, `currentColor`, 16px default). No emoji, no icon fonts.
+- **Pure helpers in `lib/`**: `slug`, `authPreview`, `authPresets`, `clipboard`. Unit-testable, no DOM.
+- **Auth fields:** one component per method (`HeaderAuthFields`, `QueryAuthFields`, `BearerAuthFields`, `BasicAuthFields`, `NoneAuthNote`), selected by `AuthMethodPicker`. Adding a method = add one component + one preset/preview case, nothing else.
+- Keep components small (aim < ~120 lines). If it grows, extract.
+
+### Adapting to the existing stack
+Detect what Postern's embedded UI uses today and follow it:
+- **Plain HTML + JS (served via `go:embed`)** → ES modules under `ui/src/components/<group>/<Name>.js`, each exporting a function that returns a DOM node (or a template literal rendered by a tiny `h()` helper). Bundle with whatever exists (esbuild if needed) — no framework added unless asked.
+- **Go `html/template`** → one partial per component: `ui/templates/components/<group>/<name>.tmpl` with `{{define "ServiceRow"}}…{{end}}`; small behaviour in matching `ui/src/components/<name>.js`.
+- **A JS framework (Alpine, Preact, Svelte, Vue, React…)** → that framework's single-file component convention, same names/grouping.
+Don't introduce a new framework without asking.
+
+## Styling
+- Tailwind + daisyUI with the custom **`postern`** theme from `design/theme.css`. Use daisyUI component classes (`btn`, `btn-primary`, `btn-ghost`, `btn-sm`, `btn-square`, `input`, `toggle`, `badge`, `tabs tabs-box`, `join`, `modal`, `alert alert-warning alert-soft`) plus Tailwind utilities.
+- **No hard-coded hex values in components.** Only theme tokens (`bg-base-100`, `bg-base-200`, `text-base-content`, `text-muted`, `border-line`, `bg-ink-deep`, …) defined in `theme.css`.
+- **Palette only:** Ink Black `#0D1321`, Deep Space Blue `#1D2D44`, Blue Slate `#3E5C76`, Dusty Denim `#748CAB`, Eggshell `#F0EBD8` (+ derived shades listed in HANDOFF §1.1). Muted success/warning/error only for status. **No purple/indigo, no gradients, no glows, no left-border accent cards, no emoji.**
+- No inline `style=""` except truly dynamic values.
+- Fonts: Inter (UI), Space Grotesk (headings, service names), JetBrains Mono (routes, URLs, tokens, header/param names, code). Self-host + embed woff2.
+- Controls 44px tall (34px small); radius cards 14 / modals 18 / fields 10.
+
+## Behaviour
+- Copy actions show "Copied" for ~1.4s; secrets masked by default with reveal toggle.
+- Status switch is optimistic; roll back and show a Toast on API error.
+- Only one service row expanded at a time.
+- Destructive actions always confirm; delete requires typing the service name.
+- Upstream secrets are never displayed after save (API doesn't return them); edit form shows `•••••••• (unchanged)` placeholder.
+
+## Accessibility
+Real `<button>`, `<a href>`, `<input>` + `<label>`; `aria-label` on icon-only buttons; `aria-expanded` on row toggles; `role="radiogroup"`/`aria-checked` on the auth picker; `<dialog>` modals with focus trap, Esc to close, focus returned to the trigger; text contrast ≥ 4.5:1; usable at 390px width.

@@ -4,7 +4,9 @@ import (
 	"crypto/subtle"
 	"embed"
 	"encoding/json"
-	"html/template"
+	"errors"
+	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -16,20 +18,24 @@ import (
 
 //go:generate npm run build:css
 
-//go:embed static/*.html static/components/*.html
-var pageFS embed.FS
+//go:embed static/index.html
+var indexHTML []byte
+
+//go:embed static/login.html
+var loginHTML []byte
 
 //go:embed static/app.css
 var appCSS []byte
 
-//go:embed static/admin.js
-var adminJS []byte
+//go:embed static/js
+var jsFS embed.FS
 
-var pages = template.Must(template.ParseFS(pageFS, "static/*.html", "static/components/*.html"))
+//go:embed static/fonts
+var fontsFS embed.FS
 
 type App struct {
 	store     *Store
-	adminUser string
+	sessions  *sessionStore
 	adminPass string
 }
 
@@ -45,7 +51,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	app := &App{store: store, adminUser: env("ADMIN_USER", "admin"), adminPass: os.Getenv("ADMIN_PASSWORD")}
+	app := &App{
+		store:     store,
+		sessions:  newSessionStore(),
+		adminPass: os.Getenv("ADMIN_PASSWORD"),
+	}
 	if app.adminPass == "" {
 		app.adminPass = newToken()[:16]
 		log.Printf("ADMIN_PASSWORD not set; generated one for this run: %s", app.adminPass)
@@ -55,22 +65,40 @@ func main() {
 	proxyMux.HandleFunc("/p/{name}/{rest...}", app.proxy)
 
 	adminMux := http.NewServeMux()
+	adminMux.HandleFunc("GET /admin/login", app.loginPage)
+	adminMux.HandleFunc("POST /admin/api/login", app.login)
+	adminMux.HandleFunc("POST /admin/api/logout", app.logout)
 	adminMux.HandleFunc("GET /admin/{$}", app.ui)
 	adminMux.HandleFunc("GET /admin/app.css", app.css)
-	adminMux.HandleFunc("GET /admin/admin.js", app.script)
+
+	jsRoot, err := fs.Sub(jsFS, "static/js")
+	if err != nil {
+		log.Fatal(err)
+	}
+	adminMux.Handle("GET /admin/js/", http.StripPrefix("/admin/js/", http.FileServer(http.FS(jsRoot))))
+
+	fontsRoot, err := fs.Sub(fontsFS, "static/fonts")
+	if err != nil {
+		log.Fatal(err)
+	}
+	adminMux.Handle("GET /admin/fonts/", http.StripPrefix("/admin/fonts/", http.FileServer(http.FS(fontsRoot))))
+
+	adminMux.HandleFunc("GET /admin/api/meta", app.meta)
 	adminMux.HandleFunc("GET /admin/api/services", app.listServices)
 	adminMux.HandleFunc("POST /admin/api/services", app.createService)
+	adminMux.HandleFunc("POST /admin/api/services/test", app.testConnection)
 	adminMux.HandleFunc("PUT /admin/api/services/{name}", app.updateService)
+	adminMux.HandleFunc("PATCH /admin/api/services/{name}", app.patchService)
+	adminMux.HandleFunc("POST /admin/api/services/{name}/rotate", app.rotateService)
 	adminMux.HandleFunc("DELETE /admin/api/services/{name}", app.deleteService)
 	adminMux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin/", http.StatusFound)
 	})
 
 	proxyAddr := env("LISTEN", ":8080")
-	adminAddr := os.Getenv("ADMIN_LISTEN") // optional: separate (e.g. LAN-only) port for the UI
+	adminAddr := os.Getenv("ADMIN_LISTEN")
 
 	if adminAddr == "" {
-		// Single port: serve both. Simple, but the login page is internet-reachable.
 		proxyMux.Handle("/admin/", app.adminAuth(adminMux))
 		proxyMux.Handle("/{$}", adminMux)
 		log.Printf("listening on %s (proxy at /p/<name>/..., UI at /admin/)", proxyAddr)
@@ -91,7 +119,6 @@ func newServer(addr string, h http.Handler) *http.Server {
 		Handler:           h,
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,
-		// No Read/WriteTimeout: would break large downloads and websockets.
 	}
 }
 
@@ -99,16 +126,38 @@ func eq(a, b string) bool { return subtle.ConstantTimeCompare([]byte(a), []byte(
 
 // ---------- admin ----------
 
+func adminPublic(r *http.Request) bool {
+	p := r.URL.Path
+	switch {
+	case p == "/admin/login":
+		return true
+	case p == "/admin/api/login" && r.Method == http.MethodPost:
+		return true
+	case p == "/admin/app.css":
+		return true
+	case strings.HasPrefix(p, "/admin/fonts/"):
+		return true
+	case p == "/admin/js/login.js":
+		return true
+	default:
+		return false
+	}
+}
+
 func (a *App) adminAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		u, p, ok := r.BasicAuth()
-		if !ok || !eq(u, a.adminUser) || !eq(p, a.adminPass) {
-			w.Header().Set("WWW-Authenticate", `Basic realm="postern admin"`)
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+		if adminPublic(r) {
+			next.ServeHTTP(w, r)
 			return
 		}
-		// CSRF guard: browsers resend Basic creds cross-site, but can't add
-		// custom headers without a CORS preflight (which we never allow).
+		if !a.sessions.valid(sessionID(r)) {
+			if wantsHTML(r) {
+				http.Redirect(w, r, "/admin/login", http.StatusFound)
+				return
+			}
+			writeErr(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
 		if r.Method != http.MethodGet && r.Header.Get("X-Postern-Admin") != "1" {
 			http.Error(w, "missing X-Postern-Admin header", http.StatusForbidden)
 			return
@@ -117,18 +166,57 @@ func (a *App) adminAuth(next http.Handler) http.Handler {
 	})
 }
 
+func wantsHTML(r *http.Request) bool {
+	if r.Method != http.MethodGet {
+		return false
+	}
+	accept := r.Header.Get("Accept")
+	return strings.Contains(accept, "text/html") || accept == "" || r.URL.Path == "/admin/" || r.URL.Path == "/admin"
+}
+
+func (a *App) loginPage(w http.ResponseWriter, r *http.Request) {
+	if a.sessions.valid(sessionID(r)) {
+		http.Redirect(w, r, "/admin/", http.StatusFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Write(loginHTML)
+}
+
+func (a *App) login(w http.ResponseWriter, r *http.Request) {
+	in, err := decodeJSON[struct {
+		Password string `json:"password"`
+		Remember bool   `json:"remember"`
+	}](r)
+	if err != nil {
+		writeErr(w, 400, "bad json")
+		return
+	}
+	if !eq(in.Password, a.adminPass) {
+		time.Sleep(200 * time.Millisecond)
+		writeErr(w, 401, "wrong password")
+		return
+	}
+	id, err := a.sessions.create(in.Remember)
+	if err != nil {
+		writeErr(w, 500, "could not create session")
+		return
+	}
+	setSessionCookie(w, r, id, in.Remember)
+	writeJSON(w, 200, map[string]any{"ok": true})
+}
+
+func (a *App) logout(w http.ResponseWriter, r *http.Request) {
+	a.sessions.revoke(sessionID(r))
+	clearSessionCookie(w, r)
+	writeJSON(w, 200, map[string]any{"ok": true})
+}
+
 func (a *App) ui(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	if err := pages.ExecuteTemplate(w, "index.html", nil); err != nil {
-		log.Printf("admin ui: %v", err)
-	}
-}
-
-func (a *App) script(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	w.Write(adminJS)
+	w.Write(indexHTML)
 }
 
 func (a *App) css(w http.ResponseWriter, r *http.Request) {
@@ -137,18 +225,49 @@ func (a *App) css(w http.ResponseWriter, r *http.Request) {
 	w.Write(appCSS)
 }
 
-// view hides the upstream API key from the browser.
-type view struct {
-	Name      string `json:"name"`
-	URL       string `json:"url"`
-	KeyHeader string `json:"keyHeader"`
-	HasKey    bool   `json:"hasKey"`
-	Token     string `json:"token"`
-	Enabled   bool   `json:"enabled"`
+func (a *App) meta(w http.ResponseWriter, r *http.Request) {
+	secure := r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+	scheme := "http"
+	if secure {
+		scheme = "https"
+	}
+	writeJSON(w, 200, map[string]any{
+		"secure":    secure,
+		"listen":    r.Host,
+		"publicOrigin": scheme + "://" + r.Host,
+	})
 }
 
-func toView(s Service) view {
-	return view{s.Name, s.URL, s.KeyHeader, s.APIKey != "", s.Token, s.Enabled}
+// view hides the upstream secret from the browser.
+type view struct {
+	Name       string     `json:"name"`
+	URL        string     `json:"url"`
+	Auth       AuthView   `json:"auth"`
+	Access     AccessMode `json:"access"`
+	Token      string     `json:"token"`
+	Enabled    bool       `json:"enabled"`
+	PublicBase string     `json:"publicBase"`
+}
+
+func toView(s Service, origin string) view {
+	return view{
+		Name:       s.Name,
+		URL:        s.URL,
+		Auth:       s.Auth.View(),
+		Access:     normalizeAccess(s.Access),
+		Token:      s.Token,
+		Enabled:    s.Enabled,
+		PublicBase: strings.TrimRight(origin, "/") + "/p/" + s.Name + "/",
+	}
+}
+
+func requestOrigin(r *http.Request) string {
+	secure := r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+	scheme := "http"
+	if secure {
+		scheme = "https"
+	}
+	return scheme + "://" + r.Host
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
@@ -161,52 +280,109 @@ func writeErr(w http.ResponseWriter, code int, msg string) {
 	writeJSON(w, code, map[string]string{"error": msg})
 }
 
+func writeFieldErr(w http.ResponseWriter, err error) {
+	var fe FieldError
+	if errors.As(err, &fe) {
+		writeJSON(w, 400, map[string]any{"error": err.Error(), "errors": fe})
+		return
+	}
+	writeErr(w, 400, err.Error())
+}
+
 func (a *App) listServices(w http.ResponseWriter, r *http.Request) {
+	origin := requestOrigin(r)
 	out := []view{}
 	for _, s := range a.store.List() {
-		out = append(out, toView(s))
+		out = append(out, toView(s, origin))
 	}
 	writeJSON(w, 200, out)
 }
 
-type input struct {
-	Service
-	RegenToken bool `json:"regenToken"`
+type serviceInput struct {
+	Name    string       `json:"name"`
+	URL     string       `json:"url"`
+	Auth    UpstreamAuth `json:"auth"`
+	Access  AccessMode   `json:"access"`
+	Enabled *bool        `json:"enabled"`
 }
 
-func decode(r *http.Request) (input, error) {
-	var in input
+func decodeJSON[T any](r *http.Request) (T, error) {
+	var in T
 	r.Body = http.MaxBytesReader(nil, r.Body, 1<<16)
 	return in, json.NewDecoder(r.Body).Decode(&in)
 }
 
 func (a *App) createService(w http.ResponseWriter, r *http.Request) {
-	in, err := decode(r)
+	in, err := decodeJSON[serviceInput](r)
 	if err != nil {
 		writeErr(w, 400, "bad json")
 		return
 	}
-	in.Enabled = true
-	svc, err := a.store.Create(in.Service)
+	enabled := true
+	if in.Enabled != nil {
+		enabled = *in.Enabled
+	}
+	svc, err := a.store.Create(Service{
+		Name: in.Name, URL: in.URL, Auth: in.Auth, Access: in.Access, Enabled: enabled,
+	})
 	if err != nil {
-		writeErr(w, 400, err.Error())
+		writeFieldErr(w, err)
 		return
 	}
-	writeJSON(w, 201, toView(svc))
+	writeJSON(w, 201, toView(svc, requestOrigin(r)))
 }
 
 func (a *App) updateService(w http.ResponseWriter, r *http.Request) {
-	in, err := decode(r)
+	in, err := decodeJSON[serviceInput](r)
 	if err != nil {
 		writeErr(w, 400, "bad json")
 		return
 	}
-	svc, err := a.store.Update(r.PathValue("name"), in.Service, in.RegenToken)
+	enabled := true
+	if in.Enabled != nil {
+		enabled = *in.Enabled
+	}
+	svc, err := a.store.Update(r.PathValue("name"), Service{
+		URL: in.URL, Auth: in.Auth, Access: in.Access, Enabled: enabled,
+	})
 	if err != nil {
-		writeErr(w, 400, err.Error())
+		if errors.Is(err, errNotFound) {
+			writeErr(w, 404, "not found")
+			return
+		}
+		writeFieldErr(w, err)
 		return
 	}
-	writeJSON(w, 200, toView(svc))
+	writeJSON(w, 200, toView(svc, requestOrigin(r)))
+}
+
+func (a *App) patchService(w http.ResponseWriter, r *http.Request) {
+	in, err := decodeJSON[struct {
+		Enabled *bool `json:"enabled"`
+	}](r)
+	if err != nil {
+		writeErr(w, 400, "bad json")
+		return
+	}
+	if in.Enabled == nil {
+		writeErr(w, 400, "enabled required")
+		return
+	}
+	svc, err := a.store.SetEnabled(r.PathValue("name"), *in.Enabled)
+	if err != nil {
+		writeErr(w, 404, "not found")
+		return
+	}
+	writeJSON(w, 200, toView(svc, requestOrigin(r)))
+}
+
+func (a *App) rotateService(w http.ResponseWriter, r *http.Request) {
+	svc, err := a.store.RotateToken(r.PathValue("name"))
+	if err != nil {
+		writeErr(w, 404, "not found")
+		return
+	}
+	writeJSON(w, 200, toView(svc, requestOrigin(r)))
 }
 
 func (a *App) deleteService(w http.ResponseWriter, r *http.Request) {
@@ -215,6 +391,76 @@ func (a *App) deleteService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+type testInput struct {
+	URL  string       `json:"url"`
+	Auth UpstreamAuth `json:"auth"`
+	Name string       `json:"name"` // optional: load stored secret when editing
+}
+
+func (a *App) testConnection(w http.ResponseWriter, r *http.Request) {
+	in, err := decodeJSON[testInput](r)
+	if err != nil {
+		writeErr(w, 400, "bad json")
+		return
+	}
+	auth := in.Auth
+	if auth.Secret == "" && in.Name != "" {
+		if cur, ok := a.store.Get(in.Name); ok {
+			auth.Secret = cur.Auth.Secret
+			if auth.Type == "" {
+				auth = cur.Auth
+			} else if auth.Name == "" {
+				auth.Name = cur.Auth.Name
+			}
+			if auth.Username == "" {
+				auth.Username = cur.Auth.Username
+			}
+		}
+	}
+	if err := auth.Validate(authNeedsSecret(auth.Type)); err != nil {
+		writeFieldErr(w, err)
+		return
+	}
+	u, err := url.Parse(strings.TrimRight(strings.TrimSpace(in.URL), "/"))
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		writeErr(w, 400, "url must be a valid http(s) URL")
+		return
+	}
+
+	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	if err != nil {
+		writeJSON(w, 200, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	auth.Apply(req)
+
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 3 {
+				return errors.New("stopped after 3 redirects")
+			}
+			return nil
+		},
+	}
+	start := time.Now()
+	res, err := client.Do(req)
+	latency := time.Since(start).Milliseconds()
+	if err != nil {
+		writeJSON(w, 200, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	res.Body.Close()
+
+	msg := map[string]any{"ok": true, "status": res.StatusCode, "latencyMs": latency}
+	if res.StatusCode == 401 || res.StatusCode == 403 {
+		msg["ok"] = true
+		msg["warning"] = fmt.Sprintf("Reached the service, but it rejected the credential (HTTP %d)", res.StatusCode)
+		msg["authRejected"] = true
+	}
+	writeJSON(w, 200, msg)
 }
 
 // ---------- proxy ----------
@@ -235,7 +481,7 @@ func (a *App) proxy(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if !eq(callerToken(r), svc.Token) {
+	if !AuthorizeCaller(svc, r) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -245,27 +491,21 @@ func (a *App) proxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rest := "/" + r.PathValue("rest")
+	auth := svc.Auth
 
 	rp := &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			pr.Out.URL.Path = rest
 			pr.Out.URL.RawPath = ""
-			pr.SetURL(target) // joins target path + rest, sets Host
+			pr.SetURL(target)
 
 			q := pr.In.URL.Query()
-			q.Del("token")
-			q.Del("apikey") // never let callers supply their own upstream key
+			StripCallerQuery(q)
 			pr.Out.URL.RawQuery = q.Encode()
 
-			pr.Out.Header.Del("Authorization")
-			pr.Out.Header.Del("X-Proxy-Token")
-			pr.Out.Header.Del("X-Api-Key")
-			pr.Out.Header.Del(svc.KeyHeader)
-			if svc.APIKey != "" {
-				pr.Out.Header.Set(svc.KeyHeader, svc.APIKey)
-			}
+			auth.Apply(pr.Out)
 		},
-		FlushInterval: -1, // stream immediately (SignalR / event streams)
+		FlushInterval: -1,
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 			log.Printf("proxy %s: %v", svc.Name, err)
 			http.Error(w, "upstream unavailable", http.StatusBadGateway)
