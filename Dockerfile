@@ -18,7 +18,13 @@ ARG VERSION=0.1.0
 WORKDIR /src
 COPY go.mod ./
 COPY *.go ./
-COPY --from=css /src/static ./static
+# Take JS/HTML/fonts from this build's context (not a possibly-stale css-stage cache),
+# then overlay only the freshly built stylesheet.
+COPY static ./static
+COPY --from=css /src/static/app.css ./static/app.css
+# Fail the build if open-paths UI is missing from the embed tree.
+RUN test -f static/js/components/form/OpenPathsEditor.js \
+ && grep -q "Open paths (optional)" static/js/components/form/ServiceFormModal.js
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath \
       -ldflags="-s -w -X main.Version=${VERSION}" \
       -o /out/postern .

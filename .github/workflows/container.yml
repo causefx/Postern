@@ -65,5 +65,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             VERSION=${{ steps.ver.outputs.version }}
+          # Avoid reusing a stale static/ tree from an older css-stage layer.
+          no-cache-filter: build
           cache-from: type=gha
           cache-to: type=gha,mode=max

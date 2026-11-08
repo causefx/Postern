@@ -228,6 +228,9 @@ func (a *App) logout(w http.ResponseWriter, r *http.Request) {
 func noStore(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
+		// Cloudflare respects this even when "Cache Everything" is on.
+		w.Header().Set("CDN-Cache-Control", "no-store")
+		w.Header().Set("Cloudflare-CDN-Cache-Control", "no-store")
 		next.ServeHTTP(w, r)
 	})
 }
