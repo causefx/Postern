@@ -10,18 +10,33 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 )
 
+// OpenPath is a path rule that skips Postern caller auth (upstream credential still injected).
+type OpenPath struct {
+	Match string `json:"match"` // "prefix" | "regex"
+	Path  string `json:"path"`
+}
+
+const (
+	OpenMatchPrefix = "prefix"
+	OpenMatchRegex  = "regex"
+	maxOpenPaths    = 20
+	maxOpenPathLen  = 200
+)
+
 // Service is one upstream exposed through Postern.
 type Service struct {
-	Name    string       `json:"name"`
-	URL     string       `json:"url"`
-	Auth    UpstreamAuth `json:"auth"`
-	Access  AccessMode   `json:"access,omitempty"` // postern (default) | upstream
-	Token   string       `json:"token"`
-	Enabled bool         `json:"enabled"`
+	Name      string       `json:"name"`
+	URL       string       `json:"url"`
+	Auth      UpstreamAuth `json:"auth"`
+	Access    AccessMode   `json:"access,omitempty"` // postern (default) | upstream
+	OpenPaths []OpenPath   `json:"openPaths,omitempty"`
+	Token     string       `json:"token"`
+	Enabled   bool         `json:"enabled"`
 }
 
 // legacyService is used only when reading old configs that store apiKey/keyHeader.
@@ -30,6 +45,7 @@ type legacyService struct {
 	URL       string          `json:"url"`
 	Auth      json.RawMessage `json:"auth"`
 	Access    AccessMode      `json:"access"`
+	OpenPaths []OpenPath      `json:"openPaths"`
 	APIKey    string          `json:"apiKey"`
 	KeyHeader string          `json:"keyHeader"`
 	Token     string          `json:"token"`
@@ -53,7 +69,53 @@ func (s *Service) validate(requireAuthSecret bool) error {
 	if s.Access == AccessUpstream && s.Auth.Type == AuthNone {
 		return FieldError{"access": "upstream access requires an upstream auth method (header, query, bearer, or basic)"}
 	}
+	normalized, err := normalizeOpenPaths(s.OpenPaths)
+	if err != nil {
+		return err
+	}
+	s.OpenPaths = normalized
 	return nil
+}
+
+func normalizeOpenPaths(in []OpenPath) ([]OpenPath, error) {
+	if len(in) == 0 {
+		return nil, nil
+	}
+	if len(in) > maxOpenPaths {
+		return nil, FieldError{"openPaths": "at most 20 open paths"}
+	}
+	out := make([]OpenPath, 0, len(in))
+	for i, raw := range in {
+		key := "openPaths." + strconv.Itoa(i)
+		match := strings.ToLower(strings.TrimSpace(raw.Match))
+		if match == "" {
+			match = OpenMatchPrefix
+		}
+		path := strings.TrimSpace(raw.Path)
+		if path == "" {
+			return nil, FieldError{key + ".path": "path is required"}
+		}
+		if len(path) > maxOpenPathLen {
+			return nil, FieldError{key + ".path": "path is too long"}
+		}
+		switch match {
+		case OpenMatchPrefix:
+			if !strings.HasPrefix(path, "/") {
+				return nil, FieldError{key + ".path": "prefix must start with /"}
+			}
+			if path == "/" {
+				return nil, FieldError{key + ".path": "prefix / would open the whole service"}
+			}
+		case OpenMatchRegex:
+			if _, err := regexp.Compile(path); err != nil {
+				return nil, FieldError{key + ".path": "invalid regex: " + err.Error()}
+			}
+		default:
+			return nil, FieldError{key + ".match": "match must be prefix or regex"}
+		}
+		out = append(out, OpenPath{Match: match, Path: path})
+	}
+	return out, nil
 }
 
 func newToken() string {
@@ -86,11 +148,17 @@ func OpenStore(path string) (*Store, error) {
 	dirty := false
 	for _, leg := range raw {
 		svc := Service{
-			Name:    leg.Name,
-			URL:     leg.URL,
-			Access:  normalizeAccess(leg.Access),
-			Token:   leg.Token,
-			Enabled: leg.Enabled,
+			Name:      leg.Name,
+			URL:       leg.URL,
+			Access:    normalizeAccess(leg.Access),
+			OpenPaths: leg.OpenPaths,
+			Token:     leg.Token,
+			Enabled:   leg.Enabled,
+		}
+		if paths, err := normalizeOpenPaths(svc.OpenPaths); err == nil {
+			svc.OpenPaths = paths
+		} else {
+			svc.OpenPaths = nil
 		}
 		if len(leg.Auth) > 0 && string(leg.Auth) != "null" {
 			var auth UpstreamAuth
@@ -211,6 +279,8 @@ func (s *Store) Update(name string, in Service) (Service, error) {
 		return cur, err
 	}
 	cur.Auth = auth
+	// Form always sends openPaths; replace the whole list (nil/empty clears).
+	cur.OpenPaths = in.OpenPaths
 	if err := cur.validate(false); err != nil {
 		return cur, err
 	}

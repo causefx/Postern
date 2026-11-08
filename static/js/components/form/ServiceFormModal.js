@@ -6,6 +6,7 @@ import { authPreview, secureTxt } from '../../lib/authPreview.js';
 import { AuthMethodPicker } from './AuthMethodPicker.js';
 import { AuthPresetChips } from './AuthPresetChips.js';
 import { AccessModePicker } from './AccessModePicker.js';
+import { OpenPathsEditor } from './OpenPathsEditor.js';
 import { HeaderAuthFields } from './HeaderAuthFields.js';
 import { QueryAuthFields } from './QueryAuthFields.js';
 import { BearerAuthFields } from './BearerAuthFields.js';
@@ -21,6 +22,10 @@ export function openServiceForm({ service = null, trigger, onSaved }) {
     url: service?.url || '',
     enabled: service ? service.enabled : true,
     access: service?.access === 'upstream' ? 'upstream' : 'postern',
+    openPaths: (service?.openPaths || []).map((p) => ({
+      match: p.match === 'regex' ? 'regex' : 'prefix',
+      path: p.path || '',
+    })),
     auth: {
       type: service?.auth?.type || 'header',
       name: service?.auth?.name || 'X-Api-Key',
@@ -36,6 +41,7 @@ export function openServiceForm({ service = null, trigger, onSaved }) {
   const lockLine = h('p', { className: 'm-0 text-xs text-muted leading-relaxed' }, '');
   const fieldsHost = h('div', {});
   const accessHost = h('div', {});
+  const openPathsHost = h('div', {});
   const presetHost = h('div', {});
   const methodHost = h('div', {});
 
@@ -130,6 +136,15 @@ export function openServiceForm({ service = null, trigger, onSaved }) {
     );
   }
 
+  function renderOpenPaths() {
+    openPathsHost.replaceChildren(
+      OpenPathsEditor({
+        paths: form.openPaths,
+        onChange: () => {},
+      }),
+    );
+  }
+
   function renderFields() {
     fieldsHost.replaceChildren();
     const props = { auth: form.auth, editing, onChange: patchAuth };
@@ -184,6 +199,12 @@ export function openServiceForm({ service = null, trigger, onSaved }) {
       url: form.url,
       enabled: form.enabled,
       access: form.access,
+      openPaths: form.openPaths
+        .filter((p) => (p.path || '').trim())
+        .map((p) => ({
+          match: p.match === 'regex' ? 'regex' : 'prefix',
+          path: p.path.trim(),
+        })),
       auth: {
         type: form.auth.type,
         name: form.auth.name || undefined,
@@ -206,6 +227,7 @@ export function openServiceForm({ service = null, trigger, onSaved }) {
   renderPresets();
   renderMethods();
   renderAccess();
+  renderOpenPaths();
   refreshPreview();
 
   const body = h(
@@ -258,6 +280,7 @@ export function openServiceForm({ service = null, trigger, onSaved }) {
       ),
     ),
     section('4', 'How do callers get in?', accessHost),
+    section('5', 'Open paths (optional)', openPathsHost),
     errBox,
   );
 

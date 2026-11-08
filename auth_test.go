@@ -352,6 +352,100 @@ func TestAuthorizeCallerRejectsEmptyCallerToken(t *testing.T) {
 	}
 }
 
+func TestPathIsOpenPrefixAndRegex(t *testing.T) {
+	svc := Service{OpenPaths: []OpenPath{
+		{Match: OpenMatchPrefix, Path: "/health"},
+		{Match: OpenMatchRegex, Path: `^/hooks/[^/]+$`},
+	}}
+	if !PathIsOpen(svc, "/health") || !PathIsOpen(svc, "/health/live") {
+		t.Fatal("prefix should match")
+	}
+	if PathIsOpen(svc, "/api/health") {
+		t.Fatal("prefix must be at start")
+	}
+	if !PathIsOpen(svc, "/hooks/abc") {
+		t.Fatal("regex should match")
+	}
+	if PathIsOpen(svc, "/hooks/abc/extra") {
+		t.Fatal("anchored regex should not match extra segment")
+	}
+	if PathIsOpen(svc, "/other") {
+		t.Fatal("unlisted path must not be open")
+	}
+}
+
+func TestOpenPathBypassStillInjectsUpstream(t *testing.T) {
+	var sawKey string
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sawKey = r.Header.Get("X-Api-Key")
+		w.WriteHeader(204)
+	}))
+	defer up.Close()
+
+	dir := t.TempDir()
+	store, err := OpenStore(filepath.Join(dir, "d.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = store.Create(Service{
+		Name: "open", URL: up.URL, Enabled: true,
+		Auth:      UpstreamAuth{Type: AuthHeader, Name: "X-Api-Key", Secret: "real-key"},
+		OpenPaths: []OpenPath{{Match: OpenMatchPrefix, Path: "/health"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	app := &App{store: store}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/p/{name}/{rest...}", app.proxy)
+	ps := httptest.NewServer(mux)
+	defer ps.Close()
+
+	// Open path: no caller token
+	res, err := http.Get(ps.URL + "/p/open/health")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusNoContent {
+		t.Fatalf("open path status %d", res.StatusCode)
+	}
+	if sawKey != "real-key" {
+		t.Fatalf("upstream key = %q", sawKey)
+	}
+
+	// Non-open path still requires auth
+	res, err = http.Get(ps.URL + "/p/open/api/data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", res.StatusCode)
+	}
+}
+
+func TestOpenPathRejectsBareSlashAndBadRegex(t *testing.T) {
+	dir := t.TempDir()
+	store, _ := OpenStore(filepath.Join(dir, "d.json"))
+	_, err := store.Create(Service{
+		Name: "bad", URL: "http://127.0.0.1:9", Enabled: true,
+		Auth:      UpstreamAuth{Type: AuthNone},
+		OpenPaths: []OpenPath{{Match: OpenMatchPrefix, Path: "/"}},
+	})
+	if err == nil {
+		t.Fatal("expected reject bare /")
+	}
+	_, err = store.Create(Service{
+		Name: "badre", URL: "http://127.0.0.1:9", Enabled: true,
+		Auth:      UpstreamAuth{Type: AuthNone},
+		OpenPaths: []OpenPath{{Match: OpenMatchRegex, Path: "(unclosed"}},
+	})
+	if err == nil {
+		t.Fatal("expected reject bad regex")
+	}
+}
+
 func TestOpenStoreFillsEmptyToken(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "d.json")

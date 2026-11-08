@@ -60,6 +60,30 @@ export function ServiceDetail({ service, onRotate, onEdit, onDelete }) {
         h('button', { type: 'button', className: 'btn btn-sm', onClick: onEdit }, 'Edit service'),
         h('button', { type: 'button', className: 'btn btn-sm btn-outline btn-error', onClick: onDelete }, 'Delete'),
       ),
+      service.openPaths?.length
+        ? h(
+            'div',
+            { className: 'flex flex-col gap-2 mt-3' },
+            h('span', { className: 'label-caps' }, 'Open paths'),
+            h(
+              'p',
+              { className: 'm-0 text-xs text-muted' },
+              'No caller token required; upstream credential still attached.',
+            ),
+            h(
+              'ul',
+              { className: 'm-0 pl-4 flex flex-col gap-1 text-sm text-cream-dim' },
+              ...service.openPaths.map((p) =>
+                h(
+                  'li',
+                  { className: 'font-mono text-[13px]' },
+                  h('span', { className: 'text-muted' }, (p.match === 'regex' ? 'regex' : 'prefix') + ' · '),
+                  p.path,
+                ),
+              ),
+            ),
+          )
+        : null,
     ),
     h(
       'div',

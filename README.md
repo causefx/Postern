@@ -57,6 +57,15 @@ export POSTERN_SECURE=1
 - Prefer **Bearer** or **`X-Proxy-Token`**. Query-string tokens can leak via access logs, `Referer`, and browser history.
 - `access: upstream` also accepts the real upstream key in the service’s auth shape (by design). Anyone who knows that key can call Postern in that mode.
 
+### Open paths
+
+Per service you can list **open paths** that skip the caller token check (useful for health checks or public webhooks). Postern still injects the stored upstream credential.
+
+- **Prefix** — matches the start of the proxied path (e.g. `/health` matches `/health` and `/health/ready`). Cannot be `/` alone.
+- **Regex** — Go regexp against the proxied path; anchor with `^` / `$` when you need an exact match (e.g. `^/webhooks/[^/]+$`).
+
+Open paths are reachable by anyone who can hit the proxy port. Keep the list short and specific.
+
 ### Data file
 
 Service config (including upstream secrets and Postern tokens) lives in `POSTERN_DATA` (default `data/postern-data.json`, or `/data/postern-data.json` in Docker). Treat it like a secrets store; back it up privately.

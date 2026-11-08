@@ -253,6 +253,7 @@ type view struct {
 	URL        string     `json:"url"`
 	Auth       AuthView   `json:"auth"`
 	Access     AccessMode `json:"access"`
+	OpenPaths  []OpenPath `json:"openPaths,omitempty"`
 	Token      string     `json:"token"`
 	Enabled    bool       `json:"enabled"`
 	PublicBase string     `json:"publicBase"`
@@ -264,6 +265,7 @@ func toView(s Service, origin string) view {
 		URL:        s.URL,
 		Auth:       s.Auth.View(),
 		Access:     normalizeAccess(s.Access),
+		OpenPaths:  s.OpenPaths,
 		Token:      s.Token,
 		Enabled:    s.Enabled,
 		PublicBase: strings.TrimRight(origin, "/") + "/p/" + s.Name + "/",
@@ -307,11 +309,12 @@ func (a *App) listServices(w http.ResponseWriter, r *http.Request) {
 }
 
 type serviceInput struct {
-	Name    string       `json:"name"`
-	URL     string       `json:"url"`
-	Auth    UpstreamAuth `json:"auth"`
-	Access  AccessMode   `json:"access"`
-	Enabled *bool        `json:"enabled"`
+	Name      string       `json:"name"`
+	URL       string       `json:"url"`
+	Auth      UpstreamAuth `json:"auth"`
+	Access    AccessMode   `json:"access"`
+	OpenPaths []OpenPath   `json:"openPaths"`
+	Enabled   *bool        `json:"enabled"`
 }
 
 func decodeJSON[T any](r *http.Request) (T, error) {
@@ -331,7 +334,8 @@ func (a *App) createService(w http.ResponseWriter, r *http.Request) {
 		enabled = *in.Enabled
 	}
 	svc, err := a.store.Create(Service{
-		Name: in.Name, URL: in.URL, Auth: in.Auth, Access: in.Access, Enabled: enabled,
+		Name: in.Name, URL: in.URL, Auth: in.Auth, Access: in.Access,
+		OpenPaths: in.OpenPaths, Enabled: enabled,
 	})
 	if err != nil {
 		writeFieldErr(w, err)
@@ -351,7 +355,8 @@ func (a *App) updateService(w http.ResponseWriter, r *http.Request) {
 		enabled = *in.Enabled
 	}
 	svc, err := a.store.Update(r.PathValue("name"), Service{
-		URL: in.URL, Auth: in.Auth, Access: in.Access, Enabled: enabled,
+		URL: in.URL, Auth: in.Auth, Access: in.Access,
+		OpenPaths: in.OpenPaths, Enabled: enabled,
 	})
 	if err != nil {
 		if errors.Is(err, errNotFound) {
@@ -489,7 +494,8 @@ func (a *App) proxy(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if !AuthorizeCaller(svc, r) {
+	rest := "/" + r.PathValue("rest")
+	if !PathIsOpen(svc, rest) && !AuthorizeCaller(svc, r) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -498,7 +504,6 @@ func (a *App) proxy(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad upstream", http.StatusInternalServerError)
 		return
 	}
-	rest := "/" + r.PathValue("rest")
 	auth := svc.Auth
 
 	rp := &httputil.ReverseProxy{

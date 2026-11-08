@@ -259,6 +259,33 @@ func (a UpstreamAuth) presentedSecret(r *http.Request) (val string, ok bool) {
 	}
 }
 
+// PathIsOpen reports whether the proxied path skips Postern caller auth.
+// Upstream credential injection still applies for open paths.
+func PathIsOpen(svc Service, path string) bool {
+	if path == "" {
+		path = "/"
+	} else if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	for _, rule := range svc.OpenPaths {
+		switch rule.Match {
+		case OpenMatchRegex:
+			re, err := regexp.Compile(rule.Path)
+			if err != nil {
+				continue
+			}
+			if re.MatchString(path) {
+				return true
+			}
+		default: // prefix
+			if rule.Path != "" && rule.Path != "/" && strings.HasPrefix(path, rule.Path) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // AuthorizeCaller checks the service access mode against the incoming request.
 // AccessUpstream accepts the upstream-shaped credential when its value matches
 // either the stored upstream secret or the Postern-issued token.
