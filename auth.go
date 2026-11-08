@@ -262,6 +262,7 @@ func (a UpstreamAuth) presentedSecret(r *http.Request) (val string, ok bool) {
 // AuthorizeCaller checks the service access mode against the incoming request.
 // AccessUpstream accepts the upstream-shaped credential when its value matches
 // either the stored upstream secret or the Postern-issued token.
+// Empty Postern tokens never authorize (fail closed — secretEq("", "") is true).
 func AuthorizeCaller(svc Service, r *http.Request) bool {
 	switch normalizeAccess(svc.Access) {
 	case AccessUpstream:
@@ -269,9 +270,19 @@ func AuthorizeCaller(svc Service, r *http.Request) bool {
 		if !ok {
 			return false
 		}
-		return secretEq(presented, svc.Auth.Secret) || secretEq(presented, svc.Token)
+		if svc.Auth.Secret != "" && secretEq(presented, svc.Auth.Secret) {
+			return true
+		}
+		if svc.Token != "" && secretEq(presented, svc.Token) {
+			return true
+		}
+		return false
 	default:
-		return secretEq(callerToken(r), svc.Token)
+		got := callerToken(r)
+		if got == "" || svc.Token == "" {
+			return false
+		}
+		return secretEq(got, svc.Token)
 	}
 }
 

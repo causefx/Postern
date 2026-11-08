@@ -104,7 +104,3 @@ func sessionID(r *http.Request) string {
 	}
 	return c.Value
 }
-
-func isHTTPS(r *http.Request) bool {
-	return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
-}

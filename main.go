@@ -36,6 +36,7 @@ var fontsFS embed.FS
 type App struct {
 	store     *Store
 	sessions  *sessionStore
+	logins    *loginLimiter
 	adminPass string
 }
 
@@ -54,6 +55,7 @@ func main() {
 	app := &App{
 		store:     store,
 		sessions:  newSessionStore(),
+		logins:    newLoginLimiter(),
 		adminPass: os.Getenv("ADMIN_PASSWORD"),
 	}
 	if app.adminPass == "" {
@@ -185,6 +187,11 @@ func (a *App) loginPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) login(w http.ResponseWriter, r *http.Request) {
+	ip := clientIP(r)
+	if a.logins.blocked(ip) {
+		writeErr(w, http.StatusTooManyRequests, "too many failed attempts; try again in a minute")
+		return
+	}
 	in, err := decodeJSON[struct {
 		Password string `json:"password"`
 		Remember bool   `json:"remember"`
@@ -195,6 +202,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	}
 	if !eq(in.Password, a.adminPass) {
 		time.Sleep(200 * time.Millisecond)
+		a.logins.failure(ip)
 		writeErr(w, 401, "wrong password")
 		return
 	}
@@ -203,6 +211,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, "could not create session")
 		return
 	}
+	a.logins.success(ip)
 	setSessionCookie(w, r, id, in.Remember)
 	writeJSON(w, 200, map[string]any{"ok": true})
 }
@@ -226,14 +235,14 @@ func (a *App) css(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) meta(w http.ResponseWriter, r *http.Request) {
-	secure := r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+	secure := isHTTPS(r)
 	scheme := "http"
 	if secure {
 		scheme = "https"
 	}
 	writeJSON(w, 200, map[string]any{
-		"secure":    secure,
-		"listen":    r.Host,
+		"secure":       secure,
+		"listen":       r.Host,
 		"publicOrigin": scheme + "://" + r.Host,
 	})
 }
@@ -262,9 +271,8 @@ func toView(s Service, origin string) view {
 }
 
 func requestOrigin(r *http.Request) string {
-	secure := r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 	scheme := "http"
-	if secure {
+	if isHTTPS(r) {
 		scheme = "https"
 	}
 	return scheme + "://" + r.Host

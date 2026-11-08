@@ -83,7 +83,7 @@ func OpenStore(path string) (*Store, error) {
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return nil, err
 	}
-	migrated := false
+	dirty := false
 	for _, leg := range raw {
 		svc := Service{
 			Name:    leg.Name,
@@ -101,11 +101,15 @@ func OpenStore(path string) (*Store, error) {
 		}
 		if svc.Auth.Type == "" {
 			svc.Auth = migrateLegacy(leg.APIKey, leg.KeyHeader)
-			migrated = true
+			dirty = true
+		}
+		if svc.Token == "" {
+			svc.Token = newToken()
+			dirty = true
 		}
 		s.data[svc.Name] = svc
 	}
-	if migrated {
+	if dirty {
 		s.mu.Lock()
 		err := s.saveLocked()
 		s.mu.Unlock()
@@ -130,6 +134,11 @@ func (s *Store) saveLocked() error {
 	if dir := filepath.Dir(s.path); dir != "." {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return err
+		}
+	}
+	for _, v := range list {
+		if v.Token == "" {
+			return errors.New("refusing to persist service with empty token")
 		}
 	}
 	tmp := s.path + ".tmp"

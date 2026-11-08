@@ -331,3 +331,52 @@ func TestAccessUpstreamRejectsNoneAuth(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestAuthorizeCallerEmptyTokenFailClosed(t *testing.T) {
+	svc := Service{Name: "empty", Token: "", Access: AccessPostern, Enabled: true}
+	req := httptest.NewRequest("GET", "http://postern/p/empty/", nil)
+	if AuthorizeCaller(svc, req) {
+		t.Fatal("empty token must not authorize unauthenticated caller")
+	}
+	req.Header.Set("Authorization", "Bearer ")
+	if AuthorizeCaller(svc, req) {
+		t.Fatal("empty bearer must not authorize empty token")
+	}
+}
+
+func TestAuthorizeCallerRejectsEmptyCallerToken(t *testing.T) {
+	svc := Service{Name: "s", Token: "abc", Access: AccessPostern, Enabled: true}
+	req := httptest.NewRequest("GET", "http://postern/p/s/", nil)
+	if AuthorizeCaller(svc, req) {
+		t.Fatal("missing caller token must fail")
+	}
+}
+
+func TestOpenStoreFillsEmptyToken(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "d.json")
+	raw := `[{"name":"s","url":"http://127.0.0.1:9","auth":{"type":"none"},"token":"","enabled":true}]`
+	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store, err := OpenStore(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc, ok := store.Get("s")
+	if !ok {
+		t.Fatal("missing service")
+	}
+	if svc.Token == "" {
+		t.Fatal("expected regenerated token")
+	}
+	// Persisted
+	store2, err := OpenStore(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc2, _ := store2.Get("s")
+	if svc2.Token != svc.Token {
+		t.Fatalf("token not persisted: %q vs %q", svc.Token, svc2.Token)
+	}
+}
