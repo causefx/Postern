@@ -1,0 +1,15 @@
+.git
+.github
+.cursor
+node_modules
+data
+*.exe
+*.log
+*.out
+*.test
+postern
+README*
+*.md
+.env
+.env.*
+agent-transcripts
