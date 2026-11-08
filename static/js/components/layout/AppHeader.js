@@ -23,7 +23,14 @@ export function AppHeader() {
         h(
           'div',
           { className: 'flex flex-col' },
-          h('span', { className: 'font-display text-lg font-bold tracking-tight' }, 'Postern'),
+          h(
+            'div',
+            { className: 'flex items-baseline gap-2' },
+            h('span', { className: 'font-display text-lg font-bold tracking-tight' }, 'Postern'),
+            state.meta.version
+              ? h('span', { className: 'font-mono text-[11px] text-muted' }, 'v' + state.meta.version)
+              : null,
+          ),
           h('span', { className: 'text-xs text-muted' }, 'Private services, public front door'),
         ),
       ),

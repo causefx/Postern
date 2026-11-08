@@ -14,11 +14,14 @@ RUN npm run build:css
 
 # --- Go binary ---
 FROM golang:1.22-alpine AS build
+ARG VERSION=0.1.0
 WORKDIR /src
 COPY go.mod ./
 COPY *.go ./
 COPY --from=css /src/static ./static
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/postern .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath \
+      -ldflags="-s -w -X main.Version=${VERSION}" \
+      -o /out/postern .
 
 # --- Runtime ---
 # Alpine (not distroless) so an entrypoint can chown mounted /data, then drop privileges.

@@ -2,6 +2,16 @@
 
 A small reverse proxy that puts a front door on private services: callers get a Postern token (or use the service’s own auth shape), while the real upstream credential never leaves this server.
 
+## Version
+
+Current release series: **0.1.x**. Source default is `0.1.0` ([`version.go`](version.go)).
+
+```bash
+go build -ldflags "-X main.Version=1.2.3" -o postern .
+```
+
+Docker/CI inject the same via build-arg `VERSION` (git tag `v1.2.3` → `1.2.3`). The version appears in startup logs, `/admin/api/meta`, the admin header, and the login footer.
+
 ## Quick start
 
 ```bash

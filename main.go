@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/subtle"
 	"embed"
 	"encoding/json"
@@ -62,6 +63,7 @@ func main() {
 		app.adminPass = newToken()[:16]
 		log.Printf("ADMIN_PASSWORD not set; generated one for this run: %s", app.adminPass)
 	}
+	log.Printf("postern %s", Version)
 
 	proxyMux := http.NewServeMux()
 	proxyMux.HandleFunc("/p/{name}/{rest...}", app.proxy)
@@ -183,7 +185,7 @@ func (a *App) loginPage(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	w.Write(loginHTML)
+	w.Write(bytes.ReplaceAll(loginHTML, []byte("{{VERSION}}"), []byte(Version)))
 }
 
 func (a *App) login(w http.ResponseWriter, r *http.Request) {
@@ -241,6 +243,7 @@ func (a *App) meta(w http.ResponseWriter, r *http.Request) {
 		scheme = "https"
 	}
 	writeJSON(w, 200, map[string]any{
+		"version":      Version,
 		"secure":       secure,
 		"listen":       r.Host,
 		"publicOrigin": scheme + "://" + r.Host,
