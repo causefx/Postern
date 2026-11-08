@@ -174,7 +174,11 @@ func (s *Store) Create(svc Service) (Service, error) {
 	}
 	svc.Token = newToken()
 	s.data[svc.Name] = svc
-	return svc, s.saveLocked()
+	if err := s.saveLocked(); err != nil {
+		delete(s.data, svc.Name)
+		return svc, err
+	}
+	return svc, nil
 }
 
 // Update patches an existing service. Empty auth.secret keeps the stored secret.
@@ -201,8 +205,13 @@ func (s *Store) Update(name string, in Service) (Service, error) {
 	if err := cur.validate(false); err != nil {
 		return cur, err
 	}
+	prev := s.data[name]
 	s.data[name] = cur
-	return cur, s.saveLocked()
+	if err := s.saveLocked(); err != nil {
+		s.data[name] = prev
+		return prev, err
+	}
+	return cur, nil
 }
 
 func (s *Store) SetEnabled(name string, enabled bool) (Service, error) {
@@ -212,9 +221,14 @@ func (s *Store) SetEnabled(name string, enabled bool) (Service, error) {
 	if !ok {
 		return cur, errNotFound
 	}
+	prev := cur
 	cur.Enabled = enabled
 	s.data[name] = cur
-	return cur, s.saveLocked()
+	if err := s.saveLocked(); err != nil {
+		s.data[name] = prev
+		return prev, err
+	}
+	return cur, nil
 }
 
 func (s *Store) RotateToken(name string) (Service, error) {
@@ -224,17 +238,27 @@ func (s *Store) RotateToken(name string) (Service, error) {
 	if !ok {
 		return cur, errNotFound
 	}
+	prev := cur
 	cur.Token = newToken()
 	s.data[name] = cur
-	return cur, s.saveLocked()
+	if err := s.saveLocked(); err != nil {
+		s.data[name] = prev
+		return prev, err
+	}
+	return cur, nil
 }
 
 func (s *Store) Delete(name string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, ok := s.data[name]; !ok {
+	prev, ok := s.data[name]
+	if !ok {
 		return errNotFound
 	}
 	delete(s.data, name)
-	return s.saveLocked()
+	if err := s.saveLocked(); err != nil {
+		s.data[name] = prev
+		return err
+	}
+	return nil
 }

@@ -13,3 +13,4 @@ README*
 .env
 .env.*
 agent-transcripts
+!docker-entrypoint.sh

@@ -21,13 +21,21 @@ COPY --from=css /src/static ./static
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/postern .
 
 # --- Runtime ---
-FROM gcr.io/distroless/static-debian12:nonroot
+# Alpine (not distroless) so an entrypoint can chown mounted /data, then drop privileges.
+FROM alpine:3.21
+RUN apk add --no-cache ca-certificates tzdata su-exec \
+ && adduser -D -H -u 65532 postern \
+ && mkdir -p /data \
+ && chown postern:postern /data
+
 COPY --from=build /out/postern /postern
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 ENV LISTEN=:8080 \
     POSTERN_DATA=/data/postern-data.json
 
 EXPOSE 8080
 VOLUME ["/data"]
-USER nonroot:nonroot
-ENTRYPOINT ["/postern"]
+# Start as root so the entrypoint can fix volume ownership, then su-exec to postern.
+ENTRYPOINT ["/docker-entrypoint.sh"]
