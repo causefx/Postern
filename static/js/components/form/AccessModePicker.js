@@ -1,20 +1,21 @@
 import { h } from '../../lib/h.js';
 import { authMethodShort, callerPreview } from '../../lib/authPreview.js';
+import { isAuthNone } from '../../lib/authPresets.js';
 
 export function AccessModePicker({ access, auth, publicBase, onChange }) {
-  const upstreamDisabled = !auth || auth.type === 'none';
+  const upstreamDisabled = isAuthNone(auth);
   const method = authMethodShort(auth);
 
   const modes = [
     {
       id: 'postern',
       title: 'Postern token',
-      hint: 'Callers send Authorization: Bearer pst_…. The service’s credential never leaves Postern.',
+      hint: 'Callers send Authorization: Bearer pst_…. The service’s credentials never leave Postern.',
     },
     {
       id: 'upstream',
       title: 'Same as the service',
-      hint: `Callers use ${method}, exactly as if talking to the service directly. Accepts the Postern token or the real key. Works with apps that only speak the service’s own API.`,
+      hint: `Callers use ${method}, exactly as if talking to the service directly. Accepts the Postern token or the real value.`,
     },
   ];
 
@@ -23,7 +24,7 @@ export function AccessModePicker({ access, auth, publicBase, onChange }) {
   wrap.append(
     h(
       'div',
-      { className: 'flex flex-col gap-2', role: 'radiogroup', 'aria-label': 'Caller access' },
+      { className: 'grid gap-2 sm:grid-cols-2', role: 'radiogroup', 'aria-label': 'Caller access' },
       ...modes.map((m) => {
         const selected = access === m.id;
         const disabled = m.id === 'upstream' && upstreamDisabled;
@@ -35,9 +36,7 @@ export function AccessModePicker({ access, auth, publicBase, onChange }) {
             'aria-checked': selected,
             disabled,
             className: `rounded-[12px] border px-4 py-3 text-left flex gap-3 items-start transition-colors ${
-              selected
-                ? 'border-slate bg-space-raised'
-                : 'border-line bg-ink-raised hover:border-slate'
+              selected ? 'border-eggshell/40 bg-space-raised' : 'border-line bg-ink-raised hover:border-slate'
             } ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`,
             onClick: () => {
               if (!disabled) onChange(m.id);
@@ -66,7 +65,11 @@ export function AccessModePicker({ access, auth, publicBase, onChange }) {
 
   if (upstreamDisabled) {
     wrap.append(
-      h('p', { className: 'm-0 text-xs text-muted' }, 'Pick an upstream auth method first to use “Same as the service”.'),
+      h(
+        'p',
+        { className: 'm-0 text-xs text-muted' },
+        'Turn on at least one upstream auth method first to use “Same as the service”.',
+      ),
     );
   }
 
@@ -77,7 +80,7 @@ export function AccessModePicker({ access, auth, publicBase, onChange }) {
       h(
         'p',
         { className: 'm-0 text-xs text-muted leading-relaxed' },
-        'Postern checks the value matches this service’s Postern token or the stored key; anything else gets 401 before it reaches the service. Callers given the real key aren’t affected by rotating the Postern token.',
+        'A caller only needs one of these. Postern checks it matches the Postern token or the stored value for that place; anything else gets 401. All stored values are then sent upstream.',
       ),
     );
   }

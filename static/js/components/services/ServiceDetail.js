@@ -28,9 +28,9 @@ export function ServiceDetail({ service, onRotate, onEdit, onDelete }) {
             h(
               'p',
               { className: 'm-0 text-sm text-cream-dim leading-relaxed' },
-              'Callers send ',
+              'Callers need any one of: ',
               h('span', { className: 'font-mono text-[13px]' }, authMethodShort(service.auth)),
-              ' with either the Postern token or the real upstream key (',
+              ' — Postern token or the real value for that place (',
               h('span', { className: 'font-mono text-[13px]' }, authLabel(service.auth)),
               ').',
             ),
@@ -98,16 +98,17 @@ export function ServiceDetail({ service, onRotate, onEdit, onDelete }) {
 
 function upstreamCurl(service, base) {
   const a = service.auth || {};
-  switch (a.type) {
-    case 'header':
-      return `curl -H "${a.name || 'X-Api-Key'}: $TOKEN_OR_KEY" \\\n  ${base}api/…`;
-    case 'query':
-      return `curl "${base}api/…?${a.name || 'apikey'}=$TOKEN_OR_KEY"`;
-    case 'bearer':
-      return `curl -H "Authorization: Bearer $TOKEN_OR_KEY" \\\n  ${base}api/…`;
-    case 'basic':
-      return `curl -u "${a.username || 'user'}:$TOKEN_OR_PASSWORD" \\\n  ${base}api/…`;
-    default:
-      return `curl ${base}api/…`;
+  if (a.query) {
+    return `curl "${base}api/…?${a.query.name || 'apikey'}=$TOKEN_OR_KEY"`;
   }
+  if (a.header) {
+    return `curl -H "${a.header.name || 'X-Api-Key'}: $TOKEN_OR_KEY" \\\n  ${base}api/…`;
+  }
+  if (a.authz?.kind === 'basic') {
+    return `curl -u "${a.authz.username || 'user'}:$TOKEN_OR_PASSWORD" \\\n  ${base}api/…`;
+  }
+  if (a.authz) {
+    return `curl -H "Authorization: Bearer $TOKEN_OR_KEY" \\\n  ${base}api/…`;
+  }
+  return `curl ${base}api/…`;
 }

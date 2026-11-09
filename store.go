@@ -66,8 +66,8 @@ func (s *Service) validate(requireAuthSecret bool) error {
 	if err := s.Auth.Validate(requireAuthSecret); err != nil {
 		return err
 	}
-	if s.Access == AccessUpstream && s.Auth.Type == AuthNone {
-		return FieldError{"access": "upstream access requires an upstream auth method (header, query, bearer, or basic)"}
+	if s.Access == AccessUpstream && s.Auth.IsNone() {
+		return FieldError{"access": "upstream access requires at least one upstream auth method"}
 	}
 	normalized, err := normalizeOpenPaths(s.OpenPaths)
 	if err != nil {
@@ -167,7 +167,7 @@ func OpenStore(path string) (*Store, error) {
 			}
 			svc.Auth = auth
 		}
-		if svc.Auth.Type == "" {
+		if svc.Auth.IsNone() && leg.APIKey != "" {
 			svc.Auth = migrateLegacy(leg.APIKey, leg.KeyHeader)
 			dirty = true
 		}
@@ -237,11 +237,8 @@ func (s *Store) List() []Service {
 func (s *Store) Create(svc Service) (Service, error) {
 	svc.Name = strings.ToLower(strings.TrimSpace(svc.Name))
 	svc.URL = strings.TrimRight(strings.TrimSpace(svc.URL), "/")
-	if svc.Auth.Type == "" {
-		svc.Auth.Type = AuthNone
-	}
 	svc.Access = normalizeAccess(svc.Access)
-	if err := svc.validate(authNeedsSecret(svc.Auth.Type)); err != nil {
+	if err := svc.validate(authNeedsSecret(svc.Auth)); err != nil {
 		return svc, err
 	}
 	s.mu.Lock()

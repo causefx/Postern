@@ -161,6 +161,16 @@
   color: var(--color-eggshell);
 }
 
+.auth-slot-badge {
+  flex-shrink: 0;
+  font: 500 11px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--color-cream-dim);
+  border: 1px solid var(--color-line);
+  background: var(--color-ink-deep);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
 .auth-method-tabs {
   display: flex;
   width: 100%;

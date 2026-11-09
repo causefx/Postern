@@ -3,15 +3,10 @@ import { Modal, openModal, closeModal } from '../common/Modal.js';
 import { Icon } from '../common/Icon.js';
 import { slugify } from '../../lib/slug.js';
 import { authPreview, secureTxt } from '../../lib/authPreview.js';
-import { AuthMethodPicker } from './AuthMethodPicker.js';
-import { AuthPresetChips } from './AuthPresetChips.js';
+import { authFromView, authToPayload, emptyAuth, isAuthNone } from '../../lib/authPresets.js';
 import { AccessModePicker } from './AccessModePicker.js';
+import { AuthSlotsEditor } from './AuthSlotsEditor.js';
 import { OpenPathsEditor } from './OpenPathsEditor.js';
-import { HeaderAuthFields } from './HeaderAuthFields.js';
-import { QueryAuthFields } from './QueryAuthFields.js';
-import { BearerAuthFields } from './BearerAuthFields.js';
-import { BasicAuthFields } from './BasicAuthFields.js';
-import { NoneAuthNote } from './NoneAuthNote.js';
 import { api } from '../../api.js';
 import { state } from '../../state.js';
 
@@ -26,24 +21,24 @@ export function openServiceForm({ service = null, trigger, onSaved }) {
       match: p.match === 'regex' ? 'regex' : 'prefix',
       path: p.path || '',
     })),
-    auth: {
-      type: service?.auth?.type || 'header',
-      name: service?.auth?.name || 'X-Api-Key',
-      username: service?.auth?.username || '',
-      secret: '',
-    },
+    auth: service ? authFromView(service.auth) : emptyAuth(),
   };
 
   const errBox = h('p', { className: 'text-danger-text text-sm min-h-5 m-0' });
   const testResult = h('p', { className: 'text-sm m-0 min-h-5 flex items-center gap-2' });
   const routeCode = h('code', { className: 'font-mono text-[13px] text-cream-dim break-all' }, routeText(form.name));
   const previewPre = h('pre', { className: 'code-block' }, '');
-  const lockLine = h('p', { className: 'm-0 text-xs text-muted leading-relaxed' }, '');
-  const fieldsHost = h('div', {});
+  const lockLine = h(
+    'p',
+    { className: 'm-0 text-xs text-muted leading-relaxed flex items-start gap-1.5' },
+    Icon('lock', { size: 14, className: 'mt-0.5 shrink-0' }),
+    h('span', {}),
+  );
+  const lockText = lockLine.querySelector('span');
+  const authHost = h('div', {});
   const accessHost = h('div', {});
   const openPathsHost = h('div', {});
-  const presetHost = h('div', {});
-  const methodHost = h('div', {});
+  const step3Title = h('span', { className: 'm-0 font-display text-[15px] font-semibold' }, step3Heading());
 
   const nameInput = h('input', {
     className: 'input w-full font-mono text-[15px]',
@@ -53,6 +48,7 @@ export function openServiceForm({ service = null, trigger, onSaved }) {
     onInput: (e) => {
       form.name = e.target.value;
       routeCode.textContent = routeText(slugify(form.name) || form.name);
+      step3Title.textContent = step3Heading();
       refreshPreview();
       renderAccess();
     },
@@ -77,48 +73,24 @@ export function openServiceForm({ service = null, trigger, onSaved }) {
     },
   });
 
-  function patchAuth(partial) {
-    Object.assign(form.auth, partial);
-    // Don't remount fields here — that steals focus after every keystroke.
-    renderPresets();
-    renderAccess();
-    refreshPreview();
+  function step3Heading() {
+    const n = slugify(form.name) || form.name || 'this service';
+    return `Where does ${n} expect its key?`;
   }
 
-  function setType(type) {
-    form.auth.type = type;
-    if (type === 'header' && !form.auth.name) form.auth.name = 'X-Api-Key';
-    if (type === 'query' && !form.auth.name) form.auth.name = 'apikey';
-    if (type === 'none') {
-      form.auth.name = form.auth.username = form.auth.secret = '';
-      form.access = 'postern';
-    }
-    renderFields();
-    renderPresets();
-    renderMethods();
-    renderAccess();
-    refreshPreview();
-  }
-
-  function renderPresets() {
-    presetHost.replaceChildren(
-      AuthPresetChips({
+  function renderAuth() {
+    authHost.replaceChildren(
+      AuthSlotsEditor({
         auth: form.auth,
-        onPick: (p) => {
-          form.auth = { ...form.auth, ...p };
-          renderFields();
-          renderPresets();
-          renderMethods();
-          renderAccess();
+        editing,
+        onChange: () => {
+          if (isAuthNone(form.auth) && form.access === 'upstream') {
+            form.access = 'postern';
+          }
           refreshPreview();
+          renderAccess();
         },
       }),
-    );
-  }
-
-  function renderMethods() {
-    methodHost.replaceChildren(
-      AuthMethodPicker({ type: form.auth.type, onChange: setType }),
     );
   }
 
@@ -145,22 +117,9 @@ export function openServiceForm({ service = null, trigger, onSaved }) {
     );
   }
 
-  function renderFields() {
-    fieldsHost.replaceChildren();
-    const props = { auth: form.auth, editing, onChange: patchAuth };
-    const map = {
-      header: HeaderAuthFields,
-      query: QueryAuthFields,
-      bearer: BearerAuthFields,
-      basic: BasicAuthFields,
-      none: NoneAuthNote,
-    };
-    fieldsHost.append((map[form.auth.type] || NoneAuthNote)(props));
-  }
-
   function refreshPreview() {
     previewPre.textContent = authPreview(form.auth, { url: form.url });
-    lockLine.textContent = secureTxt(form.auth);
+    lockText.textContent = secureTxt(form.auth);
   }
 
   async function runTest() {
@@ -170,13 +129,15 @@ export function openServiceForm({ service = null, trigger, onSaved }) {
     try {
       const res = await api.testConnection({
         url: form.url,
-        auth: { ...form.auth },
+        auth: authToPayload(form.auth),
         name: editing ? service.name : undefined,
       });
       clear(testResult);
       if (res.authRejected) {
         testResult.className = 'text-sm m-0 min-h-5 flex items-center gap-2 text-warn';
-        testResult.append(document.createTextNode(res.warning || `Reached the service, but it rejected the credential (HTTP ${res.status})`));
+        testResult.append(
+          document.createTextNode(res.warning || `Reached the service, but it rejected the credential (HTTP ${res.status})`),
+        );
       } else if (res.ok) {
         testResult.className = 'text-sm m-0 min-h-5 flex items-center gap-2 text-live';
         testResult.append(Icon('check', { size: 16, className: 'text-live' }));
@@ -205,17 +166,10 @@ export function openServiceForm({ service = null, trigger, onSaved }) {
           match: p.match === 'regex' ? 'regex' : 'prefix',
           path: p.path.trim(),
         })),
-      auth: {
-        type: form.auth.type,
-        name: form.auth.name || undefined,
-        username: form.auth.username || undefined,
-        secret: form.auth.secret || undefined,
-      },
+      auth: authToPayload(form.auth),
     };
     try {
-      const saved = editing
-        ? await api.updateService(service.name, body)
-        : await api.createService(body);
+      const saved = editing ? await api.updateService(service.name, body) : await api.createService(body);
       closeModal(dlg);
       onSaved?.(saved, { created: !editing });
     } catch (err) {
@@ -223,9 +177,7 @@ export function openServiceForm({ service = null, trigger, onSaved }) {
     }
   }
 
-  renderFields();
-  renderPresets();
-  renderMethods();
+  renderAuth();
   renderAccess();
   renderOpenPaths();
   refreshPreview();
@@ -246,7 +198,11 @@ export function openServiceForm({ service = null, trigger, onSaved }) {
           h('span', { className: 'label-caps' }, 'Public route'),
           routeCode,
         ),
-        h('p', { className: 'm-0 text-xs text-muted' }, 'Lowercase letters, numbers and dashes. Other characters are converted for you.'),
+        h(
+          'p',
+          { className: 'm-0 text-xs text-muted' },
+          'Lowercase letters, numbers and dashes. Other characters are converted for you.',
+        ),
       ),
     ),
     section(
@@ -255,25 +211,27 @@ export function openServiceForm({ service = null, trigger, onSaved }) {
       h(
         'div',
         { className: 'flex flex-col gap-2.5' },
-        h(
-          'div',
-          { className: 'flex gap-2' },
-          urlInput,
-          h('button', { type: 'button', className: 'btn', onClick: runTest }, 'Test'),
-        ),
+        h('div', { className: 'flex gap-2' }, urlInput, h('button', { type: 'button', className: 'btn', onClick: runTest }, 'Test')),
         testResult,
-        h('p', { className: 'm-0 text-xs text-muted' }, 'Where the service lives on your network. Only Postern needs to reach it.'),
+        h(
+          'p',
+          { className: 'm-0 text-xs text-muted' },
+          'Where the service lives on your network. Only Postern needs to reach it.',
+        ),
       ),
     ),
     section(
       '3',
-      'How does this service authenticate?',
+      step3Title,
       h(
         'div',
         { className: 'flex flex-col gap-3' },
-        presetHost,
-        methodHost,
-        fieldsHost,
+        h(
+          'p',
+          { className: 'm-0 text-sm text-muted leading-relaxed' },
+          'Switch on each place the service reads a credential from. Most apps need just one; turn on several if the service accepts them in more than one place.',
+        ),
+        authHost,
         h('span', { className: 'label-caps' }, 'What Postern sends upstream'),
         previewPre,
         lockLine,
@@ -292,7 +250,11 @@ export function openServiceForm({ service = null, trigger, onSaved }) {
       'div',
       { className: 'flex gap-2' },
       h('button', { type: 'button', className: 'btn btn-ghost', onClick: () => closeModal(dlg) }, 'Cancel'),
-      h('button', { type: 'button', className: 'btn btn-primary', onClick: submit }, editing ? 'Save changes' : 'Create service'),
+      h(
+        'button',
+        { type: 'button', className: 'btn btn-primary', onClick: submit },
+        editing ? 'Save changes' : 'Create service',
+      ),
     ),
   );
 
@@ -307,6 +269,8 @@ export function openServiceForm({ service = null, trigger, onSaved }) {
 }
 
 function section(num, title, content) {
+  const titleNode =
+    typeof title === 'string' ? h('h3', { className: 'm-0 font-display text-[15px] font-semibold' }, title) : title;
   return h(
     'section',
     { className: 'flex flex-col gap-3' },
@@ -315,10 +279,13 @@ function section(num, title, content) {
       { className: 'flex items-center gap-2.5' },
       h(
         'span',
-        { className: 'w-6 h-6 rounded-full bg-slate text-eggshell text-xs font-bold flex items-center justify-center flex-none' },
+        {
+          className:
+            'w-6 h-6 rounded-full bg-slate text-eggshell text-xs font-bold flex items-center justify-center flex-none',
+        },
         num,
       ),
-      h('h3', { className: 'm-0 font-display text-[15px] font-semibold' }, title),
+      titleNode,
     ),
     content,
   );

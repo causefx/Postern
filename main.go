@@ -437,20 +437,15 @@ func (a *App) testConnection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	auth := in.Auth
-	if auth.Secret == "" && in.Name != "" {
+	if in.Name != "" {
 		if cur, ok := a.store.Get(in.Name); ok {
-			auth.Secret = cur.Auth.Secret
-			if auth.Type == "" {
-				auth = cur.Auth
-			} else if auth.Name == "" {
-				auth.Name = cur.Auth.Name
-			}
-			if auth.Username == "" {
-				auth.Username = cur.Auth.Username
+			merged, merr := mergeAuth(cur.Auth, auth)
+			if merr == nil {
+				auth = merged
 			}
 		}
 	}
-	if err := auth.Validate(authNeedsSecret(auth.Type)); err != nil {
+	if err := auth.Validate(authNeedsSecret(auth)); err != nil {
 		writeFieldErr(w, err)
 		return
 	}
