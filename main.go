@@ -13,6 +13,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -39,6 +40,17 @@ type App struct {
 	sessions  *sessionStore
 	logins    *loginLimiter
 	adminPass string
+	// staticDir, when set (POSTERN_DEV), serves UI assets from disk instead of embed.
+	staticDir string
+}
+
+func envTruthy(k string) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(k))) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
 }
 
 func env(k, def string) string {
@@ -63,6 +75,17 @@ func main() {
 		app.adminPass = newToken()[:16]
 		log.Printf("ADMIN_PASSWORD not set; generated one for this run: %s", app.adminPass)
 	}
+	if envTruthy("POSTERN_DEV") {
+		dir, err := filepath.Abs("static")
+		if err != nil {
+			log.Fatal(err)
+		}
+		if st, err := os.Stat(dir); err != nil || !st.IsDir() {
+			log.Fatalf("POSTERN_DEV: static dir not found at %s (run from repo root)", dir)
+		}
+		app.staticDir = dir
+		log.Printf("POSTERN_DEV: serving UI from %s (hard-refresh; run npm run dev:css for Tailwind)", dir)
+	}
 	log.Printf("postern %s", Version)
 
 	proxyMux := http.NewServeMux()
@@ -75,18 +98,26 @@ func main() {
 	adminMux.HandleFunc("GET /admin/{$}", app.ui)
 	adminMux.HandleFunc("GET /admin/app.css", app.css)
 
-	jsRoot, err := fs.Sub(jsFS, "static/js")
-	if err != nil {
-		log.Fatal(err)
+	var jsHandler http.Handler
+	var fontsHandler http.Handler
+	if app.staticDir != "" {
+		jsHandler = http.FileServer(http.Dir(filepath.Join(app.staticDir, "js")))
+		fontsHandler = http.FileServer(http.Dir(filepath.Join(app.staticDir, "fonts")))
+	} else {
+		jsRoot, err := fs.Sub(jsFS, "static/js")
+		if err != nil {
+			log.Fatal(err)
+		}
+		fontsRoot, err := fs.Sub(fontsFS, "static/fonts")
+		if err != nil {
+			log.Fatal(err)
+		}
+		jsHandler = http.FileServer(http.FS(jsRoot))
+		fontsHandler = http.FileServer(http.FS(fontsRoot))
 	}
 	// no-store: ES module graphs are easy to serve stale after image upgrades
-	adminMux.Handle("GET /admin/js/", http.StripPrefix("/admin/js/", noStore(http.FileServer(http.FS(jsRoot)))))
-
-	fontsRoot, err := fs.Sub(fontsFS, "static/fonts")
-	if err != nil {
-		log.Fatal(err)
-	}
-	adminMux.Handle("GET /admin/fonts/", http.StripPrefix("/admin/fonts/", http.FileServer(http.FS(fontsRoot))))
+	adminMux.Handle("GET /admin/js/", http.StripPrefix("/admin/js/", noStore(jsHandler)))
+	adminMux.Handle("GET /admin/fonts/", http.StripPrefix("/admin/fonts/", fontsHandler))
 
 	adminMux.HandleFunc("GET /admin/api/meta", app.meta)
 	adminMux.HandleFunc("GET /admin/api/services", app.listServices)
@@ -184,9 +215,14 @@ func (a *App) loginPage(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin/", http.StatusFound)
 		return
 	}
+	b, err := a.staticFile("login.html", loginHTML)
+	if err != nil {
+		http.Error(w, "login page unavailable", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	w.Write(withVersion(loginHTML))
+	w.Write(withVersion(b))
 }
 
 func (a *App) login(w http.ResponseWriter, r *http.Request) {
@@ -239,16 +275,33 @@ func withVersion(b []byte) []byte {
 	return bytes.ReplaceAll(b, []byte("{{VERSION}}"), []byte(Version))
 }
 
+func (a *App) staticFile(name string, embedded []byte) ([]byte, error) {
+	if a.staticDir == "" {
+		return embedded, nil
+	}
+	return os.ReadFile(filepath.Join(a.staticDir, name))
+}
+
 func (a *App) ui(w http.ResponseWriter, r *http.Request) {
+	b, err := a.staticFile("index.html", indexHTML)
+	if err != nil {
+		http.Error(w, "ui unavailable", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	w.Write(withVersion(indexHTML))
+	w.Write(withVersion(b))
 }
 
 func (a *App) css(w http.ResponseWriter, r *http.Request) {
+	b, err := a.staticFile("app.css", appCSS)
+	if err != nil {
+		http.Error(w, "css unavailable", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "text/css; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	w.Write(appCSS)
+	w.Write(b)
 }
 
 func (a *App) meta(w http.ResponseWriter, r *http.Request) {
@@ -373,7 +426,7 @@ func (a *App) updateService(w http.ResponseWriter, r *http.Request) {
 		enabled = *in.Enabled
 	}
 	svc, err := a.store.Update(r.PathValue("name"), Service{
-		URL: in.URL, Auth: in.Auth, Access: in.Access,
+		Name: in.Name, URL: in.URL, Auth: in.Auth, Access: in.Access,
 		OpenPaths: in.OpenPaths, Enabled: enabled,
 	})
 	if err != nil {

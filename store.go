@@ -256,6 +256,7 @@ func (s *Store) Create(svc Service) (Service, error) {
 }
 
 // Update patches an existing service. Empty auth.secret keeps the stored secret.
+// If in.Name is set and differs from name, the service is renamed (token preserved).
 func (s *Store) Update(name string, in Service) (Service, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -263,9 +264,23 @@ func (s *Store) Update(name string, in Service) (Service, error) {
 	if !ok {
 		return cur, errNotFound
 	}
+	prev := cur
+	newName := strings.ToLower(strings.TrimSpace(in.Name))
+	if newName == "" {
+		newName = name
+	}
+	if newName != name {
+		if !nameRe.MatchString(newName) {
+			return cur, FieldError{"name": "name must be 1-32 chars: a-z, 0-9, dash"}
+		}
+		if _, exists := s.data[newName]; exists {
+			return cur, FieldError{"name": "a service with that name already exists"}
+		}
+	}
+	cur.Name = newName
 	cur.URL = strings.TrimRight(strings.TrimSpace(in.URL), "/")
 	if u, err := url.Parse(cur.URL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		return cur, errors.New("url must be a valid http(s) URL")
+		return prev, errors.New("url must be a valid http(s) URL")
 	}
 	cur.Enabled = in.Enabled
 	if in.Access != "" {
@@ -273,17 +288,20 @@ func (s *Store) Update(name string, in Service) (Service, error) {
 	}
 	auth, err := mergeAuth(cur.Auth, in.Auth)
 	if err != nil {
-		return cur, err
+		return prev, err
 	}
 	cur.Auth = auth
 	// Form always sends openPaths; replace the whole list (nil/empty clears).
 	cur.OpenPaths = in.OpenPaths
 	if err := cur.validate(false); err != nil {
-		return cur, err
+		return prev, err
 	}
-	prev := s.data[name]
-	s.data[name] = cur
+	if newName != name {
+		delete(s.data, name)
+	}
+	s.data[newName] = cur
 	if err := s.saveLocked(); err != nil {
+		delete(s.data, newName)
 		s.data[name] = prev
 		return prev, err
 	}

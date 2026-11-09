@@ -1,84 +1,198 @@
 import { api } from './api.js';
-import { state, setState, subscribe } from './state.js';
+import {
+  state,
+  setState,
+  subscribe,
+  filteredServices,
+  focusedService,
+  setFocusIndex,
+  toggleSelect,
+  syncListState,
+} from './state.js';
 import { h, clear } from './lib/h.js';
-import { AppHeader } from './components/layout/AppHeader.js';
+import { DashboardHeader } from './components/layout/DashboardHeader.js';
 import { HttpsBanner } from './components/layout/HttpsBanner.js';
-import { PageHeader } from './components/layout/PageHeader.js';
-import { ServiceToolbar } from './components/services/ServiceToolbar.js';
+import { KeyboardHints } from './components/layout/KeyboardHints.js';
+import { FilterBar } from './components/services/FilterBar.js';
 import { ServiceList } from './components/services/ServiceList.js';
+import { MobileServiceList } from './components/services/MobileServiceList.js';
+import { BulkActionBar } from './components/services/BulkActionBar.js';
 import { EmptyState } from './components/services/EmptyState.js';
-import { FlowDiagram } from './components/services/FlowDiagram.js';
+import { CommandPalette } from './components/command/CommandPalette.js';
 import { mountToast, showToast } from './components/common/Toast.js';
-import { openServiceForm } from './components/form/ServiceFormModal.js';
-import { openServiceCreated } from './components/dialogs/ServiceCreatedModal.js';
-import { openRotateDialog } from './components/dialogs/RotateTokenDialog.js';
-import { openDeleteDialog } from './components/dialogs/DeleteServiceDialog.js';
+import {
+  openServiceDrawer,
+  closeServiceDrawer,
+  isDrawerOpen,
+  navigateDrawer,
+  requestDrawerSave,
+  getDrawerName,
+} from './components/drawer/ServiceDrawer.js';
+import { copyServiceToken, toggleServiceEnabled } from './lib/serviceActions.js';
 
 const root = document.getElementById('app');
 mountToast(document.body);
 
-const handlers = {
-  onEdit: (service) =>
-    openServiceForm({
-      service,
-      onSaved: async () => {
-        await reload();
-        showToast('Service saved');
-      },
-    }),
-  onRotate: (service) =>
-    openRotateDialog({
-      service,
-      onRotated: async () => {
-        await reload();
-      },
-    }),
-  onDelete: (service) =>
-    openDeleteDialog({
-      service,
-      onDeleted: async () => {
-        await reload();
-        showToast(`${service.name} deleted`);
-      },
-    }),
+const drawerHandlers = {
+  onSaved: async (saved) => {
+    await reload();
+    const items = filteredServices();
+    const idx = items.findIndex((s) => s.name === saved.name);
+    if (idx >= 0) setState({ focusIndex: idx });
+  },
+  onDeleted: async () => {
+    await reload();
+    showToast('Service deleted');
+  },
+  onClose: () => {},
+  onNavigate: (delta) => {
+    const items = filteredServices();
+    if (!items.length) return;
+    const curName = getDrawerName();
+    let idx = items.findIndex((s) => s.name === curName);
+    if (idx < 0) idx = state.focusIndex;
+    const next = items[((idx + delta) % items.length + items.length) % items.length];
+    if (navigateDrawer(next)) setState({ focusIndex: items.indexOf(next) });
+  },
 };
 
-function openAdd(trigger) {
-  openServiceForm({
-    trigger,
-    onSaved: async (saved, { created }) => {
-      await reload();
-      if (created) {
-        openServiceCreated({
-          service: saved,
-          onAddAnother: () => openAdd(),
-          onDone: () => {},
-        });
-      } else {
-        showToast('Service saved');
-      }
-    },
-  });
+function openCreate() {
+  setState({ commandOpen: false });
+  openServiceDrawer({ mode: 'create', handlers: drawerHandlers });
+}
+
+function openEdit(service) {
+  if (!service) return;
+  setState({ commandOpen: false });
+  const items = filteredServices();
+  const idx = items.findIndex((s) => s.name === service.name);
+  if (idx >= 0) setState({ focusIndex: idx });
+  openServiceDrawer({ mode: 'edit', service, handlers: drawerHandlers });
+}
+
+function typingTarget(el) {
+  if (!el || el === document.body) return false;
+  const tag = el.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  if (el.isContentEditable) return true;
+  if (el.closest?.('.cmd-overlay')) return true;
+  return false;
+}
+
+function onKeydown(e) {
+  if (state.commandOpen) return;
+
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    setState({ commandOpen: true });
+    return;
+  }
+
+  if (isDrawerOpen()) {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      requestDrawerSave();
+      return;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeServiceDrawer();
+      return;
+    }
+    if (!typingTarget(e.target) && (e.key === 'j' || e.key === 'J' || e.key === 'k' || e.key === 'K')) {
+      e.preventDefault();
+      drawerHandlers.onNavigate(e.key.toLowerCase() === 'j' ? 1 : -1);
+      return;
+    }
+    return;
+  }
+
+  if (typingTarget(e.target)) return;
+
+  const key = e.key;
+  if (key === 'n' || key === 'N') {
+    e.preventDefault();
+    openCreate();
+    return;
+  }
+
+  const items = filteredServices();
+  if (!items.length) return;
+
+  if (key === 'j' || key === 'J') {
+    e.preventDefault();
+    setFocusIndex(state.focusIndex < 0 ? 0 : state.focusIndex + 1);
+    return;
+  }
+  if (key === 'k' || key === 'K') {
+    e.preventDefault();
+    setFocusIndex(state.focusIndex < 0 ? 0 : state.focusIndex - 1);
+    return;
+  }
+
+  const svc = focusedService();
+  if (!svc) {
+    if (['x', 'X', ' ', 'c', 'C', 'Enter'].includes(key)) setFocusIndex(0);
+    return;
+  }
+
+  if (key === 'x' || key === 'X') {
+    e.preventDefault();
+    toggleSelect(svc.name);
+    return;
+  }
+  if (key === ' ') {
+    e.preventDefault();
+    toggleServiceEnabled(svc);
+    return;
+  }
+  if (key === 'c' || key === 'C') {
+    e.preventDefault();
+    copyServiceToken(svc);
+    return;
+  }
+  if (key === 'Enter') {
+    e.preventDefault();
+    openEdit(svc);
+  }
 }
 
 function render() {
+  syncListState();
   clear(root);
-  root.append(AppHeader());
 
-  const main = h('main', {
-    className: 'max-w-[1200px] mx-auto px-6 pt-8 pb-16 flex flex-col gap-6',
-  });
+  root.append(
+    DashboardHeader({
+      onAdd: () => openCreate(),
+      onOpenCommand: () => setState({ commandOpen: true }),
+    }),
+  );
 
+  const main = h('main', { className: 'dash-main flex flex-col gap-4' });
   const banner = HttpsBanner();
+
   if (!state.services.length) {
     if (banner) main.append(banner);
-    main.append(EmptyState({ onAdd: () => openAdd() }));
+    main.append(EmptyState({ onAdd: () => openCreate() }));
   } else {
-    main.append(PageHeader({ onAdd: () => openAdd() }));
     if (banner) main.append(banner);
-    main.append(ServiceToolbar(), ServiceList({ handlers }), FlowDiagram());
+    main.append(FilterBar());
+    const bulk = BulkActionBar();
+    if (bulk) main.append(bulk);
+    main.append(
+      ServiceList({ onOpen: openEdit }),
+      MobileServiceList({ onOpen: openEdit, onAdd: () => openCreate() }),
+    );
+    main.append(KeyboardHints({ drawerOpen: isDrawerOpen() }));
   }
   root.append(main);
+
+  const palette = CommandPalette({
+    onAdd: () => openCreate(),
+    onReload: () => reload(),
+    onEdit: openEdit,
+  });
+  if (palette) root.append(palette);
 }
 
 async function reload() {
@@ -91,10 +205,14 @@ async function boot() {
     const meta = await api.meta();
     setState({ meta });
   } catch {
-    /* meta is optional */
+    /* meta optional */
   }
+  document.addEventListener('keydown', onKeydown);
   subscribe(render);
   await reload();
+  if (filteredServices().length && state.focusIndex < 0) {
+    setState({ focusIndex: 0 });
+  }
 }
 
 boot().catch((err) => {

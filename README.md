@@ -90,3 +90,4 @@ Service config (including upstream secrets and Postern tokens) lives in `POSTERN
 | `ADMIN_PASSWORD` | _(generated)_ | Admin sign-in password |
 | `POSTERN_DATA` | `data/postern-data.json` | JSON store path |
 | `POSTERN_SECURE` | _(auto)_ | Cookie / origin HTTPS mode (see above) |
+| `POSTERN_DEV` | _(off)_ | Serve UI from `./static` on disk (no rebuild for JS/HTML/CSS). Run from repo root; use `npm run dev:css` in another terminal for Tailwind. |

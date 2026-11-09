@@ -1,4 +1,5 @@
 import { h } from '../../lib/h.js';
+import { Icon } from '../common/Icon.js';
 
 /** Editable list of open-path rules. Mutates `paths` in place; calls onChange after structural edits. */
 export function OpenPathsEditor({ paths, onChange }) {
@@ -27,31 +28,34 @@ export function OpenPathsEditor({ paths, onChange }) {
         h('option', { value: 'regex', selected: isRegex }, 'Regex'),
       );
       const pathInput = h('input', {
-        className: 'input input-sm w-full font-mono text-[13px]',
+        className: 'input input-sm flex-1 min-w-0 font-mono text-[13px]',
         value: rule.path || '',
         placeholder: rule.match === 'regex' ? '^/webhooks/[^/]+$' : '/health',
         onInput: (e) => {
           rule.path = e.target.value;
+          onChange?.();
         },
       });
       list.append(
         h(
           'div',
-          { className: 'flex flex-wrap items-center gap-2' },
+          { className: 'flex items-center gap-2' },
           matchSel,
           pathInput,
           h(
             'button',
             {
               type: 'button',
-              className: 'btn btn-ghost btn-sm text-danger-text',
+              className: 'btn btn-ghost btn-square btn-sm text-muted shrink-0',
+              'aria-label': 'Remove path',
+              title: 'Remove path',
               onClick: () => {
                 paths.splice(i, 1);
                 redraw();
                 onChange?.();
               },
             },
-            'Remove',
+            Icon('close', { size: 14 }),
           ),
         ),
       );

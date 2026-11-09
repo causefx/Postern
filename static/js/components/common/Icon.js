@@ -16,6 +16,9 @@ const PATHS = {
   door: '<path d="M6 21V11a6 6 0 0 1 12 0v10"/><path d="M3 21h18"/><circle cx="12" cy="13" r="1.6"/><path d="M12 14.6V17"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
   close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  rotate: '<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/>',
+  on: '<circle cx="12" cy="12" r="8"/><path d="M12 8v8"/>',
+  off: '<circle cx="12" cy="12" r="8"/>',
 };
 
 export function Icon(name, { size = 16, className = '' } = {}) {
