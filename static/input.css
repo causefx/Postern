@@ -243,6 +243,30 @@
   margin: 0 auto;
   padding-inline: 1.5rem;
 }
+.dash-header-grid {
+  display: grid;
+  grid-template-columns: 1fr minmax(200px, 36rem) 1fr;
+  align-items: center;
+  gap: 0.75rem 1rem;
+}
+.dash-header-center {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+.dash-header-left { min-width: 0; }
+.dash-header-right { min-width: 0; }
+@media (max-width: 720px) {
+  .dash-header-grid {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "left right"
+      "center center";
+  }
+  .dash-header-left { grid-area: left; }
+  .dash-header-center { grid-area: center; }
+  .dash-header-right { grid-area: right; }
+}
 .dash-main {
   max-width: 1400px;
   margin: 0 auto;
@@ -299,6 +323,20 @@
 .cmd-trigger:hover {
   border-color: var(--color-line-strong);
   color: var(--color-cream-dim);
+}
+
+.http-warn-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-warn);
+  animation: http-warn-pulse 1.8s ease-in-out infinite;
+}
+@keyframes http-warn-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(1.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .http-warn-icon { animation: none; }
 }
 
 .filter-tabs {
@@ -733,36 +771,46 @@
 .mobile-row {
   overflow: hidden;
   border-bottom: 1px solid var(--color-line);
+  position: relative;
 }
 .mobile-row:last-of-type { border-bottom: 0; }
 .mobile-row-track {
   display: flex;
-  width: calc(100% + 112px);
+  flex-wrap: nowrap;
+  align-items: stretch;
   transition: transform 0.15s ease;
+  will-change: transform;
 }
 .mobile-row-content {
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  width: 100%;
-  flex: 0 0 100%;
+  flex: 0 0 auto;
+  box-sizing: border-box;
   padding: 0.85rem 0.9rem;
-  background: var(--color-ink-raised);
+  background: var(--color-base-100);
   touch-action: pan-y;
 }
 .mobile-row-actions {
   display: flex;
-  flex: 0 0 112px;
-  width: 112px;
+  flex: 0 0 168px;
+  width: 168px;
+  min-width: 168px;
+  align-self: stretch;
 }
 .mobile-action {
-  flex: 1;
+  flex: 1 1 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 0.35rem;
   border: 0;
+  padding: 0.5rem 0.25rem;
+  min-height: 100%;
   background: var(--color-space-raised);
   color: var(--color-eggshell);
+  font: 500 11px/1.1 Inter, system-ui, sans-serif;
   cursor: pointer;
 }
 .mobile-action-power {

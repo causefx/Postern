@@ -16,52 +16,68 @@ export function DashboardHeader({ onAdd, onOpenCommand }) {
     { className: 'dash-header border-b border-line bg-ink-raised/80' },
     h(
       'div',
-      { className: 'dash-inner flex flex-wrap items-center gap-3 py-3.5' },
+      { className: 'dash-inner dash-header-grid py-3.5' },
       h(
         'div',
-        { className: 'flex items-center gap-2 min-w-0 shrink-0' },
+        { className: 'dash-header-left flex items-center gap-2.5 min-w-0' },
         h(
           'div',
           {
-            className:
-              'w-8 h-8 rounded-[9px] bg-eggshell text-ink flex items-center justify-center mobile-only',
+            className: 'w-8 h-8 rounded-[9px] bg-eggshell text-ink flex items-center justify-center shrink-0',
             'aria-hidden': 'true',
           },
           Icon('door', { size: 18 }),
         ),
-        h('span', { className: 'font-display text-[15px] font-semibold text-muted desktop-only' }, 'Postern'),
-        h('span', { className: 'text-muted/60 desktop-only', 'aria-hidden': 'true' }, '/'),
-        h('span', { className: 'font-display text-[15px] font-semibold text-eggshell' }, 'Services'),
-        h('span', { className: 'count-badge desktop-only' }, String(c.all)),
-        drawerName
-          ? h(
-              'span',
-              { className: 'desktop-only inline-flex items-center gap-2 min-w-0' },
-              h('span', { className: 'text-muted/60' }, '/'),
-              h('span', { className: 'font-display text-[15px] font-semibold text-eggshell truncate' }, drawerName),
-            )
-          : null,
-      ),
-      h(
-        'button',
-        {
-          type: 'button',
-          className: 'cmd-trigger flex-1 min-w-[160px] max-w-xl',
-          onClick: () => onOpenCommand?.(),
-        },
-        Icon('search', { size: 16, className: 'text-muted shrink-0' }),
-        h('span', { className: 'flex-1 text-left text-muted truncate' }, 'Search or run a command'),
-        h('kbd', { className: 'kbd-hint desktop-only' }, `${mod} K`),
+        h(
+          'div',
+          { className: 'flex items-center gap-2 min-w-0' },
+          h('span', { className: 'font-display text-[15px] font-semibold text-eggshell' }, 'Postern'),
+          h('span', { className: 'text-muted/60', 'aria-hidden': 'true' }, '/'),
+          h('span', { className: 'font-display text-[15px] font-semibold text-eggshell' }, 'Services'),
+          h('span', { className: 'count-badge' }, String(c.all)),
+          drawerName
+            ? h(
+                'span',
+                { className: 'desktop-only inline-flex items-center gap-2 min-w-0' },
+                h('span', { className: 'text-muted/60' }, '/'),
+                h('span', { className: 'font-display text-[15px] font-semibold text-eggshell truncate' }, drawerName),
+              )
+            : null,
+        ),
       ),
       h(
         'div',
-        { className: 'flex items-center gap-2.5 ml-auto shrink-0' },
+        { className: 'dash-header-center' },
+        h(
+          'button',
+          {
+            type: 'button',
+            className: 'cmd-trigger w-full max-w-xl',
+            onClick: () => onOpenCommand?.(),
+          },
+          Icon('search', { size: 16, className: 'text-muted shrink-0' }),
+          h('span', { className: 'flex-1 text-left text-muted truncate' }, 'Search or run a command'),
+          h(
+            'span',
+            { className: 'desktop-only inline-flex items-center gap-1 shrink-0' },
+            h('kbd', { className: 'kbd-hint' }, mod),
+            h('kbd', { className: 'kbd-hint' }, 'K'),
+          ),
+        ),
+      ),
+      h(
+        'div',
+        { className: 'dash-header-right flex items-center justify-end gap-2.5' },
         !secure
           ? h(
               'span',
-              { className: 'inline-flex items-center gap-1.5 text-[13px] text-warn desktop-only' },
-              Icon('warn', { size: 14 }),
-              'HTTP only',
+              {
+                className: 'http-warn-icon',
+                title: 'HTTP only — add HTTPS before exposing this admin UI remotely',
+                'aria-label': 'HTTP only — add HTTPS before exposing this admin UI remotely',
+                role: 'img',
+              },
+              Icon('warn', { size: 20 }),
             )
           : null,
         h(
@@ -79,7 +95,9 @@ export function DashboardHeader({ onAdd, onOpenCommand }) {
           'button',
           {
             type: 'button',
-            className: 'btn btn-ghost btn-sm h-9 gap-1.5 text-cream-dim desktop-only',
+            className: 'btn btn-ghost btn-sm btn-square h-9 w-9 text-cream-dim desktop-only',
+            'aria-label': 'Sign out',
+            title: 'Sign out',
             onClick: async () => {
               try {
                 await api.logout();
@@ -89,8 +107,7 @@ export function DashboardHeader({ onAdd, onOpenCommand }) {
               location.replace('/admin/login');
             },
           },
-          Icon('logout', { size: 14 }),
-          'Sign out',
+          Icon('logout', { size: 16 }),
         ),
       ),
     ),

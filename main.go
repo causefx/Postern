@@ -320,14 +320,15 @@ func (a *App) meta(w http.ResponseWriter, r *http.Request) {
 
 // view hides the upstream secret from the browser.
 type view struct {
-	Name       string     `json:"name"`
-	URL        string     `json:"url"`
-	Auth       AuthView   `json:"auth"`
-	Access     AccessMode `json:"access"`
-	OpenPaths  []OpenPath `json:"openPaths,omitempty"`
-	Token      string     `json:"token"`
-	Enabled    bool       `json:"enabled"`
-	PublicBase string     `json:"publicBase"`
+	Name       string      `json:"name"`
+	URL        string      `json:"url"`
+	Auth       AuthView    `json:"auth"`
+	Access     AccessMode  `json:"access"`
+	Gate       *CallerGate `json:"gate,omitempty"`
+	OpenPaths  []OpenPath  `json:"openPaths,omitempty"`
+	Token      string      `json:"token"`
+	Enabled    bool        `json:"enabled"`
+	PublicBase string      `json:"publicBase"`
 }
 
 func toView(s Service, origin string) view {
@@ -336,6 +337,7 @@ func toView(s Service, origin string) view {
 		URL:        s.URL,
 		Auth:       s.Auth.View(),
 		Access:     normalizeAccess(s.Access),
+		Gate:       s.Gate,
 		OpenPaths:  s.OpenPaths,
 		Token:      s.Token,
 		Enabled:    s.Enabled,
@@ -384,6 +386,7 @@ type serviceInput struct {
 	URL       string       `json:"url"`
 	Auth      UpstreamAuth `json:"auth"`
 	Access    AccessMode   `json:"access"`
+	Gate      *CallerGate  `json:"gate"`
 	OpenPaths []OpenPath   `json:"openPaths"`
 	Enabled   *bool        `json:"enabled"`
 }
@@ -406,7 +409,7 @@ func (a *App) createService(w http.ResponseWriter, r *http.Request) {
 	}
 	svc, err := a.store.Create(Service{
 		Name: in.Name, URL: in.URL, Auth: in.Auth, Access: in.Access,
-		OpenPaths: in.OpenPaths, Enabled: enabled,
+		Gate: in.Gate, OpenPaths: in.OpenPaths, Enabled: enabled,
 	})
 	if err != nil {
 		writeFieldErr(w, err)
@@ -427,7 +430,7 @@ func (a *App) updateService(w http.ResponseWriter, r *http.Request) {
 	}
 	svc, err := a.store.Update(r.PathValue("name"), Service{
 		Name: in.Name, URL: in.URL, Auth: in.Auth, Access: in.Access,
-		OpenPaths: in.OpenPaths, Enabled: enabled,
+		Gate: in.Gate, OpenPaths: in.OpenPaths, Enabled: enabled,
 	})
 	if err != nil {
 		if errors.Is(err, errNotFound) {
@@ -544,16 +547,6 @@ func (a *App) testConnection(w http.ResponseWriter, r *http.Request) {
 
 // ---------- proxy ----------
 
-func callerToken(r *http.Request) string {
-	if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
-		return strings.TrimPrefix(h, "Bearer ")
-	}
-	if t := r.Header.Get("X-Proxy-Token"); t != "" {
-		return t
-	}
-	return r.URL.Query().Get("token")
-}
-
 func (a *App) proxy(w http.ResponseWriter, r *http.Request) {
 	svc, ok := a.store.Get(r.PathValue("name"))
 	if !ok || !svc.Enabled {
@@ -578,10 +571,8 @@ func (a *App) proxy(w http.ResponseWriter, r *http.Request) {
 			pr.Out.URL.RawPath = ""
 			pr.SetURL(target)
 
-			q := pr.In.URL.Query()
-			StripCallerQuery(q)
-			pr.Out.URL.RawQuery = q.Encode()
-
+			pr.Out.URL.RawQuery = pr.In.URL.RawQuery
+			svc.Gate.Strip(pr.Out)
 			auth.Apply(pr.Out)
 		},
 		FlushInterval: -1,

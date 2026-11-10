@@ -14,11 +14,169 @@ import (
 type AccessMode string
 
 const (
-	// AccessPostern requires the Postern-issued caller token (Bearer / X-Proxy-Token / ?token=).
+	// AccessPostern requires the Postern-issued caller token (Bearer / X-Proxy-Token / ?token= by default).
 	AccessPostern AccessMode = "postern"
 	// AccessUpstream accepts any enabled upstream auth shape (header, query, or authz).
 	AccessUpstream AccessMode = "upstream"
+
+	defaultGateHeader = "X-Proxy-Token"
+	defaultGateQuery  = "token"
 )
+
+// GateHeader is a caller-gate header place (name only; value is the Postern token).
+type GateHeader struct {
+	Name string `json:"name"`
+}
+
+// GateQuery is a caller-gate query place (name only; value is the Postern token).
+type GateQuery struct {
+	Name string `json:"name"`
+}
+
+// CallerGate is where callers may present the Postern token when access=postern.
+// Nil means the default trio: Bearer + X-Proxy-Token + ?token=.
+type CallerGate struct {
+	Bearer bool        `json:"bearer,omitempty"`
+	Header *GateHeader `json:"header,omitempty"`
+	Query  *GateQuery  `json:"query,omitempty"`
+}
+
+func (g *CallerGate) IsEmpty() bool {
+	return g == nil || (!g.Bearer && g.Header == nil && g.Query == nil)
+}
+
+// MatchesDefault reports the classic Bearer + X-Proxy-Token + ?token= shape.
+func (g *CallerGate) MatchesDefault() bool {
+	if g == nil {
+		return true
+	}
+	if !g.Bearer || g.Header == nil || g.Query == nil {
+		return false
+	}
+	h := strings.TrimSpace(g.Header.Name)
+	q := strings.TrimSpace(g.Query.Name)
+	if h == "" {
+		h = defaultGateHeader
+	}
+	if q == "" {
+		q = defaultGateQuery
+	}
+	return strings.EqualFold(h, defaultGateHeader) && q == defaultGateQuery
+}
+
+// Normalize returns nil for empty/default gates; otherwise a cleaned copy.
+func (g *CallerGate) Normalize() *CallerGate {
+	if g.IsEmpty() || g.MatchesDefault() {
+		return nil
+	}
+	out := &CallerGate{Bearer: g.Bearer}
+	if g.Header != nil {
+		name := strings.TrimSpace(g.Header.Name)
+		if name == "" {
+			name = defaultGateHeader
+		}
+		out.Header = &GateHeader{Name: name}
+	}
+	if g.Query != nil {
+		name := strings.TrimSpace(g.Query.Name)
+		if name == "" {
+			name = defaultGateQuery
+		}
+		out.Query = &GateQuery{Name: name}
+	}
+	return out
+}
+
+func (g *CallerGate) Validate() error {
+	if g == nil {
+		return nil
+	}
+	if g.IsEmpty() {
+		return FieldError{"gate": "enable at least one caller gate method"}
+	}
+	errs := FieldError{}
+	if g.Header != nil {
+		name := strings.TrimSpace(g.Header.Name)
+		if name == "" {
+			name = defaultGateHeader
+		}
+		if !headerNameRe.MatchString(name) {
+			errs["gate.header.name"] = "invalid header name"
+		} else if forbiddenHeaders[strings.ToLower(name)] {
+			errs["gate.header.name"] = "header name is not allowed"
+		} else {
+			g.Header.Name = name
+		}
+	}
+	if g.Query != nil {
+		name := strings.TrimSpace(g.Query.Name)
+		if name == "" {
+			name = defaultGateQuery
+		}
+		if name == "" {
+			errs["gate.query.name"] = "parameter name is required"
+		} else {
+			g.Query.Name = name
+		}
+	}
+	if len(errs) > 0 {
+		return errs
+	}
+	return nil
+}
+
+// Authorize checks whether the request presents svcToken in any enabled gate place.
+func (g *CallerGate) Authorize(r *http.Request, svcToken string) bool {
+	if svcToken == "" {
+		return false
+	}
+	if g.IsEmpty() {
+		got := callerToken(r)
+		return got != "" && secretEq(got, svcToken)
+	}
+	if g.Bearer {
+		h := r.Header.Get("Authorization")
+		if strings.HasPrefix(h, "Bearer ") && secretEq(strings.TrimPrefix(h, "Bearer "), svcToken) {
+			return true
+		}
+	}
+	if g.Header != nil {
+		name := g.Header.Name
+		if name == "" {
+			name = defaultGateHeader
+		}
+		if secretEq(r.Header.Get(name), svcToken) {
+			return true
+		}
+	}
+	if g.Query != nil {
+		name := g.Query.Name
+		if name == "" {
+			name = defaultGateQuery
+		}
+		if secretEq(r.URL.Query().Get(name), svcToken) {
+			return true
+		}
+	}
+	return false
+}
+
+// Strip removes caller-gate credentials from the outbound request.
+func (g *CallerGate) Strip(out *http.Request) {
+	out.Header.Del("Authorization")
+	out.Header.Del("X-Proxy-Token")
+	q := out.URL.Query()
+	q.Del("token")
+	if g != nil {
+		if g.Header != nil && g.Header.Name != "" {
+			out.Header.Del(g.Header.Name)
+		}
+		if g.Query != nil && g.Query.Name != "" {
+			q.Del(g.Query.Name)
+		}
+	}
+	out.URL.RawQuery = q.Encode()
+}
 
 func normalizeAccess(m AccessMode) AccessMode {
 	if m == AccessUpstream {
@@ -262,6 +420,17 @@ func StripCallerQuery(q url.Values) {
 	q.Del("token")
 }
 
+// callerToken reads the Postern token from the default trio of places.
+func callerToken(r *http.Request) string {
+	if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
+		return strings.TrimPrefix(h, "Bearer ")
+	}
+	if t := r.Header.Get(defaultGateHeader); t != "" {
+		return t
+	}
+	return r.URL.Query().Get(defaultGateQuery)
+}
+
 // redactURL returns a copy of u with the named query param value replaced.
 func redactURL(u *url.URL, paramName string) string {
 	if u == nil {
@@ -420,11 +589,14 @@ func AuthorizeCaller(svc Service, r *http.Request) bool {
 	case AccessUpstream:
 		return svc.Auth.authorizeUpstream(r, svc.Token)
 	default:
-		got := callerToken(r)
-		if got == "" || svc.Token == "" {
+		if svc.Token == "" {
 			return false
 		}
-		return secretEq(got, svc.Token)
+		if svc.Gate == nil || svc.Gate.IsEmpty() {
+			got := callerToken(r)
+			return got != "" && secretEq(got, svc.Token)
+		}
+		return svc.Gate.Authorize(r, svc.Token)
 	}
 }
 

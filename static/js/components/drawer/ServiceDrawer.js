@@ -1,10 +1,12 @@
 import { h } from '../../lib/h.js';
 import { Icon } from '../common/Icon.js';
 import { AuthRowsEditor } from './AuthRowsEditor.js';
+import { CallerGateEditor } from './CallerGateEditor.js';
 import { OpenPathsEditor } from '../form/OpenPathsEditor.js';
 import { api } from '../../api.js';
 import { slugify } from '../../lib/slug.js';
 import { authFromView, authToPayload, emptyAuth, isAuthNone } from '../../lib/authPresets.js';
+import { defaultGate, gateFromView, gateToPayload, gateHint } from '../../lib/callerGate.js';
 import { copyText } from '../../lib/clipboard.js';
 import { showToast } from '../common/Toast.js';
 import { openRotateDialog } from '../dialogs/RotateTokenDialog.js';
@@ -99,6 +101,7 @@ function createController({ mode, service, handlers }) {
         }))
       : [],
     auth: isEdit ? authFromView(service.auth) : emptyAuth(),
+    gate: isEdit ? gateFromView(service.gate) : defaultGate(),
   };
 
   function snapshot() {
@@ -111,6 +114,7 @@ function createController({ mode, service, handlers }) {
         .filter((p) => (p.path || '').trim())
         .map((p) => ({ match: p.match === 'regex' ? 'regex' : 'prefix', path: p.path.trim() })),
       auth: authToPayload(draft.auth),
+      gate: draft.access === 'postern' ? gateToPayload(draft.gate) : null,
     });
   }
 
@@ -163,6 +167,7 @@ function createController({ mode, service, handlers }) {
   const deleteHost = h('div', { className: 'drawer-section' });
   const authHost = h('div', { className: 'drawer-section' });
   const accessHost = h('div', { className: 'drawer-section flex flex-col gap-2' });
+  const gateHost = h('div', { className: 'drawer-section' });
   const pathsHost = h('div', { className: 'drawer-section flex flex-col gap-2' });
 
   const nameInput = h('input', {
@@ -235,6 +240,8 @@ function createController({ mode, service, handlers }) {
         onChange: () => {
           if (isAuthNone(draft.auth) && draft.access === 'upstream') draft.access = 'postern';
           renderAccess();
+          renderGate();
+          renderToken();
           markDirty();
         },
       }),
@@ -252,15 +259,37 @@ function createController({ mode, service, handlers }) {
         segBtn('postern', 'Postern token', draft.access === 'postern', false, () => {
           draft.access = 'postern';
           renderAccess();
+          renderGate();
+          renderToken();
           markDirty();
         }),
         segBtn('upstream', `Same as ${label}`, draft.access === 'upstream', upstreamDisabled, () => {
           if (upstreamDisabled) return;
           draft.access = 'upstream';
           renderAccess();
+          renderGate();
+          renderToken();
           markDirty();
         }),
       ),
+    );
+  }
+
+  function renderGate() {
+    if (draft.access !== 'postern') {
+      gateHost.replaceChildren();
+      gateHost.hidden = true;
+      return;
+    }
+    gateHost.hidden = false;
+    gateHost.replaceChildren(
+      CallerGateEditor({
+        gate: draft.gate,
+        onChange: () => {
+          renderToken();
+          markDirty();
+        },
+      }),
     );
   }
 
@@ -296,7 +325,7 @@ function createController({ mode, service, handlers }) {
       return;
     }
     const masked = token.length > 8 ? token.slice(0, 4) + '••••••••••••••••' : '••••••••';
-    tokenHost.replaceChildren(
+    const kids = [
       h('span', { className: 'label-caps' }, 'Caller token'),
       h(
         'div',
@@ -340,7 +369,13 @@ function createController({ mode, service, handlers }) {
           Icon('rotate', { size: 16 }),
         ),
       ),
-    );
+    ];
+    if (draft.access === 'postern') {
+      kids.push(
+        h('p', { className: 'm-0 text-xs text-muted' }, 'Accepted as ', gateHint(draft.gate), '.'),
+      );
+    }
+    tokenHost.replaceChildren(...kids);
   }
 
   function renderDelete() {
@@ -408,6 +443,7 @@ function createController({ mode, service, handlers }) {
       url: draft.url,
       enabled: draft.enabled,
       access: draft.access,
+      gate: draft.access === 'postern' ? gateToPayload(draft.gate) : null,
       openPaths: draft.openPaths
         .filter((p) => (p.path || '').trim())
         .map((p) => ({
@@ -464,6 +500,7 @@ function createController({ mode, service, handlers }) {
       path: p.path || '',
     }));
     draft.auth = authFromView(svc.auth);
+    draft.gate = gateFromView(svc.gate);
     nameInput.value = draft.name;
     urlInput.value = draft.url;
     liveToggle.checked = draft.enabled;
@@ -476,6 +513,7 @@ function createController({ mode, service, handlers }) {
     testResult.textContent = '';
     renderAuth();
     renderAccess();
+    renderGate();
     renderPaths();
     renderToken();
     renderDelete();
@@ -559,6 +597,7 @@ function createController({ mode, service, handlers }) {
     ),
     authHost,
     accessHost,
+    gateHost,
     tokenHost,
     pathsHost,
     deleteHost,
@@ -567,6 +606,7 @@ function createController({ mode, service, handlers }) {
 
   renderAuth();
   renderAccess();
+  renderGate();
   renderPaths();
   renderToken();
   renderDelete();

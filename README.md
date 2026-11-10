@@ -63,8 +63,8 @@ export POSTERN_SECURE=1
 
 ### Caller tokens on `/p/...`
 
-- Default access mode requires the Postern-issued token (`Authorization: Bearer …`, `X-Proxy-Token`, or `?token=`).
-- Prefer **Bearer** or **`X-Proxy-Token`**. Query-string tokens can leak via access logs, `Referer`, and browser history.
+- Default access mode requires the Postern-issued token. By default that is accepted as `Authorization: Bearer …`, `X-Proxy-Token`, or `?token=`. Per service you can narrow or rename those places (any one enabled place is enough).
+- Prefer **Bearer** or a dedicated header. Query-string tokens can leak via access logs, `Referer`, and browser history.
 - Upstream credentials are multi-slot: a service can use a **request header**, a **URL parameter**, and/or **Authorization** (Bearer or Basic) at once. Postern injects every enabled slot on outbound requests.
 - `access: upstream` accepts a matching value in **any one** of those places — the Postern token or the real secret for that slot (by design). Anyone who knows a real upstream key can call Postern in that mode.
 

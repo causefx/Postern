@@ -19,6 +19,7 @@ const PATHS = {
   rotate: '<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/>',
   on: '<circle cx="12" cy="12" r="8"/><path d="M12 8v8"/>',
   off: '<circle cx="12" cy="12" r="8"/>',
+  power: '<path d="M12 2v10"/><path d="M6.3 6.3a7 7 0 1 0 11.4 0"/>',
 };
 
 export function Icon(name, { size = 16, className = '' } = {}) {

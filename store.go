@@ -34,6 +34,7 @@ type Service struct {
 	URL       string       `json:"url"`
 	Auth      UpstreamAuth `json:"auth"`
 	Access    AccessMode   `json:"access,omitempty"` // postern (default) | upstream
+	Gate      *CallerGate  `json:"gate,omitempty"`   // nil = default Postern-token places
 	OpenPaths []OpenPath   `json:"openPaths,omitempty"`
 	Token     string       `json:"token"`
 	Enabled   bool         `json:"enabled"`
@@ -68,6 +69,16 @@ func (s *Service) validate(requireAuthSecret bool) error {
 	}
 	if s.Access == AccessUpstream && s.Auth.IsNone() {
 		return FieldError{"access": "upstream access requires at least one upstream auth method"}
+	}
+	if s.Gate != nil {
+		if err := s.Gate.Validate(); err != nil {
+			return err
+		}
+		s.Gate = s.Gate.Normalize()
+	}
+	// Gate only applies to postern access; clear when using upstream shapes.
+	if s.Access == AccessUpstream {
+		s.Gate = nil
 	}
 	normalized, err := normalizeOpenPaths(s.OpenPaths)
 	if err != nil {
@@ -246,6 +257,7 @@ func (s *Store) Create(svc Service) (Service, error) {
 	if _, exists := s.data[svc.Name]; exists {
 		return svc, errors.New("a service with that name already exists")
 	}
+	svc.Gate = svc.Gate.Normalize()
 	svc.Token = newToken()
 	s.data[svc.Name] = svc
 	if err := s.saveLocked(); err != nil {
@@ -291,6 +303,7 @@ func (s *Store) Update(name string, in Service) (Service, error) {
 		return prev, err
 	}
 	cur.Auth = auth
+	cur.Gate = in.Gate
 	// Form always sends openPaths; replace the whole list (nil/empty clears).
 	cur.OpenPaths = in.OpenPaths
 	if err := cur.validate(false); err != nil {
