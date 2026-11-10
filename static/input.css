@@ -104,6 +104,31 @@
   justify-content: center;
   height: 2.75rem;
   line-height: 1;
+  background-color: var(--btn-bg);
+  border-color: var(--btn-border);
+  color: var(--btn-fg);
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease,
+    filter 0.12s ease,
+    opacity 0.12s ease;
+}
+.btn:hover:not(:disabled):not([aria-busy='true']) {
+  --btn-bg: var(--color-space);
+  --btn-border: var(--color-denim);
+  --btn-fg: var(--color-eggshell);
+  background-color: var(--btn-bg);
+  border-color: var(--btn-border);
+  color: var(--btn-fg);
+}
+.btn:active:not(:disabled):not([aria-busy='true']) {
+  filter: brightness(0.92);
+}
+.btn:disabled,
+.btn[aria-busy='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 .btn-sm { height: 2.125rem; }
 .btn-xs { height: 1.75rem; min-height: 1.75rem; padding-inline: 0.75rem; font-size: 0.75rem; }
@@ -112,36 +137,86 @@
   --btn-bg: var(--color-eggshell);
   --btn-border: var(--color-eggshell);
   --btn-fg: var(--color-ink);
+  background-color: var(--btn-bg);
+  border-color: var(--btn-border);
+  color: var(--btn-fg);
+}
+.btn-primary:hover:not(:disabled):not([aria-busy='true']) {
+  --btn-bg: #ffffff;
+  --btn-border: #ffffff;
+  --btn-fg: var(--color-ink);
+  background-color: var(--btn-bg);
+  border-color: var(--btn-border);
+  color: var(--btn-fg);
+}
+.btn-primary:active:not(:disabled):not([aria-busy='true']) {
+  filter: brightness(0.96);
 }
 .btn-secondary {
   --btn-color: var(--color-slate);
   --btn-bg: var(--color-slate);
   --btn-border: var(--color-slate);
   --btn-fg: var(--color-eggshell);
+  background-color: var(--btn-bg);
+  border-color: var(--btn-border);
+  color: var(--btn-fg);
+}
+.btn-secondary:hover:not(:disabled):not([aria-busy='true']) {
+  --btn-bg: var(--color-denim);
+  --btn-border: var(--color-denim);
+  --btn-fg: var(--color-ink);
+  background-color: var(--btn-bg);
+  border-color: var(--btn-border);
+  color: var(--btn-fg);
 }
 .btn-ghost {
   /* Do not set --btn-color: transparent — daisyUI uses it as the text color */
   --btn-bg: transparent;
   --btn-border: transparent;
   --btn-fg: var(--color-soft);
+  background-color: transparent;
+  border-color: transparent;
   color: var(--color-soft);
 }
-.btn-ghost:hover {
+.btn-ghost:hover:not(:disabled):not([aria-busy='true']) {
   --btn-bg: var(--color-space-raised);
+  --btn-border: transparent;
   --btn-fg: var(--color-eggshell);
-  color: var(--color-eggshell);
+  background-color: var(--btn-bg);
+  border-color: transparent;
+  color: var(--btn-fg);
 }
 .btn-ghost.btn-square {
   color: var(--color-denim);
 }
+.btn-ghost.btn-square:hover:not(:disabled):not([aria-busy='true']) {
+  color: var(--color-eggshell);
+}
 .btn-ghost.text-eggshell { color: var(--color-eggshell); }
+.btn-ghost.text-eggshell:hover:not(:disabled):not([aria-busy='true']) {
+  color: #ffffff;
+}
 .btn-ghost.text-danger-text { color: var(--color-danger-text); }
-.btn-ghost.text-danger-text:hover { color: var(--color-danger-text); }
+.btn-ghost.text-danger-text:hover:not(:disabled):not([aria-busy='true']) {
+  --btn-bg: rgb(185 28 28 / 0.15);
+  background-color: var(--btn-bg);
+  color: #fecaca;
+}
 .btn-outline {
   --btn-bg: transparent;
   --btn-border: var(--color-slate);
   --btn-fg: var(--color-cream-dim);
-  color: var(--color-cream-dim);
+  background-color: transparent;
+  border-color: var(--btn-border);
+  color: var(--btn-fg);
+}
+.btn-outline:hover:not(:disabled):not([aria-busy='true']) {
+  --btn-bg: var(--color-space-raised);
+  --btn-border: var(--color-denim);
+  --btn-fg: var(--color-eggshell);
+  background-color: var(--btn-bg);
+  border-color: var(--btn-border);
+  color: var(--btn-fg);
 }
 
 /* Compact preset pills — not daisyUI btn height */
@@ -211,7 +286,16 @@
   --btn-border: var(--color-danger-line);
   --btn-fg: var(--color-danger-text);
   background-color: transparent;
+  border-color: var(--btn-border);
   color: var(--color-danger-text);
+}
+.btn-outline.btn-error:hover:not(:disabled):not([aria-busy='true']) {
+  --btn-bg: rgb(185 28 28 / 0.18);
+  --btn-border: var(--color-danger-border);
+  --btn-fg: #fecaca;
+  background-color: var(--btn-bg);
+  border-color: var(--btn-border);
+  color: var(--btn-fg);
 }
 .btn-error:not(.btn-outline) {
   --btn-color: var(--color-danger);
@@ -219,11 +303,20 @@
   --btn-border: var(--color-danger);
   --btn-fg: var(--color-danger-content);
   background-color: var(--color-danger);
+  border-color: var(--color-danger);
   color: var(--color-danger-content);
 }
-.btn-error:not(.btn-outline):hover {
-  filter: brightness(0.9);
-  color: var(--color-danger-content);
+.btn-error:not(.btn-outline):hover:not(:disabled):not([aria-busy='true']) {
+  --btn-bg: #991b1b;
+  --btn-border: #991b1b;
+  --btn-fg: var(--color-danger-content);
+  background-color: var(--btn-bg);
+  border-color: var(--btn-border);
+  color: var(--btn-fg);
+  filter: none;
+}
+.btn-error:not(.btn-outline):active:not(:disabled):not([aria-busy='true']) {
+  filter: brightness(0.92);
 }
 
 @layer components {

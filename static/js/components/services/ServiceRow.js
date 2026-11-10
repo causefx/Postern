@@ -101,7 +101,7 @@ export function ServiceRow({ service, index, focused, onOpen }) {
         'button',
         {
           type: 'button',
-          className: 'link-action',
+          className: 'btn btn-sm',
           onClick: async (e) => {
             e.stopPropagation();
             await copyServiceToken(service);
