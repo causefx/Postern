@@ -10,15 +10,35 @@ A small reverse proxy that puts a front door on private services: callers get a 
 | `web/` | Admin UI (HTML, CSS, JS). Embedded into the binary |
 | `data/` | Local config and design references. Not part of the build |
 
-## Version
+## Releases
 
-Current release series: **0.1.x**. Source default is `0.1.0` ([`version.go`](version.go)).
+Versions follow [semantic versioning](https://semver.org/). `0.1.0` in [`cmd/postern/version.go`](cmd/postern/version.go) is the baseline already shipped in source. Later versions come from commit messages on `main`.
+
+One release is one git tag, one GitHub Release, and one container image:
+
+| | |
+|---|---|
+| Git tag | `v1.2.3` |
+| GitHub Release | `v1.2.3`, with the changelog |
+| Image | `ghcr.io/causefx/postern:1.2.3`, also tagged `1.2` and `latest` |
+
+Every push to `main` also publishes `ghcr.io/causefx/postern:edge`. That tag moves continuously and is not a release. A new GHCR package is private until its visibility is changed in the package settings.
+
+1. Open a pull request whose title is a [Conventional Commit](https://www.conventionalcommits.org/). Squash-merge it so that title is the commit on `main`.
+   - `fix:` patch, `0.1.0` → `0.1.1`
+   - `feat:` minor, `0.1.0` → `0.2.0`
+   - `feat!:` or a `BREAKING CHANGE:` footer bumps the minor while the version is still `0.x`. Put `Release-As: 1.0.0` in the commit footer to cut the first stable major.
+   - `docs:`, `chore:`, `refactor:`, `test:`, `ci:` do not cut a release
+2. Release Please opens a Release pull request that bumps `cmd/postern/version.go`, the Dockerfile default, and `CHANGELOG.md`.
+3. Merge that pull request. GitHub creates tag `vX.Y.Z` and the Release, then builds the image with that version and adds the image name to the Release notes.
+
+Pushing a `vX.Y.Z` tag yourself publishes the same image and opens a GitHub Release if one does not already exist. Prefer the Release pull request so the changelog and the binary version stay together.
 
 ```bash
-go build -ldflags "-X main.Version=1.2.3" -o postern .
+go build -ldflags "-X main.Version=1.2.3" -o postern ./cmd/postern
 ```
 
-Docker/CI inject the same via build-arg `VERSION` (git tag `v1.2.3` → `1.2.3`). The version appears in startup logs, `/admin/api/meta`, the admin header, and the login footer.
+The running version shows in the startup log, `/admin/api/meta`, the admin header, and the login footer.
 
 ## Quick start
 
