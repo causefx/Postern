@@ -20,6 +20,7 @@ const PATHS = {
   on: '<circle cx="12" cy="12" r="8"/><path d="M12 8v8"/>',
   off: '<circle cx="12" cy="12" r="8"/>',
   power: '<path d="M12 2v10"/><path d="M6.3 6.3a7 7 0 1 0 11.4 0"/>',
+  trash: '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>',
 };
 
 export function Icon(name, { size = 16, className = '' } = {}) {

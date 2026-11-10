@@ -1,6 +1,6 @@
 import { h } from '../../lib/h.js';
 import { Icon } from '../common/Icon.js';
-import { AUTH_PRESETS, presetMatches, isAuthNone } from '../../lib/authPresets.js';
+import { AUTH_PRESETS, isAuthNone } from '../../lib/authPresets.js';
 
 const TYPES = [
   { id: 'header', label: 'Header' },
@@ -13,7 +13,7 @@ const TYPES = [
  * Compact multi-slot auth editor for the slide-out.
  * Mutates `auth` in place; calls onChange after edits.
  */
-export function AuthRowsEditor({ auth, editing, onChange, serviceLabel = 'service' }) {
+export function AuthRowsEditor({ auth, editing, onChange, serviceLabel = 'service', showPresets = true }) {
   const wrap = h('div', { className: 'flex flex-col gap-2.5' });
 
   function bump() {
@@ -101,40 +101,43 @@ export function AuthRowsEditor({ auth, editing, onChange, serviceLabel = 'servic
     bump();
   }
 
+  function applyPreset(p) {
+    auth.header = p.auth.header ? { ...p.auth.header, secret: auth.header?.secret || '' } : null;
+    auth.query = p.auth.query ? { ...p.auth.query, secret: auth.query?.secret || '' } : null;
+    auth.authz = p.auth.authz ? { ...p.auth.authz, secret: auth.authz?.secret || '' } : null;
+    bump();
+  }
+
   function redraw() {
     const rows = rowsFromAuth();
+    const head = h(
+      'div',
+      { className: 'flex flex-wrap items-center justify-between gap-2' },
+      h('span', { className: 'label-caps' }, 'Upstream credentials'),
+    );
+    if (showPresets) {
+      const sel = h(
+        'select',
+        {
+          className: 'auth-row-select max-w-[11rem]',
+          onChange: (e) => {
+            const p = AUTH_PRESETS[Number(e.target.value)];
+            if (p) applyPreset(p);
+            e.target.selectedIndex = 0;
+          },
+        },
+        h('option', { value: '', selected: true, disabled: true }, 'Fill from preset'),
+        ...AUTH_PRESETS.map((p, i) => h('option', { value: String(i) }, p.label)),
+      );
+      head.append(sel);
+    }
     wrap.replaceChildren(
-      h(
-        'div',
-        { className: 'flex flex-wrap items-center gap-2' },
-        h('span', { className: 'label-caps' }, `${serviceLabel}'s credentials`.toUpperCase()),
-      ),
-      h(
-        'div',
-        { className: 'flex flex-wrap gap-1.5' },
-        ...AUTH_PRESETS.map((p) => {
-          const active = presetMatches(auth, p);
-          return h(
-            'button',
-            {
-              type: 'button',
-              className: `preset-chip${active ? ' preset-chip-active' : ''}`,
-              onClick: () => {
-                auth.header = p.auth.header ? { ...p.auth.header, secret: auth.header?.secret || '' } : null;
-                auth.query = p.auth.query ? { ...p.auth.query, secret: auth.query?.secret || '' } : null;
-                auth.authz = p.auth.authz ? { ...p.auth.authz, secret: auth.authz?.secret || '' } : null;
-                bump();
-              },
-            },
-            p.label,
-          );
-        }),
-      ),
+      head,
       ...rows.map((row, idx) => rowEl(row, idx, rows)),
       rows.length < 3
         ? h(
             'button',
-            { type: 'button', className: 'btn btn-sm btn-ghost justify-start w-fit', onClick: addRow },
+            { type: 'button', className: 'btn btn-sm w-fit', onClick: addRow },
             Icon('plus', { size: 14 }),
             'Add credential',
           )
@@ -186,7 +189,7 @@ export function AuthRowsEditor({ auth, editing, onChange, serviceLabel = 'servic
     const nameOrUser =
       row.type === 'basic'
         ? h('input', {
-            className: 'input input-sm font-mono flex-1 min-w-0',
+            className: 'input font-mono flex-1 min-w-0',
             placeholder: 'username',
             value: row.username || '',
             onInput: (e) => {
@@ -198,7 +201,7 @@ export function AuthRowsEditor({ auth, editing, onChange, serviceLabel = 'servic
         : row.type === 'bearer'
           ? h('span', { className: 'text-xs text-muted shrink-0 w-[5.5rem]' }, 'Authorization')
           : h('input', {
-              className: 'input input-sm font-mono flex-1 min-w-0',
+              className: 'input font-mono flex-1 min-w-0',
               placeholder: row.type === 'header' ? 'X-Api-Key' : 'apikey',
               value: row.name || '',
               onInput: (e) => {
@@ -210,7 +213,7 @@ export function AuthRowsEditor({ auth, editing, onChange, serviceLabel = 'servic
 
     const secret = h('input', {
       type: 'password',
-      className: 'input input-sm font-mono flex-1 min-w-0',
+      className: 'input font-mono flex-1 min-w-0',
       autocomplete: 'off',
       placeholder: editing ? '•••••••• unchanged' : 'value',
       value: row.secret || '',

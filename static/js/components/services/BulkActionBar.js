@@ -49,7 +49,7 @@ export function BulkActionBar() {
         'button',
         {
           type: 'button',
-          className: 'btn btn-sm btn-ghost text-danger-text',
+          className: 'btn btn-sm btn-error',
           onClick: () => openBulkDeleteDialog({ names }),
         },
         'Delete',
@@ -58,7 +58,7 @@ export function BulkActionBar() {
         'button',
         {
           type: 'button',
-          className: 'btn btn-sm btn-ghost',
+          className: 'btn btn-sm',
           onClick: () => clearSelection(),
         },
         'Clear',

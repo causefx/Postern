@@ -7,17 +7,12 @@ export function OpenPathsEditor({ paths, onChange }) {
 
   function redraw() {
     list.replaceChildren();
-    if (!paths.length) {
-      list.append(
-        h('p', { className: 'm-0 text-sm text-muted' }, 'No open paths — every request needs a caller token.'),
-      );
-    }
     paths.forEach((rule, i) => {
       const isRegex = rule.match === 'regex';
       const matchSel = h(
         'select',
         {
-          className: 'select select-bordered select-sm w-[7.5rem] shrink-0 bg-ink-raised border-slate',
+          className: 'auth-row-select w-auto max-w-none shrink-0',
           onChange: (e) => {
             rule.match = e.target.value;
             redraw();
@@ -28,7 +23,7 @@ export function OpenPathsEditor({ paths, onChange }) {
         h('option', { value: 'regex', selected: isRegex }, 'Regex'),
       );
       const pathInput = h('input', {
-        className: 'input input-sm flex-1 min-w-0 font-mono text-[13px]',
+        className: 'input w-full min-w-0 font-mono text-[13px]',
         value: rule.path || '',
         placeholder: rule.match === 'regex' ? '^/webhooks/[^/]+$' : '/health',
         onInput: (e) => {
@@ -36,27 +31,39 @@ export function OpenPathsEditor({ paths, onChange }) {
           onChange?.();
         },
       });
+      const removeBtn = h(
+        'button',
+        {
+          type: 'button',
+          className: 'btn btn-ghost btn-square btn-sm text-muted shrink-0',
+          'aria-label': 'Remove path',
+          title: 'Remove path',
+          onClick: () => {
+            paths.splice(i, 1);
+            redraw();
+            onChange?.();
+          },
+        },
+        Icon('close', { size: 14 }),
+      );
+      const hint =
+        rule.path && !isRegex
+          ? h(
+              'p',
+              { className: 'm-0 text-xs text-muted leading-relaxed' },
+              'Opens ',
+              h('span', { className: 'font-mono' }, rule.path.startsWith('/') ? rule.path : `/${rule.path}`),
+              ' and anything under it.',
+            )
+          : null;
+
       list.append(
         h(
           'div',
-          { className: 'flex items-center gap-2' },
+          { className: 'open-path-row' },
           matchSel,
-          pathInput,
-          h(
-            'button',
-            {
-              type: 'button',
-              className: 'btn btn-ghost btn-square btn-sm text-muted shrink-0',
-              'aria-label': 'Remove path',
-              title: 'Remove path',
-              onClick: () => {
-                paths.splice(i, 1);
-                redraw();
-                onChange?.();
-              },
-            },
-            Icon('close', { size: 14 }),
-          ),
+          h('div', { className: 'open-path-main' }, pathInput, hint),
+          removeBtn,
         ),
       );
     });
@@ -67,15 +74,6 @@ export function OpenPathsEditor({ paths, onChange }) {
   return h(
     'div',
     { className: 'flex flex-col gap-3' },
-    h(
-      'p',
-      { className: 'm-0 text-sm text-muted leading-relaxed' },
-      'These paths skip the caller token. Postern still attaches the upstream credential. Prefix matches the start of the path (e.g. ',
-      h('code', { className: 'font-mono text-[12px]' }, '/health'),
-      '); regex matches the full path string (use ',
-      h('code', { className: 'font-mono text-[12px]' }, '^…$'),
-      ' to anchor).',
-    ),
     list,
     h(
       'button',
@@ -89,7 +87,15 @@ export function OpenPathsEditor({ paths, onChange }) {
           onChange?.();
         },
       },
+      Icon('plus', { size: 14 }),
       'Add path',
+    ),
+    h(
+      'p',
+      { className: 'm-0 text-xs text-muted leading-relaxed' },
+      'Prefix matches the start of a path. Regex matches the whole path — anchor with ',
+      h('code', { className: 'font-mono text-[12px]' }, '^…$'),
+      '.',
     ),
   );
 }
