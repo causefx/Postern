@@ -29,6 +29,12 @@ import {
   getDrawerName,
 } from './components/drawer/ServiceDrawer.js';
 import { copyServiceToken, toggleServiceEnabled } from './lib/serviceActions.js';
+import {
+  openSettings,
+  closeSettings,
+  isSettingsOpen,
+  requestSettingsSave,
+} from './components/settings/SettingsDrawer.js';
 
 const root = document.getElementById('app');
 mountToast(document.body);
@@ -56,13 +62,25 @@ const drawerHandlers = {
   },
 };
 
+function openSettingsDrawer() {
+  if (isSettingsOpen()) {
+    closeSettings();
+    return;
+  }
+  if (isDrawerOpen() && !closeServiceDrawer()) return;
+  setState({ commandOpen: false });
+  openSettings();
+}
+
 function openCreate() {
+  if (isSettingsOpen() && !closeSettings()) return;
   setState({ commandOpen: false });
   openServiceDrawer({ mode: 'create', handlers: drawerHandlers });
 }
 
 function openEdit(service) {
   if (!service) return;
+  if (isSettingsOpen() && !closeSettings()) return;
   setState({ commandOpen: false });
   const items = filteredServices();
   const idx = items.findIndex((s) => s.name === service.name);
@@ -85,6 +103,20 @@ function onKeydown(e) {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
     e.preventDefault();
     setState({ commandOpen: true });
+    return;
+  }
+
+  if (isSettingsOpen()) {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      requestSettingsSave();
+      return;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeSettings();
+      return;
+    }
     return;
   }
 
@@ -165,6 +197,7 @@ function render() {
     DashboardHeader({
       onAdd: () => openCreate(),
       onOpenCommand: () => setState({ commandOpen: true }),
+      onSettings: () => openSettingsDrawer(),
     }),
   );
 
@@ -191,6 +224,7 @@ function render() {
     onAdd: () => openCreate(),
     onReload: () => reload(),
     onEdit: openEdit,
+    onSettings: () => openSettingsDrawer(),
   });
   if (palette) root.append(palette);
 }
@@ -210,6 +244,10 @@ async function boot() {
   document.addEventListener('keydown', onKeydown);
   subscribe(render);
   await reload();
+  if (new URLSearchParams(location.search).get('settings') === '1') {
+    history.replaceState(null, '', location.pathname);
+    openSettings();
+  }
   if (filteredServices().length && state.focusIndex < 0) {
     setState({ focusIndex: 0 });
   }

@@ -95,9 +95,11 @@ function createController({ mode, service, handlers }) {
   let isEdit = mode === 'edit' && !!service;
   let savedName = isEdit ? service.name : null;
   let token = isEdit ? service.token || '' : '';
+  let tokens = isEdit && Array.isArray(service.tokens) ? service.tokens : [];
   let baseline = null;
   let origUrl = isEdit ? service.url || '' : '';
   let activeTab = 'connection';
+  let fieldErrors = null;
 
   const draft = {
     name: isEdit ? service.name : '',
@@ -350,14 +352,20 @@ function createController({ mode, service, handlers }) {
     accessPanel = AccessPanel({
       draft,
       token,
+      tokens,
       savedName,
       serviceLabel,
       onChange: () => {
         markDirty();
         if (activeTab === 'usage') renderUsage();
       },
-      onTokenRotated: (next) => {
-        token = next;
+      onTokensUpdated: (svc) => {
+        token = svc.token || '';
+        tokens = svc.tokens || [];
+        setState({
+          services: state.services.map((s) => (s.name === savedName ? { ...s, token, tokens } : s)),
+        });
+        renderAccess();
       },
     });
     panelHost.replaceChildren(accessPanel, errBox);
@@ -376,6 +384,7 @@ function createController({ mode, service, handlers }) {
         ),
         OpenPathsEditor({
           paths: draft.openPaths,
+          errors: fieldErrors,
           onChange: () => {
             markDirty();
             paintTabs();
@@ -388,7 +397,7 @@ function createController({ mode, service, handlers }) {
   }
 
   function renderUsage() {
-    usagePanel = UsagePanel({ draft });
+    usagePanel = UsagePanel({ draft, savedName });
     panelHost.replaceChildren(usagePanel, errBox);
   }
 
@@ -448,6 +457,7 @@ function createController({ mode, service, handlers }) {
 
   async function save() {
     errBox.textContent = '';
+    fieldErrors = null;
     const body = draftSaveBody(draft);
     try {
       const creating = !savedName;
@@ -460,6 +470,7 @@ function createController({ mode, service, handlers }) {
       }
       savedName = saved.name;
       token = saved.token || token;
+      tokens = saved.tokens || tokens;
       draft.name = saved.name;
       nameInput.value = saved.name;
       titleEl.textContent = saved.name;
@@ -478,7 +489,9 @@ function createController({ mode, service, handlers }) {
       setState({ drawer: { mode: 'edit', name: savedName } });
       renderActiveTab();
     } catch (e) {
+      fieldErrors = e.errors || null;
       errBox.textContent = e.errors ? Object.values(e.errors).join(' · ') : e.message;
+      if (fieldErrors && activeTab === 'advanced') renderAdvanced();
     }
   }
 
@@ -487,6 +500,7 @@ function createController({ mode, service, handlers }) {
     isEdit = true;
     savedName = svc.name;
     token = svc.token || '';
+    tokens = svc.tokens || [];
     origUrl = svc.url || '';
     draft.name = svc.name;
     draft.url = svc.url || '';

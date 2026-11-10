@@ -5,6 +5,7 @@ import { openBulkRotateDialog } from '../components/dialogs/BulkRotateDialog.js'
 import { openBulkDeleteDialog } from '../components/dialogs/BulkDeleteDialog.js';
 import { openRotateDialog } from '../components/dialogs/RotateTokenDialog.js';
 import { openDeleteDialog } from '../components/dialogs/DeleteServiceDialog.js';
+import { openDuplicateDialog } from '../components/dialogs/DuplicateServiceDialog.js';
 
 export const LIST_SHORTCUTS = [
   { keys: ['J', 'K'], label: 'move' },
@@ -28,7 +29,7 @@ function matches(query, text) {
 /**
  * Palette sections. Each item is { id, section, label, icon, danger?, run }.
  */
-export function commandSections({ query = '', onAdd, onReload, onEdit } = {}) {
+export function commandSections({ query = '', onAdd, onReload, onEdit, onSettings } = {}) {
   const sections = [];
   const selected = state.services.filter((s) => state.selected.includes(s.name));
   const names = selected.map((s) => s.name);
@@ -78,6 +79,15 @@ export function commandSections({ query = '', onAdd, onReload, onEdit } = {}) {
         run: () => openBulkDeleteDialog({ names }),
       });
     }
+    if (selected.length === 1 && matches(query, `duplicate ${selected[0].name}`)) {
+      bulk.push({
+        id: 'dup-selected',
+        section: 'selected',
+        label: `Duplicate ${selected[0].name}`,
+        icon: 'copy',
+        run: () => openDuplicateDialog({ service: selected[0], onDuplicated: () => onReload?.() }),
+      });
+    }
     if (matches(query, 'clear selection')) {
       bulk.push({
         id: 'clear',
@@ -93,6 +103,9 @@ export function commandSections({ query = '', onAdd, onReload, onEdit } = {}) {
   const actions = [];
   if (matches(query, 'add service')) {
     actions.push({ id: 'add', section: 'actions', label: 'Add service', icon: 'plus', run: () => onAdd?.() });
+  }
+  if (matches(query, 'settings')) {
+    actions.push({ id: 'settings', section: 'actions', label: 'Settings', icon: 'gear', run: () => onSettings?.() });
   }
   for (const f of [
     { id: 'all', label: 'Filter: All services' },
@@ -143,6 +156,12 @@ export function commandSections({ query = '', onAdd, onReload, onEdit } = {}) {
         label: `Rotate token — ${s.name}`,
         icon: 'rotate',
         run: () => openRotateDialog({ service: s, onRotated: () => onReload?.() }),
+      },
+      {
+        id: `dup-${s.name}`,
+        label: `Duplicate — ${s.name}`,
+        icon: 'copy',
+        run: () => openDuplicateDialog({ service: s, onDuplicated: () => onReload?.() }),
       },
       {
         id: `delete-${s.name}`,

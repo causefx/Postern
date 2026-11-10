@@ -46,5 +46,7 @@ ENV LISTEN=:8080 \
 
 EXPOSE 8080
 VOLUME ["/data"]
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
+  CMD wget -q -O - http://127.0.0.1:8080/healthz || exit 1
 # Start as root so the entrypoint can fix volume ownership, then su-exec to postern.
 ENTRYPOINT ["/docker-entrypoint.sh"]

@@ -5,13 +5,12 @@ import { CallerGateEditor } from './CallerGateEditor.js';
 import { isAuthNone } from '../../lib/authPresets.js';
 import { copyText } from '../../lib/clipboard.js';
 import { showToast } from '../common/Toast.js';
-import { openRotateDialog } from '../dialogs/RotateTokenDialog.js';
-import { setState, state } from '../../state.js';
+import { api } from '../../api.js';
 
 /**
  * Access tab: Postern-token card vs same-as-upstream card.
  */
-export function AccessPanel({ draft, token, savedName, serviceLabel, onChange, onTokenRotated }) {
+export function AccessPanel({ draft, token, tokens = [], savedName, serviceLabel, onChange, onTokensUpdated }) {
   const wrap = h('div', {
     className: 'flex flex-col gap-3',
     role: 'radiogroup',
@@ -55,61 +54,123 @@ export function AccessPanel({ draft, token, savedName, serviceLabel, onChange, o
     );
   }
 
-  function tokenField() {
-    if (!savedName || !token) {
+  function tokenRows() {
+    if (tokens.length) return tokens;
+    if (token) return [{ id: '', name: 'default', secret: token }];
+    return [];
+  }
+
+  function tokenList() {
+    const rows = tokenRows();
+    if (!savedName || !rows.length) {
       return h(
         'p',
         { className: 'm-0 text-xs text-muted' },
         'A caller token is issued when you save this service.',
       );
     }
-    const masked = token.length > 8 ? token.slice(0, 4) + '••••••••••••••••' : '••••••••';
+    const nameInput = h('input', {
+      className: 'input flex-1 min-w-0',
+      placeholder: 'Name, e.g. phone',
+      'aria-label': 'New token name',
+    });
     return h(
       'div',
-      { className: 'token-field' },
-      h('code', { className: 'token-field-value' }, masked),
-      Button(
-        {
-          variant: 'ghost',
-          size: 'sm',
-          square: true,
-          className: 'token-field-btn',
-          'aria-label': 'Copy token',
-          title: 'Copy',
-          onClick: async () => {
-            try {
-              await copyText(token);
-              showToast('Token copied');
-            } catch {
-              showToast('Copy failed', 'error');
-            }
-          },
-        },
-        Icon('copy', { size: 15 }),
-      ),
-      Button(
-        {
-          variant: 'ghost',
-          size: 'sm',
-          square: true,
-          className: 'token-field-btn',
-          'aria-label': 'Rotate token',
-          title: 'Rotate…',
-          onClick: () =>
-            openRotateDialog({
-              service: { name: savedName, token },
-              onRotated: (updated) => {
-                setState({
-                  services: state.services.map((s) =>
-                    s.name === savedName ? { ...s, token: updated.token } : s,
-                  ),
-                });
-                onTokenRotated?.(updated.token);
-                paint();
+      { className: 'flex flex-col gap-2' },
+      ...rows.map((t) => {
+        const masked = t.secret && t.secret.length > 8 ? t.secret.slice(0, 4) + '••••••••••••••••' : '••••••••';
+        return h(
+          'div',
+          { className: 'token-field' },
+          h('span', { className: 'text-xs text-cream-dim shrink-0 w-16 truncate' }, t.name || 'token'),
+          h('code', { className: 'token-field-value' }, masked),
+          Button(
+            {
+              variant: 'ghost',
+              size: 'sm',
+              square: true,
+              className: 'token-field-btn',
+              'aria-label': `Copy ${t.name || 'token'}`,
+              title: 'Copy',
+              onClick: async () => {
+                try {
+                  await copyText(t.secret);
+                  showToast('Token copied');
+                } catch {
+                  showToast('Copy failed', 'error');
+                }
               },
-            }),
-        },
-        Icon('rotate', { size: 15 }),
+            },
+            Icon('copy', { size: 15 }),
+          ),
+          Button(
+            {
+              variant: 'ghost',
+              size: 'sm',
+              square: true,
+              className: 'token-field-btn',
+              'aria-label': `Rotate ${t.name || 'token'}`,
+              title: 'Rotate',
+              onClick: async () => {
+                try {
+                  const updated = t.id
+                    ? await api.rotateTokenId(savedName, t.id)
+                    : await api.rotateToken(savedName);
+                  showToast(`Rotated ${t.name || 'token'}`);
+                  onTokensUpdated?.(updated);
+                } catch (e) {
+                  showToast(e.message, 'error');
+                }
+              },
+            },
+            Icon('rotate', { size: 15 }),
+          ),
+          Button(
+            {
+              variant: 'ghost',
+              size: 'sm',
+              square: true,
+              className: 'token-field-btn',
+              'aria-label': `Revoke ${t.name || 'token'}`,
+              title: 'Revoke',
+              disabled: rows.length < 2,
+              onClick: async () => {
+                if (rows.length < 2 || !t.id) return;
+                if (!confirm(`Revoke ${t.name}? Callers using it will get 401.`)) return;
+                try {
+                  const updated = await api.deleteToken(savedName, t.id);
+                  showToast(`Revoked ${t.name}`);
+                  onTokensUpdated?.(updated);
+                } catch (e) {
+                  showToast(e.message, 'error');
+                }
+              },
+            },
+            Icon('close', { size: 15 }),
+          ),
+        );
+      }),
+      h(
+        'div',
+        { className: 'flex gap-2 items-center' },
+        nameInput,
+        Button(
+          {
+            size: 'sm',
+            className: 'shrink-0',
+            onClick: async () => {
+              try {
+                const updated = await api.addToken(savedName, nameInput.value.trim());
+                nameInput.value = '';
+                showToast('Token added');
+                onTokensUpdated?.(updated);
+              } catch (e) {
+                showToast(e.message, 'error');
+              }
+            },
+          },
+          'Add',
+        ),
       ),
     );
   }
@@ -118,7 +179,7 @@ export function AccessPanel({ draft, token, savedName, serviceLabel, onChange, o
     return h(
       'div',
       { className: 'flex flex-col gap-3 mt-1' },
-      tokenField(),
+      tokenList(),
       CallerGateEditor({
         gate: draft.gate,
         onChange: () => onChange?.(),
@@ -131,7 +192,7 @@ export function AccessPanel({ draft, token, savedName, serviceLabel, onChange, o
       'div',
       { className: 'flex flex-col gap-2 mt-1' },
       h('span', { className: 'text-[13px] font-semibold text-cream-dim' }, 'Token'),
-      tokenField(),
+      tokenList(),
       h(
         'p',
         { className: 'm-0 text-xs text-muted leading-relaxed' },

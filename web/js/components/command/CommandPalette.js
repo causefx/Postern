@@ -7,7 +7,7 @@ import { commandSections } from '../../lib/commands.js';
  * Command palette overlay. Call with { onAdd, onReload }.
  * Visibility driven by state.commandOpen — parent remounts on state change.
  */
-export function CommandPalette({ onAdd, onReload, onEdit }) {
+export function CommandPalette({ onAdd, onReload, onEdit, onSettings }) {
   if (!state.commandOpen) return null;
 
   let query = '';
@@ -52,7 +52,7 @@ export function CommandPalette({ onAdd, onReload, onEdit }) {
   }
 
   function build() {
-    return commandSections({ query, onAdd, onReload, onEdit });
+    return commandSections({ query, onAdd, onReload, onEdit, onSettings });
   }
 
   let flat = [];

@@ -4,6 +4,14 @@ import { Button } from '../common/Button.js';
 import { LoginError } from './LoginError.js';
 import { PasswordField } from './PasswordField.js';
 
+const oidcErrors = {
+  locked: 'Too many failed attempts. Try again in a minute.',
+  denied: 'The sign-in was cancelled.',
+  state: 'That sign-in expired. Try again.',
+  failed: 'Could not sign in with the identity provider.',
+  allow: 'That account is not allowed to manage Postern.',
+};
+
 export function LoginForm() {
   const error = LoginError();
   const password = PasswordField();
@@ -11,6 +19,7 @@ export function LoginForm() {
     { type: 'submit', variant: 'primary', className: 'w-full h-12 text-[15px]' },
     'Sign in',
   );
+  const oidcSlot = h('div', { className: 'flex flex-col gap-6', hidden: true });
 
   const form = h(
     'form',
@@ -66,7 +75,8 @@ export function LoginForm() {
       ),
     ),
     error,
-    password,
+    oidcSlot,
+    h('div', { className: 'password-block flex flex-col gap-6' }, password,
     h(
       'label',
       { className: 'flex items-center gap-2.5 min-h-11 text-sm text-cream-dim cursor-pointer' },
@@ -80,8 +90,45 @@ export function LoginForm() {
       }),
       'Keep me signed in on this device',
     ),
-    submit,
+    submit),
   );
+
+  const oidcError = oidcErrors[new URLSearchParams(location.search).get('error')];
+  if (oidcError) {
+    error.show(oidcError);
+    history.replaceState(null, '', location.pathname);
+  }
+  fetch('/admin/api/login', { headers: { Accept: 'application/json' } })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((info) => {
+      if (!info?.oidc) return;
+      const blurb = form.querySelector('p');
+      if (blurb) {
+        blurb.textContent = info.password === false
+          ? 'Sign in with your identity provider.'
+          : 'Use your identity provider, or the admin password.';
+      }
+      if (info.password === false) {
+        const block = form.querySelector('.password-block');
+        if (block) block.hidden = true;
+      }
+      oidcSlot.hidden = false;
+      oidcSlot.replaceChildren(
+        Button(
+          {
+            type: 'button',
+            className: 'btn-outline w-full h-12 text-[15px]',
+            onClick: () => {
+              const remember = form.querySelector('#remember').checked ? '1' : '0';
+              location.assign(`/admin/oidc/start?remember=${remember}`);
+            },
+          },
+          info.label || 'Sign in with SSO',
+        ),
+        info.password === false ? null : h('div', { className: 'text-center text-xs uppercase tracking-wide text-muted' }, 'or'),
+      );
+    })
+    .catch(() => {});
 
   return form;
 }

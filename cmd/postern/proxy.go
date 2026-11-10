@@ -2,10 +2,20 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"time"
+)
+
+var (
+	proxyDialTimeout   = 10 * time.Second
+	proxyTLSHandshake  = 10 * time.Second
+	proxyHeaderTimeout = 60 * time.Second
+	proxyIdleTimeout   = 90 * time.Second
 )
 
 type proxyHop struct {
@@ -18,10 +28,28 @@ type proxyHop struct {
 
 type proxyCtxKey struct{}
 
+func proxyTransport() *http.Transport {
+	return &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   proxyDialTimeout,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       proxyIdleTimeout,
+		TLSHandshakeTimeout:   proxyTLSHandshake,
+		ResponseHeaderTimeout: proxyHeaderTimeout,
+		ExpectContinueTimeout: time.Second,
+		TLSClientConfig:       &tls.Config{MinVersion: tls.VersionTLS12},
+	}
+}
+
 func (a *App) reverseProxy() *httputil.ReverseProxy {
 	a.proxyOnce.Do(func() {
 		a.proxyRP = &httputil.ReverseProxy{
 			Rewrite:       rewriteProxy,
+			Transport:     proxyTransport(),
 			FlushInterval: -1,
 			ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 				name := ""
@@ -43,22 +71,46 @@ func rewriteProxy(pr *httputil.ProxyRequest) {
 	pr.SetURL(hop.target)
 	pr.Out.URL.RawQuery = pr.In.URL.RawQuery
 	hop.gate.Strip(pr.Out)
+	pr.Out.Header.Del("Cookie")
 	hop.auth.Apply(pr.Out)
 }
 
 func (a *App) proxy(w http.ResponseWriter, r *http.Request) {
-	svc, ok := a.store.Get(r.PathValue("name"))
-	if !ok || !svc.Enabled {
+	name := r.PathValue("name")
+	svc, ok := a.store.Get(name)
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
 	rest := "/" + r.PathValue("rest")
-	if !PathIsOpen(svc, rest) && !AuthorizeCaller(svc, r) {
+	path := activityPath(rest, r, svc)
+	if a.hits != nil && !a.hits.allow(name, clientIP(r)) {
+		a.noteActivity(name, r.Method, path, "limited", http.StatusTooManyRequests)
+		w.WriteHeader(http.StatusTooManyRequests)
+		return
+	}
+	if !svc.Enabled {
+		a.noteActivity(name, r.Method, path, "off", http.StatusForbidden)
+		http.Error(w, "service disabled", http.StatusForbidden)
+		return
+	}
+	if PathIsOpen(svc, rest) {
+		a.serveUpstream(w, r, svc, rest, path, "open")
+		return
+	}
+	who, allowed := identifyCaller(svc, r)
+	if !allowed {
+		a.noteActivity(name, r.Method, path, "rejected", http.StatusUnauthorized)
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
+	a.serveUpstream(w, r, svc, rest, path, who)
+}
+
+func (a *App) serveUpstream(w http.ResponseWriter, r *http.Request, svc Service, rest, path, who string) {
 	target, err := url.Parse(svc.URL)
 	if err != nil {
+		a.noteActivity(svc.Name, r.Method, path, who, http.StatusInternalServerError)
 		http.Error(w, "bad upstream", http.StatusInternalServerError)
 		return
 	}
@@ -70,5 +122,33 @@ func (a *App) proxy(w http.ResponseWriter, r *http.Request) {
 		auth:   svc.Auth,
 	}
 	ctx := context.WithValue(r.Context(), proxyCtxKey{}, hop)
-	a.reverseProxy().ServeHTTP(w, r.WithContext(ctx))
+	sw := &statusWriter{ResponseWriter: w}
+	a.reverseProxy().ServeHTTP(sw, r.WithContext(ctx))
+	code := sw.code
+	if code == 0 {
+		code = http.StatusOK
+	}
+	a.noteActivity(svc.Name, r.Method, path, who, code)
+}
+
+func activityPath(rest string, r *http.Request, svc Service) string {
+	q := r.URL.Query()
+	redact := func(name string) {
+		if name != "" && q.Has(name) {
+			q.Set(name, "REDACTED")
+		}
+	}
+	redact("token")
+	redact(defaultGateQuery)
+	if svc.Gate != nil && svc.Gate.Query != nil {
+		redact(svc.Gate.Query.Name)
+	}
+	if svc.Auth.Query != nil {
+		redact(svc.Auth.Query.Name)
+	}
+	enc := q.Encode()
+	if enc == "" {
+		return rest
+	}
+	return rest + "?" + enc
 }

@@ -3,7 +3,7 @@ import { Button } from '../common/Button.js';
 import { Icon } from '../common/Icon.js';
 
 /** Editable list of open-path rules. Mutates `paths` in place; calls onChange after structural edits. */
-export function OpenPathsEditor({ paths, onChange }) {
+export function OpenPathsEditor({ paths, onChange, errors }) {
   const list = h('div', { className: 'flex flex-col gap-2' });
 
   function redraw() {
@@ -23,10 +23,12 @@ export function OpenPathsEditor({ paths, onChange }) {
         h('option', { value: 'prefix', selected: !isRegex }, 'Prefix'),
         h('option', { value: 'regex', selected: isRegex }, 'Regex'),
       );
+      const pathError = (errors && (errors[`openPaths.${i}.path`] || errors[`openPaths.${i}.match`])) || '';
       const pathInput = h('input', {
-        className: 'input w-full min-w-0 font-mono text-[13px]',
+        className: `input w-full min-w-0 font-mono text-[13px]${pathError ? ' input-error' : ''}`,
         value: rule.path || '',
         placeholder: rule.match === 'regex' ? '^/webhooks/[^/]+$' : '/health',
+        'aria-invalid': pathError ? 'true' : 'false',
         onInput: (e) => {
           rule.path = e.target.value;
           onChange?.();
@@ -64,7 +66,14 @@ export function OpenPathsEditor({ paths, onChange }) {
           'div',
           { className: 'open-path-row' },
           matchSel,
-          h('div', { className: 'open-path-main' }, pathInput, hint),
+          h(
+            'div',
+            { className: 'open-path-main' },
+            pathInput,
+            pathError
+              ? h('p', { className: 'm-0 text-xs text-danger-text leading-relaxed' }, pathError)
+              : hint,
+          ),
           removeBtn,
         ),
       );
@@ -94,8 +103,8 @@ export function OpenPathsEditor({ paths, onChange }) {
     h(
       'p',
       { className: 'm-0 text-xs text-muted leading-relaxed' },
-      'Prefix matches the start of a path. Regex matches the whole path — anchor with ',
-      h('code', { className: 'font-mono text-[12px]' }, '^…$'),
+      'Prefix matches the start of a path. A regex must start with ',
+      h('code', { className: 'font-mono text-[12px]' }, '^'),
       '.',
     ),
   );

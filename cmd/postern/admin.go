@@ -55,7 +55,9 @@ func adminPublic(r *http.Request) bool {
 	switch {
 	case p == "/admin/login":
 		return true
-	case p == "/admin/api/login" && r.Method == http.MethodPost:
+	case p == "/admin/api/login" && (r.Method == http.MethodGet || r.Method == http.MethodPost):
+		return true
+	case (p == "/admin/oidc/start" || p == "/admin/oidc/callback" || p == "/admin/oidc/done") && r.Method == http.MethodGet:
 		return true
 	case p == "/admin/app.css":
 		return true
@@ -85,6 +87,10 @@ func (a *App) adminAuth(next http.Handler) http.Handler {
 			}
 			writeErr(w, http.StatusUnauthorized, "unauthorized")
 			return
+		}
+		raw := sessionID(r)
+		if refreshed, err := a.sessions.refresh(raw); err == nil {
+			setSessionCookie(w, r, refreshed, a.sessions.remember(raw))
 		}
 		if r.Method != http.MethodGet && r.Header.Get("X-Postern-Admin") != "1" {
 			http.Error(w, "missing X-Postern-Admin header", http.StatusForbidden)
@@ -129,6 +135,10 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	}](r)
 	if err != nil {
 		writeErr(w, 400, "bad json")
+		return
+	}
+	if !a.passwordAllowed() {
+		writeErr(w, http.StatusForbidden, "Password sign-in is off. Use the identity provider.")
 		return
 	}
 	if !eq(in.Password, a.adminPass) {
@@ -196,6 +206,121 @@ func (a *App) css(w http.ResponseWriter, r *http.Request) {
 	w.Write(b)
 }
 
+func (a *App) passwordAllowed() bool {
+	if a == nil || a.oidc == nil || a.store == nil || a.store.PasswordLogin() {
+		return true
+	}
+	return false
+}
+
+func (a *App) settingsPayload(s Settings, r *http.Request) map[string]any {
+	label := ""
+	if a.oidc != nil {
+		label = a.oidc.label
+	}
+	return map[string]any{
+		"activityLimit": s.ActivityLimit,
+		"rateLimit":     s.RateLimit,
+		"auditLimit":    s.AuditLimit,
+		"passwordLogin": s.PasswordLogin,
+		"oidc":          a.oidc != nil,
+		"oidcLabel":     label,
+		"oidcSession":   a.sessions != nil && a.sessions.viaOIDC(sessionID(r)),
+		"defaults": map[string]any{
+			"activityLimit": defaultActivityLimit,
+			"rateLimit":     defaultRateLimit,
+			"auditLimit":    defaultAuditLimit,
+			"passwordLogin": true,
+		},
+		"maxActivity": maxActivityLimit,
+		"maxRate":     maxRateLimit,
+		"maxAudit":    maxAuditLimit,
+	}
+}
+
+func (a *App) getSettings(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, 200, a.settingsPayload(Settings{
+		ActivityLimit: a.store.ActivityLimit(),
+		RateLimit:     a.store.RateLimit(),
+		AuditLimit:    a.store.AuditLimit(),
+		PasswordLogin: a.store.PasswordLogin(),
+	}, r))
+}
+
+func (a *App) putSettings(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ActivityLimit int   `json:"activityLimit"`
+		RateLimit     int   `json:"rateLimit"`
+		AuditLimit    int   `json:"auditLimit"`
+		PasswordLogin *bool `json:"passwordLogin"`
+	}
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
+	if err := dec.Decode(&in); err != nil {
+		writeErr(w, 400, "invalid json")
+		return
+	}
+	if in.ActivityLimit < 1 || in.ActivityLimit > maxActivityLimit {
+		writeErr(w, 400, fmt.Sprintf("activityLimit must be from 1 to %d", maxActivityLimit))
+		return
+	}
+	if in.RateLimit < 0 || in.RateLimit > maxRateLimit {
+		writeErr(w, 400, fmt.Sprintf("rateLimit must be 0 or from 1 to %d", maxRateLimit))
+		return
+	}
+	if in.AuditLimit < 1 || in.AuditLimit > maxAuditLimit {
+		writeErr(w, 400, fmt.Sprintf("auditLimit must be from 1 to %d", maxAuditLimit))
+		return
+	}
+	passwordLogin := true
+	if a.store != nil {
+		passwordLogin = a.store.PasswordLogin()
+	}
+	if in.PasswordLogin != nil {
+		passwordLogin = *in.PasswordLogin
+	}
+	if !passwordLogin && a.oidc == nil {
+		writeErr(w, 400, "Configure OIDC before turning the admin password off")
+		return
+	}
+	if !passwordLogin && (a.sessions == nil || !a.sessions.viaOIDC(sessionID(r))) {
+		writeErr(w, 400, "Sign in with the identity provider before turning the admin password off")
+		return
+	}
+	saved, err := a.store.UpdateSettings(Settings{
+		ActivityLimit: in.ActivityLimit,
+		RateLimit:     in.RateLimit,
+		AuditLimit:    in.AuditLimit,
+		PasswordLogin: passwordLogin,
+	})
+	if err != nil {
+		writeErr(w, 500, "could not save settings")
+		return
+	}
+	if a.hits != nil {
+		a.hits.setMax(saved.RateLimit)
+	}
+	if a.activity != nil {
+		a.activity.setLimit(saved.ActivityLimit)
+	}
+	if a.audit != nil {
+		a.audit.setLimit(saved.AuditLimit)
+	}
+	rate, activity, auditN := saved.RateLimit, saved.ActivityLimit, saved.AuditLimit
+	a.record(auditEvent{Action: "settings", Rate: &rate, Activity: &activity, Audit: &auditN})
+	writeJSON(w, 200, a.settingsPayload(saved, r))
+}
+
+func (a *App) listAudit(w http.ResponseWriter, r *http.Request) {
+	entries := []auditEvent{}
+	if a.audit != nil {
+		entries = a.audit.list()
+	}
+	writeJSON(w, 200, map[string]any{
+		"limit":   a.store.AuditLimit(),
+		"entries": entries,
+	})
+}
+
 func (a *App) meta(w http.ResponseWriter, r *http.Request) {
 	secure := isHTTPS(r)
 	scheme := "http"
@@ -219,11 +344,25 @@ type view struct {
 	Gate       *CallerGate `json:"gate,omitempty"`
 	OpenPaths  []OpenPath  `json:"openPaths,omitempty"`
 	Token      string      `json:"token"`
+	Tokens     []tokenView `json:"tokens"`
 	Enabled    bool        `json:"enabled"`
 	PublicBase string      `json:"publicBase"`
+	Requests   int         `json:"requests,omitempty"`
+	LastStatus int         `json:"lastStatus,omitempty"`
+	LastSeen   time.Time   `json:"lastSeen,omitempty"`
+}
+
+type tokenView struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Secret string `json:"secret"`
 }
 
 func toView(s Service, origin string) view {
+	tokens := make([]tokenView, 0, len(s.Tokens))
+	for _, t := range s.Tokens {
+		tokens = append(tokens, tokenView{ID: t.ID, Name: t.Name, Secret: t.Secret})
+	}
 	return view{
 		Name:       s.Name,
 		URL:        s.URL,
@@ -232,9 +371,18 @@ func toView(s Service, origin string) view {
 		Gate:       s.Gate,
 		OpenPaths:  s.OpenPaths,
 		Token:      s.Token,
+		Tokens:     tokens,
 		Enabled:    s.Enabled,
 		PublicBase: strings.TrimRight(origin, "/") + "/p/" + s.Name + "/",
 	}
+}
+
+func (a *App) present(s Service, origin string) view {
+	v := toView(s, origin)
+	if a != nil && a.activity != nil {
+		v.Requests, v.LastStatus, v.LastSeen = a.activity.summary(s.Name)
+	}
+	return v
 }
 
 func requestOrigin(r *http.Request) string {
@@ -268,7 +416,7 @@ func (a *App) listServices(w http.ResponseWriter, r *http.Request) {
 	origin := requestOrigin(r)
 	out := []view{}
 	for _, s := range a.store.List() {
-		out = append(out, toView(s, origin))
+		out = append(out, a.present(s, origin))
 	}
 	writeJSON(w, 200, out)
 }
@@ -307,7 +455,8 @@ func (a *App) createService(w http.ResponseWriter, r *http.Request) {
 		writeFieldErr(w, err)
 		return
 	}
-	writeJSON(w, 201, toView(svc, requestOrigin(r)))
+	a.record(auditEvent{Action: "create", Service: svc.Name, URL: svc.URL})
+	writeJSON(w, 201, a.present(svc, requestOrigin(r)))
 }
 
 func (a *App) updateService(w http.ResponseWriter, r *http.Request) {
@@ -332,7 +481,13 @@ func (a *App) updateService(w http.ResponseWriter, r *http.Request) {
 		writeFieldErr(w, err)
 		return
 	}
-	writeJSON(w, 200, toView(svc, requestOrigin(r)))
+	ev := auditEvent{Action: "update", Service: svc.Name, URL: svc.URL}
+	if prev := r.PathValue("name"); prev != svc.Name {
+		ev.From = prev
+		a.activity.rename(prev, svc.Name)
+	}
+	a.record(ev)
+	writeJSON(w, 200, a.present(svc, requestOrigin(r)))
 }
 
 func (a *App) patchService(w http.ResponseWriter, r *http.Request) {
@@ -352,7 +507,9 @@ func (a *App) patchService(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, "not found")
 		return
 	}
-	writeJSON(w, 200, toView(svc, requestOrigin(r)))
+	enabled := svc.Enabled
+	a.record(auditEvent{Action: "enable", Service: svc.Name, Enabled: &enabled})
+	writeJSON(w, 200, a.present(svc, requestOrigin(r)))
 }
 
 func (a *App) rotateService(w http.ResponseWriter, r *http.Request) {
@@ -361,15 +518,127 @@ func (a *App) rotateService(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, "not found")
 		return
 	}
-	writeJSON(w, 200, toView(svc, requestOrigin(r)))
+	a.record(auditEvent{Action: "rotate", Service: svc.Name, Token: tokenLabel(svc.Tokens, "")})
+	writeJSON(w, 200, a.present(svc, requestOrigin(r)))
+}
+
+func (a *App) addToken(w http.ResponseWriter, r *http.Request) {
+	in, err := decodeJSON[struct {
+		Name string `json:"name"`
+	}](r)
+	if err != nil {
+		writeErr(w, 400, "bad json")
+		return
+	}
+	svc, err := a.store.AddToken(r.PathValue("name"), in.Name)
+	if err != nil {
+		if errors.Is(err, errNotFound) {
+			writeErr(w, 404, "not found")
+			return
+		}
+		writeFieldErr(w, err)
+		return
+	}
+	added := ""
+	if n := len(svc.Tokens); n > 0 {
+		added = svc.Tokens[n-1].Name
+	}
+	a.record(auditEvent{Action: "token_add", Service: svc.Name, Token: added})
+	writeJSON(w, 201, a.present(svc, requestOrigin(r)))
+}
+
+func (a *App) rotateToken(w http.ResponseWriter, r *http.Request) {
+	svc, err := a.store.RotateTokenID(r.PathValue("name"), r.PathValue("id"))
+	if err != nil {
+		writeErr(w, 404, "not found")
+		return
+	}
+	a.record(auditEvent{Action: "rotate", Service: svc.Name, Token: tokenLabel(svc.Tokens, r.PathValue("id"))})
+	writeJSON(w, 200, a.present(svc, requestOrigin(r)))
+}
+
+func (a *App) deleteToken(w http.ResponseWriter, r *http.Request) {
+	label := r.PathValue("id")
+	if cur, ok := a.store.Get(r.PathValue("name")); ok {
+		label = tokenLabel(cur.Tokens, r.PathValue("id"))
+	}
+	svc, err := a.store.DeleteToken(r.PathValue("name"), r.PathValue("id"))
+	if err != nil {
+		if errors.Is(err, errNotFound) {
+			writeErr(w, 404, "not found")
+			return
+		}
+		writeFieldErr(w, err)
+		return
+	}
+	a.record(auditEvent{Action: "token_revoke", Service: svc.Name, Token: label})
+	writeJSON(w, 200, a.present(svc, requestOrigin(r)))
+}
+
+func (a *App) serviceActivity(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if _, ok := a.store.Get(name); !ok {
+		writeErr(w, 404, "not found")
+		return
+	}
+	events := []activityEvent{}
+	if a.activity != nil {
+		events = a.activity.list(name)
+	}
+	writeJSON(w, 200, events)
+}
+
+func (a *App) duplicateService(w http.ResponseWriter, r *http.Request) {
+	in, err := decodeJSON[struct {
+		Name string `json:"name"`
+	}](r)
+	if err != nil {
+		writeErr(w, 400, "bad json")
+		return
+	}
+	src := r.PathValue("name")
+	svc, err := a.store.Duplicate(src, in.Name)
+	if err != nil {
+		if errors.Is(err, errNotFound) {
+			writeErr(w, 404, "not found")
+			return
+		}
+		writeFieldErr(w, err)
+		return
+	}
+	a.record(auditEvent{Action: "duplicate", Service: svc.Name, From: src, URL: svc.URL})
+	writeJSON(w, 201, a.present(svc, requestOrigin(r)))
 }
 
 func (a *App) deleteService(w http.ResponseWriter, r *http.Request) {
-	if err := a.store.Delete(r.PathValue("name")); err != nil {
+	name := r.PathValue("name")
+	if err := a.store.Delete(name); err != nil {
 		writeErr(w, 404, err.Error())
 		return
 	}
+	a.record(auditEvent{Action: "delete", Service: name})
+	a.activity.forget(name)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func tokenLabel(tokens []CallerToken, id string) string {
+	if id == "" {
+		for _, t := range tokens {
+			if t.Name == "default" {
+				return t.Name
+			}
+		}
+		if len(tokens) > 0 {
+			return tokens[0].Name
+		}
+		return "default"
+	}
+	for _, t := range tokens {
+		if t.ID == id {
+			return t.Name
+		}
+	}
+	return id
 }
 
 type testInput struct {

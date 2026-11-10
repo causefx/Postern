@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
@@ -32,7 +33,11 @@ type App struct {
 	store     *Store
 	sessions  *sessionStore
 	logins    *loginLimiter
+	activity  *activityLog
+	hits      *proxyLimiter
+	audit     *auditLog
 	adminPass string
+	oidc      *oidcClient
 	// staticDir, when set (POSTERN_DEV), serves UI assets from disk instead of embed.
 	staticDir string
 
@@ -57,20 +62,30 @@ func env(k, def string) string {
 }
 
 func main() {
-	store, err := OpenStore(env("POSTERN_DATA", "data/postern-data.json"))
+	dataPath := env("POSTERN_DATA", "data/postern-data.json")
+	if len(os.Args) > 1 && os.Args[1] == "check" {
+		os.Exit(checkMain(dataPath))
+	}
+	store, err := OpenStore(dataPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 	app := &App{
 		store:     store,
-		sessions:  newSessionStore(),
+		sessions:  newSessionStore(os.Getenv("ADMIN_PASSWORD")),
 		logins:    newLoginLimiter(),
+		activity:  openActivityLog(dataPath+".activity", store.ActivityLimit()),
+		hits:      configuredProxyLimiter(store.RateLimit()),
+		audit:     newAuditLog(dataPath + ".audit"),
 		adminPass: os.Getenv("ADMIN_PASSWORD"),
 	}
+	app.audit.setLimit(store.AuditLimit())
 	if app.adminPass == "" {
 		app.adminPass = newToken()[:16]
 		log.Printf("ADMIN_PASSWORD not set; generated one for this run: %s", app.adminPass)
+		app.sessions = newSessionStore(app.adminPass)
 	}
+	app.oidc = loadOIDC()
 	if envTruthy("POSTERN_DEV") {
 		dir, err := filepath.Abs("web")
 		if err != nil {
@@ -89,7 +104,11 @@ func main() {
 
 	adminMux := http.NewServeMux()
 	adminMux.HandleFunc("GET /admin/login", app.loginPage)
+	adminMux.HandleFunc("GET /admin/api/login", app.loginOptions)
 	adminMux.HandleFunc("POST /admin/api/login", app.login)
+	adminMux.HandleFunc("GET /admin/oidc/start", app.oidcStart)
+	adminMux.HandleFunc("GET /admin/oidc/callback", app.oidcCallback)
+	adminMux.HandleFunc("GET /admin/oidc/done", app.oidcDone)
 	adminMux.HandleFunc("POST /admin/api/logout", app.logout)
 	adminMux.HandleFunc("GET /admin/{$}", app.ui)
 	adminMux.HandleFunc("GET /admin/app.css", app.css)
@@ -116,12 +135,20 @@ func main() {
 	adminMux.Handle("GET /admin/fonts/", http.StripPrefix("/admin/fonts/", fontsHandler))
 
 	adminMux.HandleFunc("GET /admin/api/meta", app.meta)
+	adminMux.HandleFunc("GET /admin/api/settings", app.getSettings)
+	adminMux.HandleFunc("PUT /admin/api/settings", app.putSettings)
+	adminMux.HandleFunc("GET /admin/api/audit", app.listAudit)
 	adminMux.HandleFunc("GET /admin/api/services", app.listServices)
 	adminMux.HandleFunc("POST /admin/api/services", app.createService)
 	adminMux.HandleFunc("POST /admin/api/services/test", app.testConnection)
 	adminMux.HandleFunc("PUT /admin/api/services/{name}", app.updateService)
 	adminMux.HandleFunc("PATCH /admin/api/services/{name}", app.patchService)
+	adminMux.HandleFunc("POST /admin/api/services/{name}/duplicate", app.duplicateService)
 	adminMux.HandleFunc("POST /admin/api/services/{name}/rotate", app.rotateService)
+	adminMux.HandleFunc("POST /admin/api/services/{name}/tokens", app.addToken)
+	adminMux.HandleFunc("POST /admin/api/services/{name}/tokens/{id}/rotate", app.rotateToken)
+	adminMux.HandleFunc("DELETE /admin/api/services/{name}/tokens/{id}", app.deleteToken)
+	adminMux.HandleFunc("GET /admin/api/services/{name}/activity", app.serviceActivity)
 	adminMux.HandleFunc("DELETE /admin/api/services/{name}", app.deleteService)
 	adminMux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin/", http.StatusFound)
@@ -136,15 +163,45 @@ func main() {
 		proxyMux.Handle("/admin/", app.adminAuth(adminMux))
 		proxyMux.Handle("/{$}", adminMux)
 		log.Printf("listening on %s (proxy at /p/<name>/..., UI at /admin/)", proxyAddr)
-		log.Fatal(newServer(proxyAddr, proxyMux).ListenAndServe())
+		log.Fatal(newServer(proxyAddr, withHealth(proxyMux)).ListenAndServe())
 	}
 
 	go func() {
 		log.Printf("admin UI on %s/admin/", adminAddr)
-		log.Fatal(newServer(adminAddr, app.adminAuth(adminMux)).ListenAndServe())
+		log.Fatal(newServer(adminAddr, withHealth(app.adminAuth(adminMux))).ListenAndServe())
 	}()
 	log.Printf("proxy on %s (/p/<name>/...)", proxyAddr)
-	log.Fatal(newServer(proxyAddr, proxyMux).ListenAndServe())
+	log.Fatal(newServer(proxyAddr, withHealth(proxyMux)).ListenAndServe())
+}
+
+func healthz(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write([]byte("ok\n"))
+}
+
+// withHealth serves GET /healthz with no auth, in front of either listener.
+func withHealth(next http.Handler) http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", healthz)
+	mux.Handle("/", next)
+	return mux
+}
+
+func checkMain(path string) int {
+	problems, err := CheckFile(path)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s\n", err)
+		return 1
+	}
+	if len(problems) > 0 {
+		for _, p := range problems {
+			fmt.Fprintf(os.Stderr, "%s\n", p)
+		}
+		return 1
+	}
+	fmt.Println("ok")
+	return 0
 }
 
 func newServer(addr string, h http.Handler) *http.Server {

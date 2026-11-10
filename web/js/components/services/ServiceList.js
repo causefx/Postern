@@ -41,6 +41,7 @@ export function ServiceList({ onOpen }) {
           h('th', { className: 'svc-th' }, 'Name'),
           h('th', { className: 'svc-th' }, 'Route'),
           h('th', { className: 'svc-th' }, 'Upstream'),
+          h('th', { className: 'svc-th' }, 'Recent'),
           h('th', { className: 'svc-th' }, 'Callers use'),
           h('th', { className: 'svc-th' }, 'Upstream creds'),
           h('th', { className: 'svc-th svc-td-actions' }, 'Actions'),

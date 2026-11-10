@@ -6,14 +6,17 @@ import { usageSnippet, usageSendOptions } from '../../lib/usageSnippet.js';
 import { copyText } from '../../lib/clipboard.js';
 import { showToast } from '../common/Toast.js';
 import { state } from '../../state.js';
+import { api } from '../../api.js';
 
 /**
  * Usage tab: examples derived only from the current draft config.
  */
-export function UsagePanel({ draft }) {
+export function UsagePanel({ draft, savedName }) {
   const wrap = h('div', { className: 'flex flex-col gap-5' });
   let lang = 'curl';
   let sendAs = 'bearer';
+  let events = [];
+  let eventsLoaded = false;
 
   function publicBase() {
     const name = slugify(draft.name) || draft.name || savedFallback();
@@ -187,12 +190,40 @@ export function UsagePanel({ draft }) {
           { className: 'flex flex-col gap-1.5 text-[13px]' },
           statusLine('401', 'Token missing or wrong.'),
           statusLine('502', `Postern couldn’t reach ${serviceLabel()} at its upstream URL.`),
-          statusLine('Off', 'Service switched off — request refused.'),
+          statusLine('403', 'Service switched off.'),
         ),
       ),
     );
 
+    sections.push(recentRequests());
+
     wrap.replaceChildren(...sections);
+  }
+
+  function recentRequests() {
+    if (!savedName) {
+      return h('p', { className: 'm-0 text-xs text-muted' }, 'Save the service to see recent requests.');
+    }
+    const rows = events.length
+      ? events
+          .slice()
+          .reverse()
+          .map((ev) =>
+            h(
+              'div',
+              { className: 'flex gap-3 text-[13px] font-mono' },
+              h('span', { className: 'text-cream-dim w-10 shrink-0' }, String(ev.status || '')),
+              h('span', { className: 'text-muted w-16 shrink-0 truncate' }, ev.who || ''),
+              h('span', { className: 'text-eggshell truncate' }, `${ev.method || ''} ${ev.path || ''}`),
+            ),
+          )
+      : [h('p', { className: 'm-0 text-xs text-muted' }, 'No requests yet.')];
+    return h(
+      'div',
+      { className: 'flex flex-col gap-2' },
+      h('span', { className: 'font-semibold text-sm text-eggshell' }, 'Recent requests'),
+      ...rows,
+    );
   }
 
   function statusLine(code, text) {
@@ -223,6 +254,13 @@ export function UsagePanel({ draft }) {
   }
 
   paint();
+  if (savedName && !eventsLoaded) {
+    eventsLoaded = true;
+    api.activity(savedName).then((list) => {
+      events = Array.isArray(list) ? list : [];
+      paint();
+    }).catch(() => {});
+  }
   wrap._refresh = paint;
   return wrap;
 }

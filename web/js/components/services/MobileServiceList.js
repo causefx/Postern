@@ -1,7 +1,7 @@
 import { h } from '../../lib/h.js';
 import { Icon } from '../common/Icon.js';
 import { filteredServices, state, setState, isSelected, toggleSelect } from '../../state.js';
-import { credBits } from '../../lib/serviceDisplay.js';
+import { credBits, recentLabel } from '../../lib/serviceDisplay.js';
 import { copyServiceToken, toggleServiceEnabled } from '../../lib/serviceActions.js';
 
 const LONG_MS = 480;
@@ -39,6 +39,8 @@ function mobileRow(service, index, onOpen) {
   const focused = state.focusIndex === index;
   const bits = credBits(service.auth);
   const meta = [`/p/${service.name}/`, ...bits];
+  const recent = recentLabel(service);
+  if (recent) meta.push(recent);
   if (!service.enabled) meta.push('off');
 
   const content = h(

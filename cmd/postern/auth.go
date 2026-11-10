@@ -585,19 +585,139 @@ func PathIsOpen(svc Service, path string) bool {
 
 // AuthorizeCaller checks the service access mode against the incoming request.
 func AuthorizeCaller(svc Service, r *http.Request) bool {
+	_, ok := identifyCaller(svc, r)
+	return ok
+}
+
+// identifyCaller reports which named token matched, or "upstream" when the
+// real upstream secret was presented in upstream-access mode.
+func identifyCaller(svc Service, r *http.Request) (string, bool) {
+	if len(svc.Tokens) == 0 && svc.Token != "" {
+		svc.Tokens = []CallerToken{{Name: "default", Secret: svc.Token}}
+	}
 	switch normalizeAccess(svc.Access) {
 	case AccessUpstream:
-		return svc.Auth.authorizeUpstream(r, svc.Token)
+		return identifyUpstream(svc, r)
 	default:
-		if svc.Token == "" {
-			return false
+		for _, presented := range presentedCallerValues(svc, r) {
+			if name, ok := tokenBySecret(svc, presented); ok {
+				return name, true
+			}
 		}
-		if svc.Gate == nil || svc.Gate.IsEmpty() {
-			got := callerToken(r)
-			return got != "" && secretEq(got, svc.Token)
-		}
-		return svc.Gate.Authorize(r, svc.Token)
+		return "", false
 	}
+}
+
+func tokenBySecret(svc Service, presented string) (string, bool) {
+	if presented == "" {
+		return "", false
+	}
+	name := ""
+	ok := false
+	for _, t := range svc.Tokens {
+		if t.Secret != "" && secretEq(presented, t.Secret) {
+			name = t.Name
+			ok = true
+		}
+	}
+	if !ok && svc.Token != "" && secretEq(presented, svc.Token) {
+		return "default", true
+	}
+	return name, ok
+}
+
+func presentedCallerValues(svc Service, r *http.Request) []string {
+	var out []string
+	add := func(s string) {
+		if s != "" {
+			out = append(out, s)
+		}
+	}
+	g := svc.Gate
+	if g == nil || g.IsEmpty() {
+		add(callerToken(r))
+		return out
+	}
+	if g.Bearer {
+		h := r.Header.Get("Authorization")
+		if strings.HasPrefix(h, "Bearer ") {
+			add(strings.TrimPrefix(h, "Bearer "))
+		}
+	}
+	if g.Header != nil {
+		name := g.Header.Name
+		if name == "" {
+			name = defaultGateHeader
+		}
+		add(r.Header.Get(name))
+	}
+	if g.Query != nil {
+		name := g.Query.Name
+		if name == "" {
+			name = defaultGateQuery
+		}
+		add(r.URL.Query().Get(name))
+	}
+	return out
+}
+
+func identifyUpstream(svc Service, r *http.Request) (string, bool) {
+	secretOK := svc.Auth.authorizeUpstream(r, "")
+	who := ""
+	tokenOK := false
+	for _, t := range svc.Tokens {
+		if t.Secret != "" && svc.Auth.authorizeUpstream(r, t.Secret) {
+			tokenOK = true
+			who = t.Name
+		}
+	}
+	if !tokenOK && svc.Token != "" && svc.Auth.authorizeUpstream(r, svc.Token) {
+		tokenOK = true
+		who = "default"
+	}
+	if !secretOK && !tokenOK {
+		return "", false
+	}
+	if tokenOK {
+		for _, presented := range upstreamPresented(svc, r) {
+			if name, ok := tokenBySecret(svc, presented); ok {
+				return name, true
+			}
+		}
+	}
+	if secretOK {
+		return "upstream", true
+	}
+	return who, tokenOK
+}
+
+func upstreamPresented(svc Service, r *http.Request) []string {
+	var out []string
+	a := svc.Auth
+	if a.Header != nil && a.Header.Name != "" {
+		if v := r.Header.Get(a.Header.Name); v != "" {
+			out = append(out, v)
+		}
+	}
+	if a.Query != nil && a.Query.Name != "" {
+		if v := r.URL.Query().Get(a.Query.Name); v != "" {
+			out = append(out, v)
+		}
+	}
+	if a.Authz != nil {
+		switch a.Authz.Kind {
+		case AuthzBearer:
+			h := r.Header.Get("Authorization")
+			if strings.HasPrefix(h, "Bearer ") {
+				out = append(out, strings.TrimPrefix(h, "Bearer "))
+			}
+		case AuthzBasic:
+			if _, p, ok := r.BasicAuth(); ok && p != "" {
+				out = append(out, p)
+			}
+		}
+	}
+	return out
 }
 
 var errNotFound = errors.New("not found")

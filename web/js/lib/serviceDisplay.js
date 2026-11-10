@@ -26,6 +26,20 @@ export function accessLabel(service) {
   return service.access === 'upstream' ? 'Same as service' : 'Postern token';
 }
 
+/** Compact "count · status · time" from the in-memory request ring. */
+export function recentLabel(service) {
+  if (!service || !service.requests) return '';
+  const parts = [String(service.requests)];
+  if (service.lastStatus) parts.push(String(service.lastStatus));
+  if (service.lastSeen) {
+    const when = new Date(service.lastSeen);
+    if (!Number.isNaN(when.getTime())) {
+      parts.push(when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    }
+  }
+  return parts.join(' · ');
+}
+
 export function isMac() {
   return /Mac|iPhone|iPad/.test(navigator.platform || '') || /Mac/.test(navigator.userAgent || '');
 }

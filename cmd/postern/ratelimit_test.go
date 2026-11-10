@@ -48,7 +48,7 @@ func TestClientIP(t *testing.T) {
 
 func TestLoginHandlerRateLimit(t *testing.T) {
 	app := &App{
-		sessions:  newSessionStore(),
+		sessions:  newSessionStore("secret"),
 		logins:    newLoginLimiter(),
 		adminPass: "secret",
 	}

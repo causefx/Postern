@@ -5,12 +5,13 @@ import { api } from '../../api.js';
 import { state, counts } from '../../state.js';
 import { isMac } from '../../lib/serviceDisplay.js';
 import { isDrawerOpen, getDrawerName } from '../drawer/ServiceDrawer.js';
+import { isSettingsOpen } from '../settings/SettingsDrawer.js';
 
-export function DashboardHeader({ onAdd, onOpenCommand }) {
+export function DashboardHeader({ onAdd, onOpenCommand, onSettings }) {
   const c = counts();
   const secure = state.meta.secure;
   const mod = isMac() ? '⌘' : 'Ctrl';
-  const drawerName = isDrawerOpen() ? getDrawerName() : null;
+  const drawerName = isDrawerOpen() ? getDrawerName() : isSettingsOpen() ? 'Settings' : null;
 
   return h(
     'header',
@@ -32,8 +33,8 @@ export function DashboardHeader({ onAdd, onOpenCommand }) {
         h(
           'div',
           { className: 'flex items-center gap-2 min-w-0' },
-          h('span', { className: 'font-display text-[15px] font-semibold text-eggshell' }, 'Postern'),
-          h('span', { className: 'text-muted/60', 'aria-hidden': 'true' }, '/'),
+          h('span', { className: 'font-display text-[15px] font-semibold text-eggshell desktop-only' }, 'Postern'),
+          h('span', { className: 'text-muted/60 desktop-only', 'aria-hidden': 'true' }, '/'),
           h('span', { className: 'font-display text-[15px] font-semibold text-eggshell' }, 'Services'),
           h('span', { className: 'count-badge' }, String(c.all)),
           drawerName
@@ -81,6 +82,18 @@ export function DashboardHeader({ onAdd, onOpenCommand }) {
               Icon('warn', { size: 20 }),
             )
           : null,
+        Button(
+          {
+            variant: 'ghost',
+            size: 'sm',
+            square: true,
+            className: 'h-9 w-9 text-cream-dim',
+            'aria-label': 'Settings',
+            title: 'Settings',
+            onClick: onSettings,
+          },
+          Icon('gear', { size: 16 }),
+        ),
         Button(
           {
             variant: 'primary',

@@ -38,7 +38,28 @@ export const api = {
   updateService: (name, body) => request('services/' + encodeURIComponent(name), { method: 'PUT', body: JSON.stringify(body) }),
   setEnabled: (name, enabled) => request('services/' + encodeURIComponent(name), { method: 'PATCH', body: JSON.stringify({ enabled }) }),
   rotateToken: (name) => request('services/' + encodeURIComponent(name) + '/rotate', { method: 'POST', body: '{}' }),
+  addToken: (name, tokenName) =>
+    request('services/' + encodeURIComponent(name) + '/tokens', {
+      method: 'POST',
+      body: JSON.stringify({ name: tokenName }),
+    }),
+  rotateTokenId: (name, id) =>
+    request('services/' + encodeURIComponent(name) + '/tokens/' + encodeURIComponent(id) + '/rotate', {
+      method: 'POST',
+      body: '{}',
+    }),
+  deleteToken: (name, id) =>
+    request('services/' + encodeURIComponent(name) + '/tokens/' + encodeURIComponent(id), { method: 'DELETE' }),
+  activity: (name) => request('services/' + encodeURIComponent(name) + '/activity'),
   deleteService: (name) => request('services/' + encodeURIComponent(name), { method: 'DELETE' }),
+  duplicateService: (name, newName) =>
+    request('services/' + encodeURIComponent(name) + '/duplicate', {
+      method: 'POST',
+      body: JSON.stringify({ name: newName }),
+    }),
   testConnection: (body) => request('services/test', { method: 'POST', body: JSON.stringify(body) }),
   logout: () => request('logout', { method: 'POST', body: '{}' }),
+  settings: () => request('settings'),
+  saveSettings: (body) => request('settings', { method: 'PUT', body: JSON.stringify(body) }),
+  audit: () => request('audit'),
 };
