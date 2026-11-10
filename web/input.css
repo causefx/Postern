@@ -498,25 +498,29 @@
 }
 .svc-table {
   width: 100%;
-  border-collapse: collapse;
-  min-width: 960px;
+  border-collapse: separate;
+  border-spacing: 0 0.4rem;
+  margin-top: -0.4rem;
 }
 .svc-th {
   text-align: left;
-  padding: 0.75rem 1rem;
+  padding: 0.75rem 1rem 0.35rem;
   font: 600 11px/1 Inter, system-ui, sans-serif;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--color-muted);
-  border-bottom: 1px solid var(--color-line);
   white-space: nowrap;
   background: transparent;
 }
 .svc-td {
   padding: 0.95rem 1rem;
-  border-bottom: 1px solid var(--color-line);
   vertical-align: middle;
+  background: var(--color-ink-raised);
+  transition: background 0.1s;
 }
+.svc-tr:nth-child(odd) .svc-td { background: var(--color-space); }
+.svc-td:first-child { border-radius: 12px 0 0 12px; }
+.svc-td:last-child { border-radius: 0 12px 12px 0; }
 .svc-td-check {
   width: 3rem;
   padding-left: 1.25rem;
@@ -534,16 +538,27 @@
 .svc-table thead .svc-th:last-child {
   padding-right: 1.25rem;
 }
-.svc-tr:last-child .svc-td { border-bottom: 0; }
-.svc-tr {
-  cursor: default;
-  transition: background 0.1s;
+.svc-tr { cursor: default; }
+.svc-tr:hover .svc-td { background: var(--color-space-raised); }
+.svc-tr.svc-tr-focus .svc-td:first-child { box-shadow: inset 3px 0 0 var(--color-denim); }
+.svc-tr.svc-tr-selected .svc-td {
+  background: color-mix(in srgb, var(--color-slate) 46%, var(--color-space));
 }
-.svc-tr:hover { background: rgb(38 58 85 / 0.35); }
-.svc-tr-focus { background: rgb(38 58 85 / 0.55); }
-.svc-tr-selected { background: rgb(62 92 118 / 0.28); }
-.svc-tr-selected.svc-tr-focus { background: rgb(62 92 118 / 0.4); }
+.svc-tr.svc-tr-selected:hover .svc-td {
+  background: color-mix(in srgb, var(--color-slate) 68%, var(--color-space));
+}
 .svc-tr-off .svc-name { color: var(--color-muted); }
+
+/* The phone list stays. On the table, route leaves first, then recent, then upstream creds. */
+@media (max-width: 1359px) {
+  .svc-col-route { display: none; }
+}
+@media (max-width: 1199px) {
+  .svc-col-recent { display: none; }
+}
+@media (max-width: 1039px) {
+  .svc-col-creds { display: none; }
+}
 
 .svc-check {
   width: 1rem;
@@ -751,7 +766,14 @@
   font: 600 10px/1 Inter, system-ui, sans-serif;
   letter-spacing: 0.02em;
 }
-.svc-tr-editing { box-shadow: inset 2px 0 0 var(--color-warn); }
+.svc-tr-editing .svc-td:first-child { box-shadow: inset 3px 0 0 var(--color-warn); }
+.mobile-row-content.svc-tr-focus { background: var(--color-space-raised); }
+.mobile-row-content.svc-tr-selected {
+  background: color-mix(in srgb, var(--color-slate) 46%, var(--color-space));
+}
+.mobile-row-content.svc-tr-selected.svc-tr-focus {
+  background: color-mix(in srgb, var(--color-slate) 68%, var(--color-space));
+}
 
 /* —— Login screen —— */
 .login-page {

@@ -69,7 +69,7 @@ export function ServiceRow({ service, index, focused, onOpen }) {
         showEdited ? h('span', { className: 'edited-chip' }, 'edited') : null,
       ),
     ),
-    h('td', { className: 'svc-td' }, h('span', { className: 'font-mono text-[13px] text-cream-dim' }, route)),
+    h('td', { className: 'svc-td svc-col-route' }, h('span', { className: 'font-mono text-[13px] text-cream-dim' }, route)),
     h(
       'td',
       { className: 'svc-td' },
@@ -77,7 +77,7 @@ export function ServiceRow({ service, index, focused, onOpen }) {
     ),
     h(
       'td',
-      { className: 'svc-td' },
+      { className: 'svc-td svc-col-recent' },
       h(
         'span',
         {
@@ -100,7 +100,7 @@ export function ServiceRow({ service, index, focused, onOpen }) {
     ),
     h(
       'td',
-      { className: 'svc-td' },
+      { className: 'svc-td svc-col-creds' },
       h(
         'span',
         { className: 'cred-line font-mono text-[12px] text-cream-dim' },
