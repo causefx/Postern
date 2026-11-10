@@ -14,3 +14,6 @@ postern.exe
 
 # Tailwind / daisyUI install. The built stylesheet (web/app.css) is embedded.
 node_modules/
+
+# Cursor
+.cursor/
