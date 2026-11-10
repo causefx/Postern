@@ -7,11 +7,11 @@ export function BrandPanel() {
     'aside',
     {
       className:
-        'login-brand flex flex-col gap-2 px-12 py-10 max-md:px-6 max-md:py-7 bg-ink-raised border-r border-line max-md:border-r-0 max-md:border-b',
+        'login-brand flex flex-col gap-2 px-12 py-10 max-md:px-6 max-md:py-7 bg-ink-raised border-r border-line max-md:border-r-0',
     },
     h(
       'div',
-      { className: 'flex items-center gap-3' },
+      { className: 'login-brand-logo flex items-center gap-3' },
       h(
         'div',
         {
@@ -24,12 +24,12 @@ export function BrandPanel() {
     ),
     h(
       'div',
-      { className: 'flex-1 min-h-0 flex items-center justify-center py-7 max-md:max-h-64 max-md:py-4' },
+      { className: 'login-brand-art flex-1 min-h-0 flex items-center justify-center py-7 max-md:max-h-64 max-md:py-4' },
       LoginIllustration(),
     ),
     h(
       'div',
-      { className: 'flex flex-col gap-3 max-w-[440px]' },
+      { className: 'login-brand-tagline flex flex-col gap-3 max-w-[440px]' },
       h(
         'h2',
         {
