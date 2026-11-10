@@ -35,6 +35,23 @@ var jsFS embed.FS
 //go:embed static/fonts
 var fontsFS embed.FS
 
+//go:embed static/icons
+var iconsFS embed.FS
+
+var iconFiles = map[string]string{
+	"/favicon.ico":              "image/x-icon",
+	"/favicon.svg":              "image/svg+xml",
+	"/favicon-16x16.png":        "image/png",
+	"/favicon-32x32.png":        "image/png",
+	"/apple-touch-icon.png":     "image/png",
+	"/android-chrome-192x192.png": "image/png",
+	"/android-chrome-512x512.png": "image/png",
+	"/maskable-192x192.png":     "image/png",
+	"/maskable-512x512.png":     "image/png",
+	"/safari-pinned-tab.svg":    "image/svg+xml",
+	"/site.webmanifest":         "application/manifest+json",
+}
+
 type App struct {
 	store     *Store
 	sessions  *sessionStore
@@ -130,6 +147,8 @@ func main() {
 	adminMux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin/", http.StatusFound)
 	})
+	app.mountIcons(adminMux)
+	app.mountIcons(proxyMux)
 
 	proxyAddr := env("LISTEN", ":8080")
 	adminAddr := os.Getenv("ADMIN_LISTEN")
@@ -147,6 +166,36 @@ func main() {
 	}()
 	log.Printf("proxy on %s (/p/<name>/...)", proxyAddr)
 	log.Fatal(newServer(proxyAddr, proxyMux).ListenAndServe())
+}
+
+func (a *App) mountIcons(mux *http.ServeMux) {
+	for path := range iconFiles {
+		p := path
+		mux.HandleFunc("GET "+p, a.serveIcon)
+	}
+}
+
+func (a *App) serveIcon(w http.ResponseWriter, r *http.Request) {
+	ctype, ok := iconFiles[r.URL.Path]
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	name := strings.TrimPrefix(r.URL.Path, "/")
+	var b []byte
+	var err error
+	if a.staticDir != "" {
+		b, err = os.ReadFile(filepath.Join(a.staticDir, "icons", name))
+	} else {
+		b, err = iconsFS.ReadFile("static/icons/" + name)
+	}
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", ctype)
+	w.Header().Set("Cache-Control", "public, max-age=604800, immutable")
+	w.Write(b)
 }
 
 func newServer(addr string, h http.Handler) *http.Server {
@@ -177,6 +226,9 @@ func adminPublic(r *http.Request) bool {
 		// Login page loads ES modules before a session exists.
 		return true
 	default:
+		if _, ok := iconFiles[p]; ok {
+			return true
+		}
 		return false
 	}
 }
