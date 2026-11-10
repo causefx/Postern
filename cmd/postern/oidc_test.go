@@ -174,6 +174,11 @@ func TestPasswordLoginRequiresOIDCSession(t *testing.T) {
 	if loginRec.Code != http.StatusForbidden {
 		t.Fatalf("password login %d %s", loginRec.Code, loginRec.Body.String())
 	}
+	page := httptest.NewRecorder()
+	app.loginPage(page, httptest.NewRequest(http.MethodGet, "/admin/login", nil))
+	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), `"password":false`) || strings.Contains(page.Body.String(), "{{LOGIN_OPTIONS}}") {
+		t.Fatalf("login page %d %s", page.Code, page.Body.String())
+	}
 
 	app.oidc = nil
 	loginRec = httptest.NewRecorder()

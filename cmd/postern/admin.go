@@ -120,7 +120,23 @@ func (a *App) loginPage(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	w.Write(withVersion(b))
+	w.Write(a.withLoginOptions(withVersion(b)))
+}
+
+func (a *App) withLoginOptions(b []byte) []byte {
+	label := ""
+	if a.oidc != nil {
+		label = a.oidc.label
+	}
+	opts, err := json.Marshal(map[string]any{
+		"oidc":     a.oidc != nil,
+		"password": a.passwordAllowed(),
+		"label":    label,
+	})
+	if err != nil {
+		opts = []byte(`{"oidc":false,"password":true}`)
+	}
+	return bytes.ReplaceAll(b, []byte("{{LOGIN_OPTIONS}}"), opts)
 }
 
 func (a *App) login(w http.ResponseWriter, r *http.Request) {

@@ -9,7 +9,6 @@ export function PasswordField() {
     type: 'password',
     autocomplete: 'current-password',
     required: true,
-    autofocus: true,
     'aria-describedby': 'password-hint',
     className:
       'input w-full h-12 pr-13 font-mono text-[15px] bg-ink-raised border-slate focus:border-denim',
