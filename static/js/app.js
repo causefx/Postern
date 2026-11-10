@@ -183,8 +183,8 @@ function render() {
       ServiceList({ onOpen: openEdit }),
       MobileServiceList({ onOpen: openEdit, onAdd: () => openCreate() }),
     );
-    main.append(KeyboardHints({ drawerOpen: isDrawerOpen() }));
   }
+  main.append(KeyboardHints({ drawerOpen: isDrawerOpen() }));
   root.append(main);
 
   const palette = CommandPalette({
