@@ -32,16 +32,17 @@ func normalizeAuditLimit(n int) int {
 
 // auditEvent is one admin change. It never carries a secret or a query string.
 type auditEvent struct {
-	Time     time.Time `json:"time"`
-	Action   string    `json:"action"`
-	Service  string    `json:"service"`
-	From     string    `json:"from,omitempty"`
-	URL      string    `json:"url,omitempty"`
-	Token    string    `json:"token,omitempty"`
-	Enabled  *bool     `json:"enabled,omitempty"`
-	Rate     *int      `json:"rate,omitempty"`
-	Activity *int      `json:"activity,omitempty"`
-	Audit    *int      `json:"audit,omitempty"`
+	Time          time.Time `json:"time"`
+	Action        string    `json:"action"`
+	Service       string    `json:"service"`
+	From          string    `json:"from,omitempty"`
+	URL           string    `json:"url,omitempty"`
+	Token         string    `json:"token,omitempty"`
+	Enabled       *bool     `json:"enabled,omitempty"`
+	Rate          *int      `json:"rate,omitempty"`
+	Activity      *int      `json:"activity,omitempty"`
+	Audit         *int      `json:"audit,omitempty"`
+	PasswordLogin *bool     `json:"passwordLogin,omitempty"`
 }
 
 type auditLog struct {

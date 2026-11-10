@@ -113,19 +113,21 @@ export function LoginForm() {
         if (block) block.hidden = true;
       }
       oidcSlot.hidden = false;
-      oidcSlot.replaceChildren(
-        Button(
-          {
-            type: 'button',
-            className: 'btn-outline w-full h-12 text-[15px]',
-            onClick: () => {
-              const remember = form.querySelector('#remember').checked ? '1' : '0';
-              location.assign(`/admin/oidc/start?remember=${remember}`);
-            },
+      const sso = Button(
+        {
+          type: 'button',
+          className: 'btn-outline w-full h-12 text-[15px]',
+          onClick: () => {
+            const remember = form.querySelector('#remember')?.checked ? '1' : '0';
+            location.assign(`/admin/oidc/start?remember=${remember}`);
           },
-          info.label || 'Sign in with SSO',
-        ),
-        info.password === false ? null : h('div', { className: 'text-center text-xs uppercase tracking-wide text-muted' }, 'or'),
+        },
+        info.label || 'Sign in with SSO',
+      );
+      oidcSlot.replaceChildren(
+        ...(info.password === false
+          ? [sso]
+          : [sso, h('div', { className: 'text-center text-xs uppercase tracking-wide text-muted' }, 'or')]),
       );
     })
     .catch(() => {});

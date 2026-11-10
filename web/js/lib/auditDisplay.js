@@ -38,6 +38,7 @@ export function auditDetail(ev) {
     if (ev.rate != null) bits.push(ev.rate === 0 ? 'rate off' : `rate ${ev.rate}`);
     if (ev.activity != null) bits.push(`activity ${ev.activity}`);
     if (ev.audit != null) bits.push(`audit ${ev.audit}`);
+    if (ev.passwordLogin != null) bits.push(ev.passwordLogin ? 'password on' : 'password off');
     return bits.join(' · ');
   }
   return ev.url ? `url → ${ev.url}` : '';

@@ -286,6 +286,12 @@ func (a *App) putSettings(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "Sign in with the identity provider before turning the admin password off")
 		return
 	}
+	prev := Settings{
+		ActivityLimit: a.store.ActivityLimit(),
+		RateLimit:     a.store.RateLimit(),
+		AuditLimit:    a.store.AuditLimit(),
+		PasswordLogin: a.store.PasswordLogin(),
+	}
 	saved, err := a.store.UpdateSettings(Settings{
 		ActivityLimit: in.ActivityLimit,
 		RateLimit:     in.RateLimit,
@@ -305,9 +311,35 @@ func (a *App) putSettings(w http.ResponseWriter, r *http.Request) {
 	if a.audit != nil {
 		a.audit.setLimit(saved.AuditLimit)
 	}
-	rate, activity, auditN := saved.RateLimit, saved.ActivityLimit, saved.AuditLimit
-	a.record(auditEvent{Action: "settings", Rate: &rate, Activity: &activity, Audit: &auditN})
+	if ev := settingsChanges(prev, saved); ev.Action != "" {
+		a.record(ev)
+	}
 	writeJSON(w, 200, a.settingsPayload(saved, r))
+}
+
+// settingsChanges records only the fields that differ. An unchanged save writes nothing.
+func settingsChanges(prev, saved Settings) auditEvent {
+	ev := auditEvent{Action: "settings"}
+	if saved.RateLimit != prev.RateLimit {
+		n := saved.RateLimit
+		ev.Rate = &n
+	}
+	if saved.ActivityLimit != prev.ActivityLimit {
+		n := saved.ActivityLimit
+		ev.Activity = &n
+	}
+	if saved.AuditLimit != prev.AuditLimit {
+		n := saved.AuditLimit
+		ev.Audit = &n
+	}
+	if saved.PasswordLogin != prev.PasswordLogin {
+		on := saved.PasswordLogin
+		ev.PasswordLogin = &on
+	}
+	if ev.Rate == nil && ev.Activity == nil && ev.Audit == nil && ev.PasswordLogin == nil {
+		return auditEvent{}
+	}
+	return ev
 }
 
 func (a *App) listAudit(w http.ResponseWriter, r *http.Request) {

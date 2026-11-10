@@ -130,6 +130,7 @@ func TestPasswordLoginRequiresOIDCSession(t *testing.T) {
 		logins:    newLoginLimiter(),
 		adminPass: "secret",
 		oidc:      &oidcClient{label: "SSO"},
+		audit:     newAuditLog(filepath.Join(dir, "d.json.audit")),
 	}
 	body := `{"activityLimit":20,"rateLimit":120,"auditLimit":100,"passwordLogin":false}`
 	password, err := sessions.create(true)
@@ -161,6 +162,10 @@ func TestPasswordLoginRequiresOIDCSession(t *testing.T) {
 	}
 	if store.PasswordLogin() {
 		t.Fatal("password login stayed on")
+	}
+	logged := app.audit.list()
+	if len(logged) != 1 || logged[0].PasswordLogin == nil || *logged[0].PasswordLogin || logged[0].Rate != nil || logged[0].Activity != nil || logged[0].Audit != nil {
+		t.Fatalf("audit did not record only password off: %+v", logged)
 	}
 
 	loginReq := httptest.NewRequest(http.MethodPost, "/admin/api/login", strings.NewReader(`{"password":"secret"}`))
