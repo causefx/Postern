@@ -95,7 +95,7 @@ export function DashboardHeader({ onAdd, onOpenCommand }) {
           'button',
           {
             type: 'button',
-            className: 'btn btn-ghost btn-sm btn-square h-9 w-9 text-cream-dim desktop-only',
+            className: 'btn btn-ghost btn-sm btn-square h-9 w-9 text-cream-dim',
             'aria-label': 'Sign out',
             title: 'Sign out',
             onClick: async () => {
