@@ -139,7 +139,7 @@ Service config (including upstream secrets and Postern tokens) lives in `POSTERN
 
 Admin changes are appended beside that file as `POSTERN_DATA.audit` (create, update, enable, rotate, token add, token revoke, duplicate, delete, settings). Lines do not include secrets or query strings. The Settings activity list keeps the newest `settings.auditLimit` lines (default 100, at most 5000). At about 1 MB the current file is renamed to `.audit.1` and a new one starts.
 
-Recent proxy requests (the Recent column and the Usage list) are kept beside the data file as `POSTERN_DATA.activity`. How many each service keeps is `settings.activityLimit` in the data file (default 20, at most 1000). Paths are stored with query secrets redacted. Deleting a service removes its entries. The Settings drawer saves the limit immediately and trims the log. A hand edit applies on restart.
+Recent proxy requests (the Recent column and the Usage list) are kept beside the data file as `POSTERN_DATA.activity`. The Recent column names the caller token on the latest request (`open`, `rejected`, `off`, `limited`, or `upstream` when it was not a token). How many each service keeps is `settings.activityLimit` in the data file (default 20, at most 1000). Paths are stored with query secrets redacted. Deleting a service removes its entries. The Settings drawer saves the limit immediately and trims the log. A hand edit applies on restart.
 
 `GET /healthz` on the proxy listener and the admin listener returns `ok` with no authentication and does not call an upstream.
 

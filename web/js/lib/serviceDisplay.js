@@ -26,10 +26,12 @@ export function accessLabel(service) {
   return service.access === 'upstream' ? 'Same as service' : 'Postern token';
 }
 
-/** Compact "count · status · time" from the in-memory request ring. */
+/** Compact "key · count · status · time" from the request ring. */
 export function recentLabel(service) {
   if (!service || !service.requests) return '';
-  const parts = [String(service.requests)];
+  const parts = [];
+  if (service.lastWho) parts.push(service.lastWho);
+  parts.push(String(service.requests));
   if (service.lastStatus) parts.push(String(service.lastStatus));
   if (service.lastSeen) {
     const when = new Date(service.lastSeen);

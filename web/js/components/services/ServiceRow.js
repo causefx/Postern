@@ -82,7 +82,9 @@ export function ServiceRow({ service, index, focused, onOpen }) {
         'span',
         {
           className: 'font-mono text-[12px] text-muted whitespace-nowrap',
-          title: service.lastSeen ? `Last request ${service.lastSeen}` : 'No requests yet',
+          title: service.lastSeen
+            ? `Last request ${service.lastSeen}${service.lastWho ? ` · ${service.lastWho}` : ''}`
+            : 'No requests yet',
         },
         recentLabel(service) || '—',
       ),

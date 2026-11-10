@@ -141,20 +141,21 @@ func (l *activityLog) list(name string) []activityEvent {
 	return out
 }
 
-// summary is the ring length plus the newest status and time. It is empty when
-// the service has no recorded requests.
-func (l *activityLog) summary(name string) (count, status int, last time.Time) {
+// summary is the ring length plus the newest status, time, and caller.
+// who is the token name, or open, rejected, off, limited, or upstream.
+// It is empty when the service has no recorded requests.
+func (l *activityLog) summary(name string) (count, status int, last time.Time, who string) {
 	if l == nil || name == "" {
-		return 0, 0, time.Time{}
+		return 0, 0, time.Time{}, ""
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	src := l.by[name]
 	if len(src) == 0 {
-		return 0, 0, time.Time{}
+		return 0, 0, time.Time{}, ""
 	}
 	lastEv := src[len(src)-1]
-	return len(src), lastEv.Status, lastEv.Time
+	return len(src), lastEv.Status, lastEv.Time, lastEv.Who
 }
 
 func (l *activityLog) forget(name string) {

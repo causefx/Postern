@@ -92,9 +92,9 @@ func TestProxyRateLimitCountsOpenPaths(t *testing.T) {
 	if len(events) != 2 || events[1].Who != "limited" || events[1].Status != http.StatusTooManyRequests {
 		t.Fatalf("activity %+v", events)
 	}
-	count, status, _ := app.activity.summary("one")
-	if count != 2 || status != http.StatusTooManyRequests {
-		t.Fatalf("summary %d %d", count, status)
+	count, status, _, who := app.activity.summary("one")
+	if count != 2 || status != http.StatusTooManyRequests || who != "limited" {
+		t.Fatalf("summary %d %d %q", count, status, who)
 	}
 }
 

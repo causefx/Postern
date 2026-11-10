@@ -398,6 +398,7 @@ type view struct {
 	Requests   int         `json:"requests,omitempty"`
 	LastStatus int         `json:"lastStatus,omitempty"`
 	LastSeen   time.Time   `json:"lastSeen,omitempty"`
+	LastWho    string      `json:"lastWho,omitempty"`
 }
 
 type tokenView struct {
@@ -428,7 +429,7 @@ func toView(s Service, origin string) view {
 func (a *App) present(s Service, origin string) view {
 	v := toView(s, origin)
 	if a != nil && a.activity != nil {
-		v.Requests, v.LastStatus, v.LastSeen = a.activity.summary(s.Name)
+		v.Requests, v.LastStatus, v.LastSeen, v.LastWho = a.activity.summary(s.Name)
 	}
 	return v
 }
