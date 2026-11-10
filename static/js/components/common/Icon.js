@@ -12,6 +12,7 @@ const PATHS = {
   search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   warn: '<path d="M12 3l10 18H2L12 3z"/><path d="M12 10v4M12 17.5v.5"/>',
+  alert: '<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/>',
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
   door: '<path d="M6 21V11a6 6 0 0 1 12 0v10"/><path d="M3 21h18"/><circle cx="12" cy="13" r="1.6"/><path d="M12 14.6V17"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',

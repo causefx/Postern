@@ -173,7 +173,8 @@ func adminPublic(r *http.Request) bool {
 		return true
 	case strings.HasPrefix(p, "/admin/fonts/"):
 		return true
-	case p == "/admin/js/login.js":
+	case strings.HasPrefix(p, "/admin/js/"):
+		// Login page loads ES modules before a session exists.
 		return true
 	default:
 		return false
@@ -242,7 +243,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	if !eq(in.Password, a.adminPass) {
 		time.Sleep(200 * time.Millisecond)
 		a.logins.failure(ip)
-		writeErr(w, 401, "wrong password")
+		writeErr(w, 401, "That password isn't right. Try again.")
 		return
 	}
 	id, err := a.sessions.create(in.Remember)
