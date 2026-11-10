@@ -2,8 +2,8 @@
   "name": "postern",
   "private": true,
   "scripts": {
-    "build:css": "tailwindcss -i ./static/input.css -o ./static/app.css --minify",
-    "dev:css": "tailwindcss -i ./static/input.css -o ./static/app.css --watch --poll"
+    "build:css": "tailwindcss -i ./web/input.css -o ./web/app.css --minify",
+    "dev:css": "tailwindcss -i ./web/input.css -o ./web/app.css --watch --poll"
   },
   "devDependencies": {
     "@tailwindcss/cli": "4.3.5",

@@ -2,6 +2,14 @@
 
 A small reverse proxy that puts a front door on private services: callers get a Postern token (or use the service’s own auth shape), while the real upstream credential never leaves this server.
 
+## Layout
+
+| Path | What it is |
+|---|---|
+| `cmd/postern/` | The server: proxy, admin API, store, sessions |
+| `web/` | Admin UI (HTML, CSS, JS). Embedded into the binary |
+| `data/` | Local config and design references. Not part of the build |
+
 ## Version
 
 Current release series: **0.1.x**. Source default is `0.1.0` ([`version.go`](version.go)).
@@ -16,7 +24,7 @@ Docker/CI inject the same via build-arg `VERSION` (git tag `v1.2.3` → `1.2.3`)
 
 ```bash
 export ADMIN_PASSWORD='choose-a-strong-password'
-go run .
+go run ./cmd/postern
 # UI: http://127.0.0.1:8080/admin/
 ```
 
@@ -34,6 +42,7 @@ docker run --rm -p 8080:8080 \
 ### Admin UI
 
 - Sign-in uses `ADMIN_PASSWORD` (required in production; a random one is generated for the run if unset).
+- Sessions live in memory. Restarting Postern signs everyone out.
 - After 5 failed logins from one IP, further attempts are rejected for 1 minute.
 - Prefer keeping the admin UI off the public internet.
 
@@ -90,4 +99,4 @@ Service config (including upstream secrets and Postern tokens) lives in `POSTERN
 | `ADMIN_PASSWORD` | _(generated)_ | Admin sign-in password |
 | `POSTERN_DATA` | `data/postern-data.json` | JSON store path |
 | `POSTERN_SECURE` | _(auto)_ | Cookie / origin HTTPS mode (see above) |
-| `POSTERN_DEV` | _(off)_ | Serve UI from `./static` on disk (no rebuild for JS/HTML/CSS). Run from repo root; use `npm run dev:css` in another terminal for Tailwind. |
+| `POSTERN_DEV` | _(off)_ | Serve UI from `./web` on disk (no rebuild for JS/HTML/CSS). Run from repo root; use `npm run dev:css` in another terminal for Tailwind. |

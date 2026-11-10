@@ -9,7 +9,7 @@ RUN node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.
 for (const k of Object.keys(p.devDependencies||{})) if (/win32|darwin|linux-arm/.test(k)) delete p.devDependencies[k];\
 fs.writeFileSync('package.json', JSON.stringify(p,null,2));" \
  && npm install
-COPY static ./static
+COPY web ./web
 RUN npm run build:css
 
 # --- Go binary ---
@@ -17,17 +17,17 @@ FROM golang:1.22-alpine AS build
 ARG VERSION=0.1.0
 WORKDIR /src
 COPY go.mod ./
-COPY *.go ./
-# Take JS/HTML/fonts from this build's context (not a possibly-stale css-stage cache),
-# then overlay only the freshly built stylesheet.
-COPY static ./static
-COPY --from=css /src/static/app.css ./static/app.css
-# Fail the build if open-paths UI is missing from the embed tree.
-RUN test -f static/js/components/form/OpenPathsEditor.js \
- && grep -q "Open paths (optional)" static/js/components/form/ServiceFormModal.js
+COPY cmd ./cmd
+COPY web ./web
+# Overlay the stylesheet built in the css stage.
+COPY --from=css /src/web/app.css ./web/app.css
+# Fail the build if the drawer UI is missing from the embed tree.
+RUN test -f web/js/components/drawer/OpenPathsEditor.js \
+ && test -f web/js/components/drawer/ServiceDrawer.js \
+ && ! test -f web/js/components/form/ServiceFormModal.js
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath \
       -ldflags="-s -w -X main.Version=${VERSION}" \
-      -o /out/postern .
+      -o /out/postern ./cmd/postern
 
 # --- Runtime ---
 # Alpine (not distroless) so an entrypoint can chown mounted /data, then drop privileges.

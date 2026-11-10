@@ -21,7 +21,7 @@ Full brief: `HANDOFF.md` (sections 1, 2, 6). Visual reference: `design/mockups/*
 
 ### Adapting to the existing stack
 Detect what Postern's embedded UI uses today and follow it:
-- **Plain HTML + JS (served via `go:embed`)** → ES modules under `static/js/components/<group>/<Name>.js`, each exporting a function that returns a DOM node (or a template literal rendered by a tiny `h()` helper). No framework added unless asked.
+- **Plain HTML + JS (served via `go:embed`)** → ES modules under `web/js/components/<group>/<Name>.js`, each exporting a function that returns a DOM node (or a template literal rendered by a tiny `h()` helper). No framework added unless asked.
 - **Go `html/template`** → one partial per component; small behaviour in matching JS.
 - **A JS framework (Alpine, Preact, Svelte, Vue, React…)** → that framework's single-file component convention, same names/grouping.
 Don't introduce a new framework without asking.
