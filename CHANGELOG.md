@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/causefx/Postern/compare/v0.4.0...v0.5.0) (2026-11-11)
+
+
+### Features
+
+* enhance UI components and functionality across the application ([a92a881](https://github.com/causefx/Postern/commit/a92a881e479daee547ed2923546d6e42cba9c7b3))
+
 ## [0.4.0](https://github.com/causefx/Postern/compare/v0.3.0...v0.4.0) (2026-11-11)
 
 
