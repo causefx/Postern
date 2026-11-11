@@ -600,30 +600,33 @@ func identifyCaller(svc Service, r *http.Request) (string, bool) {
 		return identifyUpstream(svc, r)
 	default:
 		for _, presented := range presentedCallerValues(svc, r) {
-			if name, ok := tokenBySecret(svc, presented); ok {
-				return name, true
+			if tok, ok := tokenBySecret(svc, presented); ok {
+				if tok.Paused {
+					return tok.Name, false
+				}
+				return tok.Name, true
 			}
 		}
 		return "", false
 	}
 }
 
-func tokenBySecret(svc Service, presented string) (string, bool) {
+func tokenBySecret(svc Service, presented string) (CallerToken, bool) {
 	if presented == "" {
-		return "", false
+		return CallerToken{}, false
 	}
-	name := ""
+	var found CallerToken
 	ok := false
 	for _, t := range svc.Tokens {
 		if t.Secret != "" && secretEq(presented, t.Secret) {
-			name = t.Name
+			found = t
 			ok = true
 		}
 	}
 	if !ok && svc.Token != "" && secretEq(presented, svc.Token) {
-		return "default", true
+		return CallerToken{Name: "default", Secret: svc.Token}, true
 	}
-	return name, ok
+	return found, ok
 }
 
 func presentedCallerValues(svc Service, r *http.Request) []string {
@@ -662,33 +665,18 @@ func presentedCallerValues(svc Service, r *http.Request) []string {
 }
 
 func identifyUpstream(svc Service, r *http.Request) (string, bool) {
-	secretOK := svc.Auth.authorizeUpstream(r, "")
-	who := ""
-	tokenOK := false
-	for _, t := range svc.Tokens {
-		if t.Secret != "" && svc.Auth.authorizeUpstream(r, t.Secret) {
-			tokenOK = true
-			who = t.Name
-		}
-	}
-	if !tokenOK && svc.Token != "" && svc.Auth.authorizeUpstream(r, svc.Token) {
-		tokenOK = true
-		who = "default"
-	}
-	if !secretOK && !tokenOK {
-		return "", false
-	}
-	if tokenOK {
-		for _, presented := range upstreamPresented(svc, r) {
-			if name, ok := tokenBySecret(svc, presented); ok {
-				return name, true
+	for _, presented := range upstreamPresented(svc, r) {
+		if tok, ok := tokenBySecret(svc, presented); ok {
+			if tok.Paused {
+				return tok.Name, false
 			}
+			return tok.Name, true
 		}
 	}
-	if secretOK {
+	if svc.Auth.authorizeUpstream(r, "") {
 		return "upstream", true
 	}
-	return who, tokenOK
+	return "", false
 }
 
 func upstreamPresented(svc Service, r *http.Request) []string {

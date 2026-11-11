@@ -115,7 +115,7 @@ export POSTERN_SECURE=1
 ### Caller tokens on `/p/...`
 
 - Default access mode requires a Postern-issued caller token. By default that is accepted as `Authorization: Bearer …`, `X-Proxy-Token`, or `?token=`. Per service you can narrow or rename those places (any one enabled place is enough).
-- A service can hold up to 8 named caller tokens. Any one of them is enough, and the last one cannot be deleted. An older file with a single `token` loads as a token named `default`; saves still write that field as the first secret.
+- A service can hold up to 8 named caller tokens. Any one of them is enough, and the last one cannot be deleted. Pausing a token refuses that caller with 403 `token paused` until it is resumed. An older file with a single `token` loads as a token named `default`; saves still write that field as the first secret.
 - A switched-off service answers `403` with `service disabled`. An unknown name is `404`.
 - Each service and client IP can make `settings.rateLimit` proxy requests per minute (default 120, at most 10000), including open paths. Set it to 0 to turn the limit off. The next request over the limit is `429` with an empty body. Admin routes are not counted. The limit uses the connection address, not a forwarded header. The Settings drawer saves it immediately. A hand edit applies on restart.
 - Caller `Cookie` headers are removed before the upstream credential is added.
@@ -139,7 +139,7 @@ Service config (including upstream secrets and Postern tokens) lives in `POSTERN
 
 Admin changes are appended beside that file as `POSTERN_DATA.audit` (create, update, enable, rotate, token add, token revoke, duplicate, delete, settings). Lines do not include secrets or query strings. The Settings activity list keeps the newest `settings.auditLimit` lines (default 100, at most 5000). At about 1 MB the current file is renamed to `.audit.1` and a new one starts.
 
-Recent proxy requests (the Recent column and the Usage list) are kept beside the data file as `POSTERN_DATA.activity`. The Recent column names the caller token on the latest request (`open`, `rejected`, `off`, `limited`, or `upstream` when it was not a token). How many each service keeps is `settings.activityLimit` in the data file (default 20, at most 1000). Paths are stored with query secrets redacted. Deleting a service removes its entries. The Settings drawer saves the limit immediately and trims the log. A hand edit applies on restart.
+Recent proxy requests (the Recent column and the Usage list) are kept beside the data file as `POSTERN_DATA.activity`. The Recent column names the caller token on the latest request (`open`, `rejected`, `off`, `limited`, or `upstream` when it was not a token). A paused token keeps its name and is marked paused. How many each service keeps is `settings.activityLimit` in the data file (default 20, at most 1000). Paths are stored with query secrets redacted. Deleting a service removes its entries. The Settings drawer saves the limit immediately and trims the log. A hand edit applies on restart.
 
 `GET /healthz` on the proxy listener and the admin listener returns `ok` with no authentication and does not call an upstream.
 

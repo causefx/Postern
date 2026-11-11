@@ -48,6 +48,7 @@ type CallerToken struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
 	Secret string `json:"secret"`
+	Paused bool   `json:"paused,omitempty"`
 }
 
 const maxCallerTokens = 8
@@ -798,6 +799,34 @@ func (s *Store) rotateLocked(serviceName, id string) (Service, error) {
 		return prev, errNotFound
 	}
 	cur.syncTokenField()
+	s.data[serviceName] = cur
+	if err := s.saveLocked(); err != nil {
+		s.data[serviceName] = prev
+		return prev, err
+	}
+	return cur, nil
+}
+
+func (s *Store) SetTokenPaused(serviceName, id string, paused bool) (Service, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cur, ok := s.data[serviceName]
+	if !ok {
+		return cur, errNotFound
+	}
+	prev := cur
+	cur.Tokens = cloneTokens(cur.Tokens)
+	found := false
+	for i := range cur.Tokens {
+		if cur.Tokens[i].ID == id {
+			cur.Tokens[i].Paused = paused
+			found = true
+			break
+		}
+	}
+	if !found {
+		return prev, errNotFound
+	}
 	s.data[serviceName] = cur
 	if err := s.saveLocked(); err != nil {
 		s.data[serviceName] = prev

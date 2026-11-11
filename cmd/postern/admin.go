@@ -405,12 +405,13 @@ type tokenView struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
 	Secret string `json:"secret"`
+	Paused bool   `json:"paused,omitempty"`
 }
 
 func toView(s Service, origin string) view {
 	tokens := make([]tokenView, 0, len(s.Tokens))
 	for _, t := range s.Tokens {
-		tokens = append(tokens, tokenView{ID: t.ID, Name: t.Name, Secret: t.Secret})
+		tokens = append(tokens, tokenView{ID: t.ID, Name: t.Name, Secret: t.Secret, Paused: t.Paused})
 	}
 	return view{
 		Name:       s.Name,
@@ -603,6 +604,35 @@ func (a *App) rotateToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.record(auditEvent{Action: "rotate", Service: svc.Name, Token: tokenLabel(svc.Tokens, r.PathValue("id"))})
+	writeJSON(w, 200, a.present(svc, requestOrigin(r)))
+}
+
+func (a *App) patchToken(w http.ResponseWriter, r *http.Request) {
+	in, err := decodeJSON[struct {
+		Paused *bool `json:"paused"`
+	}](r)
+	if err != nil {
+		writeErr(w, 400, "bad json")
+		return
+	}
+	if in.Paused == nil {
+		writeErr(w, 400, "paused is required")
+		return
+	}
+	label := r.PathValue("id")
+	if cur, ok := a.store.Get(r.PathValue("name")); ok {
+		label = tokenLabel(cur.Tokens, r.PathValue("id"))
+	}
+	svc, err := a.store.SetTokenPaused(r.PathValue("name"), r.PathValue("id"), *in.Paused)
+	if err != nil {
+		if errors.Is(err, errNotFound) {
+			writeErr(w, 404, "not found")
+			return
+		}
+		writeFieldErr(w, err)
+		return
+	}
+	a.record(auditEvent{Action: "token_pause", Service: svc.Name, Token: label, Paused: in.Paused})
 	writeJSON(w, 200, a.present(svc, requestOrigin(r)))
 }
 

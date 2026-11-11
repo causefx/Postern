@@ -147,6 +147,7 @@ func main() {
 	adminMux.HandleFunc("POST /admin/api/services/{name}/rotate", app.rotateService)
 	adminMux.HandleFunc("POST /admin/api/services/{name}/tokens", app.addToken)
 	adminMux.HandleFunc("POST /admin/api/services/{name}/tokens/{id}/rotate", app.rotateToken)
+	adminMux.HandleFunc("PATCH /admin/api/services/{name}/tokens/{id}", app.patchToken)
 	adminMux.HandleFunc("DELETE /admin/api/services/{name}/tokens/{id}", app.deleteToken)
 	adminMux.HandleFunc("GET /admin/api/services/{name}/activity", app.serviceActivity)
 	adminMux.HandleFunc("DELETE /admin/api/services/{name}/activity", app.clearActivity)

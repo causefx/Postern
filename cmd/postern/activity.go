@@ -24,6 +24,7 @@ type activityEvent struct {
 	Path   string    `json:"path"`
 	Status int       `json:"status"`
 	Who    string    `json:"who"`
+	Reason string    `json:"reason,omitempty"`
 }
 
 type activityLog struct {
@@ -143,6 +144,7 @@ func (l *activityLog) list(name string) []activityEvent {
 
 // summary is the ring length plus the newest status, time, and caller.
 // who is the token name, or open, rejected, off, limited, or upstream.
+// A paused token keeps its name and sets reason to paused.
 // It is empty when the service has no recorded requests.
 func (l *activityLog) summary(name string) (count, status int, last time.Time, who string) {
 	if l == nil || name == "" {
@@ -155,7 +157,11 @@ func (l *activityLog) summary(name string) (count, status int, last time.Time, w
 		return 0, 0, time.Time{}, ""
 	}
 	lastEv := src[len(src)-1]
-	return len(src), lastEv.Status, lastEv.Time, lastEv.Who
+	who = lastEv.Who
+	if lastEv.Reason == "paused" && who != "" && who != "paused" {
+		who += " · paused"
+	}
+	return len(src), lastEv.Status, lastEv.Time, who
 }
 
 func (l *activityLog) forget(name string) {
@@ -215,6 +221,10 @@ func (l *activityLog) saveLocked() {
 }
 
 func (a *App) noteActivity(name, method, path, who string, status int) {
+	a.noteCaller(name, method, path, who, "", status)
+}
+
+func (a *App) noteCaller(name, method, path, who, reason string, status int) {
 	if a == nil || a.activity == nil {
 		return
 	}
@@ -224,6 +234,7 @@ func (a *App) noteActivity(name, method, path, who string, status int) {
 		Path:   path,
 		Status: status,
 		Who:    who,
+		Reason: reason,
 	})
 }
 

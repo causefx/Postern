@@ -81,9 +81,40 @@ export function AccessPanel({ draft, token, tokens = [], savedName, serviceLabel
         const masked = t.secret && t.secret.length > 8 ? t.secret.slice(0, 4) + '••••••••••••••••' : '••••••••';
         return h(
           'div',
-          { className: 'token-field' },
-          h('span', { className: 'text-xs text-cream-dim shrink-0 w-16 truncate' }, t.name || 'token'),
+          { className: t.paused ? 'token-field token-field-paused' : 'token-field' },
+          h(
+            'span',
+            { className: `text-xs shrink-0 w-16 truncate ${t.paused ? 'text-muted' : 'text-cream-dim'}` },
+            t.name || 'token',
+          ),
+          t.paused ? h('span', { className: 'text-[11px] font-semibold text-warn shrink-0' }, 'Paused') : null,
           h('code', { className: 'token-field-value' }, masked),
+          Button(
+            {
+              variant: 'ghost',
+              size: 'sm',
+              square: true,
+              className: 'token-field-btn',
+              'aria-label': t.paused ? `Resume ${t.name || 'token'}` : `Pause ${t.name || 'token'}`,
+              'aria-pressed': t.paused ? 'true' : 'false',
+              title: t.paused ? 'Resume' : 'Pause',
+              disabled: !t.id,
+              onClick: async (e) => {
+                const button = e.currentTarget;
+                if (!t.id || button.disabled) return;
+                button.disabled = true;
+                try {
+                  const updated = await api.setTokenPaused(savedName, t.id, !t.paused);
+                  showToast(t.paused ? `Resumed ${t.name || 'token'}` : `Paused ${t.name || 'token'}`);
+                  onTokensUpdated?.(updated);
+                } catch (err) {
+                  showToast(err.message, 'error');
+                  if (button.isConnected) button.disabled = false;
+                }
+              },
+            },
+            Icon(t.paused ? 'play' : 'pause', { size: 15 }),
+          ),
           Button(
             {
               variant: 'ghost',

@@ -963,6 +963,9 @@
 .token-field-btn:hover {
   color: var(--color-eggshell) !important;
 }
+.token-field-paused {
+  border-color: var(--color-warn);
+}
 .gate-editor {
   display: flex;
   flex-direction: column;

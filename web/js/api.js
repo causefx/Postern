@@ -50,6 +50,11 @@ export const api = {
     }),
   deleteToken: (name, id) =>
     request('services/' + encodeURIComponent(name) + '/tokens/' + encodeURIComponent(id), { method: 'DELETE' }),
+  setTokenPaused: (name, id, paused) =>
+    request('services/' + encodeURIComponent(name) + '/tokens/' + encodeURIComponent(id), {
+      method: 'PATCH',
+      body: JSON.stringify({ paused }),
+    }),
   activity: (name) => request('services/' + encodeURIComponent(name) + '/activity'),
   clearActivity: (name) => request('services/' + encodeURIComponent(name) + '/activity', { method: 'DELETE' }),
   deleteService: (name) => request('services/' + encodeURIComponent(name), { method: 'DELETE' }),

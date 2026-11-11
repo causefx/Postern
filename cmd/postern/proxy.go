@@ -100,6 +100,11 @@ func (a *App) proxy(w http.ResponseWriter, r *http.Request) {
 	}
 	who, allowed := identifyCaller(svc, r)
 	if !allowed {
+		if who != "" {
+			a.noteCaller(name, r.Method, path, who, "paused", http.StatusForbidden)
+			http.Error(w, "token paused", http.StatusForbidden)
+			return
+		}
 		a.noteActivity(name, r.Method, path, "rejected", http.StatusUnauthorized)
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return

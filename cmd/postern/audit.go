@@ -43,6 +43,7 @@ type auditEvent struct {
 	Activity      *int      `json:"activity,omitempty"`
 	Audit         *int      `json:"audit,omitempty"`
 	PasswordLogin *bool     `json:"passwordLogin,omitempty"`
+	Paused        *bool     `json:"paused,omitempty"`
 }
 
 type auditLog struct {

@@ -17,6 +17,11 @@ export function auditHeadline(ev) {
       return { before: `Added the ${ev.token || 'caller'} token for `, name };
     case 'token_revoke':
       return { before: `Revoked the ${ev.token || 'caller'} token for `, name };
+    case 'token_pause':
+      return {
+        before: ev.paused ? `Paused the ${ev.token || 'caller'} token for ` : `Resumed the ${ev.token || 'caller'} token for `,
+        name,
+      };
     case 'create':
       return { before: 'Created ', name };
     case 'delete':
@@ -53,6 +58,8 @@ export function auditIcon(action) {
     case 'delete':
     case 'token_revoke':
       return 'trash';
+    case 'token_pause':
+      return 'pause';
     case 'create':
     case 'token_add':
       return 'plus';

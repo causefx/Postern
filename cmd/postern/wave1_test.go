@@ -351,3 +351,82 @@ func TestActivityLimitStoredInDataFile(t *testing.T) {
 		t.Fatalf("check %v %v", problems, err)
 	}
 }
+
+func TestPausedTokenRefusesUntilResumed(t *testing.T) {
+	dir := t.TempDir()
+	store, err := OpenStore(filepath.Join(dir, "d.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Create(Service{Name: "one", URL: "http://127.0.0.1:9", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	withPhone, err := store.AddToken("one", "phone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	phone := withPhone.Tokens[1]
+	paused, err := store.SetTokenPaused("one", phone.ID, true)
+	if err != nil || !paused.Tokens[1].Paused || paused.Tokens[0].Paused {
+		t.Fatalf("pause %+v %v", paused.Tokens, err)
+	}
+	rotated, err := store.RotateTokenID("one", phone.ID)
+	if err != nil || !rotated.Tokens[1].Paused || rotated.Tokens[1].Secret == phone.Secret {
+		t.Fatalf("rotate kept pause %+v %v", rotated.Tokens[1], err)
+	}
+	again, err := OpenStore(filepath.Join(dir, "d.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved, ok := again.Get("one")
+	if !ok || !saved.Tokens[1].Paused {
+		t.Fatal("pause did not persist")
+	}
+
+	app := &App{store: store, activity: newActivityLog()}
+	req := httptest.NewRequest(http.MethodGet, "/p/one/x", nil)
+	req.SetPathValue("name", "one")
+	req.SetPathValue("rest", "x")
+	req.Header.Set("Authorization", "Bearer "+rotated.Tokens[1].Secret)
+	rec := httptest.NewRecorder()
+	app.proxy(rec, req)
+	body, _ := io.ReadAll(rec.Body)
+	if rec.Code != http.StatusForbidden || !strings.Contains(string(body), "token paused") {
+		t.Fatalf("paused status %d body %s", rec.Code, body)
+	}
+	events := app.activity.list("one")
+	if len(events) != 1 || events[0].Who != "phone" || events[0].Reason != "paused" || events[0].Status != http.StatusForbidden {
+		t.Fatalf("activity %+v", events)
+	}
+	if _, _, _, who := app.activity.summary("one"); who != "phone · paused" {
+		t.Fatalf("summary who %q", who)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+rotated.Tokens[0].Secret)
+	if who, ok := identifyCaller(rotated, req); !ok || who != rotated.Tokens[0].Name {
+		t.Fatalf("active sibling who %q ok %v", who, ok)
+	}
+	if _, err := store.SetTokenPaused("one", phone.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	resumed, _ := store.Get("one")
+	req.Header.Set("Authorization", "Bearer "+resumed.Tokens[1].Secret)
+	if who, ok := identifyCaller(resumed, req); !ok || who != "phone" {
+		t.Fatalf("resumed who %q ok %v", who, ok)
+	}
+
+	up := Service{
+		Name: "s", Enabled: true, Access: AccessUpstream,
+		Tokens: []CallerToken{{Name: "phone", Secret: "pst", Paused: true}},
+		Auth:   UpstreamAuth{Header: &HeaderAuth{Name: "X-Api-Key", Secret: "real"}},
+	}
+	upReq := httptest.NewRequest(http.MethodGet, "/p/s/x", nil)
+	upReq.Header.Set("X-Api-Key", "pst")
+	if who, ok := identifyCaller(up, upReq); ok || who != "phone" {
+		t.Fatalf("upstream token who %q ok %v", who, ok)
+	}
+	upReq.Header.Set("X-Api-Key", "real")
+	if who, ok := identifyCaller(up, upReq); !ok || who != "upstream" {
+		t.Fatalf("real secret who %q ok %v", who, ok)
+	}
+}

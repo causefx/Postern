@@ -196,7 +196,7 @@ export function UsagePanel({ draft, savedName }) {
           { className: 'flex flex-col gap-1.5 text-[13px]' },
           statusLine('401', 'Token missing or wrong.'),
           statusLine('502', `Postern couldn’t reach ${serviceLabel()} at its upstream URL.`),
-          statusLine('403', 'Service switched off.'),
+          statusLine('403', 'Service switched off, or this caller token is paused.'),
         ),
       ),
     );
@@ -204,6 +204,20 @@ export function UsagePanel({ draft, savedName }) {
     sections.push(recentRequests());
 
     wrap.replaceChildren(...sections);
+  }
+
+  function eventSig(ev) {
+    return `${ev.time}|${ev.status}|${ev.who}|${ev.reason || ''}|${ev.method}|${ev.path}`;
+  }
+
+  function callerBits(ev) {
+    const paused = ev.reason === 'paused' || ev.who === 'paused';
+    const name = ev.who && ev.who !== 'paused' ? ev.who : '';
+    const bits = [];
+    if (name) bits.push(h('span', { className: 'text-muted max-w-24 shrink-0 truncate', title: name }, name));
+    if (paused) bits.push(h('span', { className: 'text-warn shrink-0 text-xs' }, 'paused'));
+    if (!bits.length) bits.push(h('span', { className: 'text-muted w-16 shrink-0 truncate' }, ev.who || ''));
+    return bits;
   }
 
   function logNodes() {
@@ -216,7 +230,7 @@ export function UsagePanel({ draft, savedName }) {
           'div',
           { className: 'flex gap-3 text-[13px] font-mono' },
           h('span', { className: 'text-cream-dim w-10 shrink-0' }, String(ev.status || '')),
-          h('span', { className: 'text-muted w-16 shrink-0 truncate' }, ev.who || ''),
+          ...callerBits(ev),
           h('span', { className: 'text-eggshell truncate' }, `${ev.method || ''} ${ev.path || ''}`),
           h(
             'span',
@@ -246,7 +260,7 @@ export function UsagePanel({ draft, savedName }) {
       const list = await api.activity(savedName);
       if (gen !== generation) return;
       const next = Array.isArray(list) ? list : [];
-      const nextSig = next.map((ev) => `${ev.time}|${ev.status}|${ev.who}|${ev.method}|${ev.path}`).join('\n');
+      const nextSig = next.map(eventSig).join('\n');
       if (nextSig === logSig) return;
       logSig = nextSig;
       events = next;
@@ -362,7 +376,7 @@ export function UsagePanel({ draft, savedName }) {
     eventsLoaded = true;
     api.activity(savedName).then((list) => {
       events = Array.isArray(list) ? list : [];
-      logSig = events.map((ev) => `${ev.time}|${ev.status}|${ev.who}|${ev.method}|${ev.path}`).join('\n');
+      logSig = events.map(eventSig).join('\n');
       paint();
     }).catch(() => {});
   }
