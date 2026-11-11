@@ -51,6 +51,7 @@ export const api = {
   deleteToken: (name, id) =>
     request('services/' + encodeURIComponent(name) + '/tokens/' + encodeURIComponent(id), { method: 'DELETE' }),
   activity: (name) => request('services/' + encodeURIComponent(name) + '/activity'),
+  clearActivity: (name) => request('services/' + encodeURIComponent(name) + '/activity', { method: 'DELETE' }),
   deleteService: (name) => request('services/' + encodeURIComponent(name), { method: 'DELETE' }),
   duplicateService: (name, newName) =>
     request('services/' + encodeURIComponent(name) + '/duplicate', {

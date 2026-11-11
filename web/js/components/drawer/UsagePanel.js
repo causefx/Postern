@@ -7,6 +7,8 @@ import { copyText } from '../../lib/clipboard.js';
 import { showToast } from '../common/Toast.js';
 import { state } from '../../state.js';
 import { api } from '../../api.js';
+import { blankServiceRecent } from '../../lib/liveList.js';
+import { requestWhen } from '../../lib/serviceDisplay.js';
 
 /**
  * Usage tab: examples derived only from the current draft config.
@@ -17,6 +19,10 @@ export function UsagePanel({ draft, savedName }) {
   let sendAs = 'bearer';
   let events = [];
   let eventsLoaded = false;
+  let live = false;
+  let liveTimer = 0;
+  let logSig = '';
+  let generation = 0;
 
   function publicBase() {
     const name = slugify(draft.name) || draft.name || savedFallback();
@@ -200,29 +206,127 @@ export function UsagePanel({ draft, savedName }) {
     wrap.replaceChildren(...sections);
   }
 
+  function logNodes() {
+    if (!events.length) return [h('p', { className: 'm-0 text-xs text-muted' }, 'No requests yet.')];
+    return events
+      .slice()
+      .reverse()
+      .map((ev) =>
+        h(
+          'div',
+          { className: 'flex gap-3 text-[13px] font-mono' },
+          h('span', { className: 'text-cream-dim w-10 shrink-0' }, String(ev.status || '')),
+          h('span', { className: 'text-muted w-16 shrink-0 truncate' }, ev.who || ''),
+          h('span', { className: 'text-eggshell truncate' }, `${ev.method || ''} ${ev.path || ''}`),
+          h(
+            'span',
+            { className: 'text-muted ml-auto shrink-0 whitespace-nowrap text-xs', title: ev.time || '' },
+            requestWhen(ev.time),
+          ),
+        ),
+      );
+  }
+
+  function renderLog() {
+    wrap.querySelector('[data-activity-log]')?.replaceChildren(...logNodes());
+  }
+
+  function stopLive() {
+    if (liveTimer) window.clearInterval(liveTimer);
+    liveTimer = 0;
+  }
+
+  async function pullActivity() {
+    if (!wrap.isConnected) {
+      stopLive();
+      return;
+    }
+    const gen = generation;
+    try {
+      const list = await api.activity(savedName);
+      if (gen !== generation) return;
+      const next = Array.isArray(list) ? list : [];
+      const nextSig = next.map((ev) => `${ev.time}|${ev.status}|${ev.who}|${ev.method}|${ev.path}`).join('\n');
+      if (nextSig === logSig) return;
+      logSig = nextSig;
+      events = next;
+      renderLog();
+    } catch {
+      /* keep the lines already shown */
+    }
+  }
+
+  function paintLive(button) {
+    button.setAttribute('aria-pressed', live ? 'true' : 'false');
+    button.setAttribute('aria-label', live ? 'Live updates on' : 'Live updates off');
+    const word = button.querySelector('[data-live-state]');
+    if (word) word.textContent = live ? 'On' : 'Off';
+  }
+
+  async function clearRecent(button) {
+    if (!savedName || button.disabled) return;
+    button.disabled = true;
+    generation += 1;
+    try {
+      await api.clearActivity(savedName);
+      generation += 1;
+      events = [];
+      logSig = '';
+      renderLog();
+      blankServiceRecent(savedName);
+    } catch (err) {
+      showToast(err.message || 'Could not clear recent requests', 'error');
+    } finally {
+      if (button.isConnected) button.disabled = false;
+    }
+  }
+
+  function toggleLive(button) {
+    live = !live;
+    paintLive(button);
+    stopLive();
+    if (!live) return;
+    pullActivity();
+    liveTimer = window.setInterval(pullActivity, 2000);
+  }
+
   function recentRequests() {
     if (!savedName) {
       return h('p', { className: 'm-0 text-xs text-muted' }, 'Save the service to see recent requests.');
     }
-    const rows = events.length
-      ? events
-          .slice()
-          .reverse()
-          .map((ev) =>
-            h(
-              'div',
-              { className: 'flex gap-3 text-[13px] font-mono' },
-              h('span', { className: 'text-cream-dim w-10 shrink-0' }, String(ev.status || '')),
-              h('span', { className: 'text-muted w-16 shrink-0 truncate' }, ev.who || ''),
-              h('span', { className: 'text-eggshell truncate' }, `${ev.method || ''} ${ev.path || ''}`),
-            ),
-          )
-      : [h('p', { className: 'm-0 text-xs text-muted' }, 'No requests yet.')];
     return h(
       'div',
       { className: 'flex flex-col gap-2' },
-      h('span', { className: 'font-semibold text-sm text-eggshell' }, 'Recent requests'),
-      ...rows,
+      h(
+        'div',
+        { className: 'flex items-center justify-between gap-2' },
+        h('span', { className: 'font-semibold text-sm text-eggshell' }, 'Recent requests'),
+        h(
+          'div',
+          { className: 'flex items-center gap-2' },
+          Button(
+            {
+              size: 'sm',
+              'aria-label': 'Clear recent requests',
+              onClick: (e) => clearRecent(e.currentTarget),
+            },
+            'Clear',
+          ),
+          Button(
+            {
+              size: 'sm',
+              className: 'live-toggle gap-1.5',
+              'aria-pressed': live ? 'true' : 'false',
+              'aria-label': live ? 'Live updates on' : 'Live updates off',
+              onClick: (e) => toggleLive(e.currentTarget),
+            },
+            h('span', { className: 'status-dot', 'aria-hidden': 'true' }),
+            'Live',
+            h('span', { 'data-live-state': '1' }, live ? 'On' : 'Off'),
+          ),
+        ),
+      ),
+      h('div', { className: 'flex flex-col gap-1.5', 'data-activity-log': '1' }, ...logNodes()),
     );
   }
 
@@ -258,6 +362,7 @@ export function UsagePanel({ draft, savedName }) {
     eventsLoaded = true;
     api.activity(savedName).then((list) => {
       events = Array.isArray(list) ? list : [];
+      logSig = events.map((ev) => `${ev.time}|${ev.status}|${ev.who}|${ev.method}|${ev.path}`).join('\n');
       paint();
     }).catch(() => {});
   }

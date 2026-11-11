@@ -42,6 +42,24 @@ export function recentLabel(service) {
   return parts.join(' · ');
 }
 
+/** Local date and time for one request, e.g. "Nov 10, 5:33:38 PM". */
+export function requestWhen(iso) {
+  const when = new Date(iso);
+  if (Number.isNaN(when.getTime())) return '';
+  return when.toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
+export function recentTitle(service) {
+  if (!service?.lastSeen) return 'No requests yet';
+  return `Last request ${service.lastSeen}${service.lastWho ? ` · ${service.lastWho}` : ''}`;
+}
+
 export function isMac() {
   return /Mac|iPhone|iPad/.test(navigator.platform || '') || /Mac/.test(navigator.userAgent || '');
 }

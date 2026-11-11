@@ -548,6 +548,16 @@
   background: color-mix(in srgb, var(--color-slate) 68%, var(--color-space));
 }
 .svc-tr-off .svc-name { color: var(--color-muted); }
+.btn.live-toggle {
+  color: var(--color-muted);
+  border-color: var(--color-line);
+}
+.btn.live-toggle .status-dot { background: var(--color-muted); }
+.btn.live-toggle[aria-pressed='true'] {
+  border-color: var(--color-live);
+  color: var(--color-live);
+}
+.btn.live-toggle[aria-pressed='true'] .status-dot { background: var(--color-live); }
 
 /* The phone list stays. On the table, route leaves first, then recent, then upstream creds. */
 @media (max-width: 1359px) {

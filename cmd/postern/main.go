@@ -149,6 +149,7 @@ func main() {
 	adminMux.HandleFunc("POST /admin/api/services/{name}/tokens/{id}/rotate", app.rotateToken)
 	adminMux.HandleFunc("DELETE /admin/api/services/{name}/tokens/{id}", app.deleteToken)
 	adminMux.HandleFunc("GET /admin/api/services/{name}/activity", app.serviceActivity)
+	adminMux.HandleFunc("DELETE /admin/api/services/{name}/activity", app.clearActivity)
 	adminMux.HandleFunc("DELETE /admin/api/services/{name}", app.deleteService)
 	adminMux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin/", http.StatusFound)

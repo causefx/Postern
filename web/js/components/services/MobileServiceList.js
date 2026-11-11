@@ -62,7 +62,12 @@ function mobileRow(service, index, onOpen) {
       'div',
       { className: 'flex-1 min-w-0 flex flex-col gap-0.5' },
       h('span', { className: 'svc-name text-[15px]' }, service.name),
-      h('span', { className: 'font-mono text-[12px] text-muted truncate' }, meta.join(' · ')),
+      h(
+        'span',
+        { className: 'font-mono text-[12px] text-muted truncate' },
+        meta.join(' · '),
+        h('span', { 'data-recent': service.name, 'data-recent-inline': '1' }, recent ? ` · ${recent}` : ''),
+      ),
     ),
     Icon('chevron', { size: 16, className: 'text-muted -rotate-90 shrink-0' }),
   );

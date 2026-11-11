@@ -1,4 +1,5 @@
 import { api } from './api.js';
+import { absorbServices } from './lib/liveList.js';
 import {
   state,
   setState,
@@ -234,6 +235,21 @@ async function reload() {
   setState({ services });
 }
 
+let liveBusy = false;
+
+async function refreshLive() {
+  if (liveBusy || document.hidden) return;
+  liveBusy = true;
+  try {
+    const services = await api.listServices();
+    if (!absorbServices(services)) setState({ services });
+  } catch {
+    /* keep the list already on screen */
+  } finally {
+    liveBusy = false;
+  }
+}
+
 async function boot() {
   try {
     const meta = await api.meta();
@@ -244,6 +260,10 @@ async function boot() {
   document.addEventListener('keydown', onKeydown);
   subscribe(render);
   await reload();
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) refreshLive();
+  });
+  window.setInterval(refreshLive, 2000);
   if (new URLSearchParams(location.search).get('settings') === '1') {
     history.replaceState(null, '', location.pathname);
     openSettings();

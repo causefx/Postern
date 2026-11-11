@@ -129,6 +129,32 @@ func TestActivityPersistsAcrossRestart(t *testing.T) {
 	}
 }
 
+func TestClearActivityDropsOneService(t *testing.T) {
+	dir := t.TempDir()
+	data := filepath.Join(dir, "d.json")
+	raw := `{"services":[{"name":"one","url":"http://127.0.0.1:9","token":"abc","enabled":true}]}`
+	if err := os.WriteFile(data, []byte(raw), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	st, err := OpenStore(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	app := &App{store: st, activity: newActivityLog()}
+	app.activity.add("one", activityEvent{Method: "GET", Path: "/x", Status: 200, Who: "open"})
+	app.activity.add("two", activityEvent{Method: "GET", Path: "/y", Status: 204, Who: "default"})
+	req := httptest.NewRequest(http.MethodDelete, "/admin/api/services/one/activity", nil)
+	req.SetPathValue("name", "one")
+	rec := httptest.NewRecorder()
+	app.clearActivity(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status %d", rec.Code)
+	}
+	if len(app.activity.list("one")) != 0 || len(app.activity.list("two")) != 1 {
+		t.Fatalf("one %d two %d", len(app.activity.list("one")), len(app.activity.list("two")))
+	}
+}
+
 func TestLegacyTokenMigratesAndNamedTokens(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "d.json")

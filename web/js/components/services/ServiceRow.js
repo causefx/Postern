@@ -1,7 +1,7 @@
 import { h } from '../../lib/h.js';
 import { Button } from '../common/Button.js';
 import { setState, isSelected, toggleSelect } from '../../state.js';
-import { accessLabel, credBits, recentLabel, upstreamHost } from '../../lib/serviceDisplay.js';
+import { accessLabel, credBits, recentLabel, recentTitle, upstreamHost } from '../../lib/serviceDisplay.js';
 import { copyServiceToken } from '../../lib/serviceActions.js';
 import { flashCopied } from '../../lib/clipboard.js';
 import { getDrawerName, isDrawerDirty } from '../drawer/ServiceDrawer.js';
@@ -82,9 +82,8 @@ export function ServiceRow({ service, index, focused, onOpen }) {
         'span',
         {
           className: 'font-mono text-[12px] text-muted whitespace-nowrap',
-          title: service.lastSeen
-            ? `Last request ${service.lastSeen}${service.lastWho ? ` · ${service.lastWho}` : ''}`
-            : 'No requests yet',
+          'data-recent': service.name,
+          title: recentTitle(service),
         },
         recentLabel(service) || '—',
       ),

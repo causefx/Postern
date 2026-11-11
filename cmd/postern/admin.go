@@ -637,6 +637,18 @@ func (a *App) serviceActivity(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, events)
 }
 
+func (a *App) clearActivity(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if _, ok := a.store.Get(name); !ok {
+		writeErr(w, 404, "not found")
+		return
+	}
+	if a.activity != nil {
+		a.activity.forget(name)
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (a *App) duplicateService(w http.ResponseWriter, r *http.Request) {
 	in, err := decodeJSON[struct {
 		Name string `json:"name"`
