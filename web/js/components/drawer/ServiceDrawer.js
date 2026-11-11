@@ -4,15 +4,19 @@ import { Icon } from '../common/Icon.js';
 import { AuthRowsEditor } from './AuthRowsEditor.js';
 import { AccessPanel } from './AccessPanel.js';
 import { UsagePanel } from './UsagePanel.js';
+import { DocsPanel } from './DocsPanel.js';
 import { OpenPathsEditor } from './OpenPathsEditor.js';
+import { ServiceDrawerHeader } from './ServiceDrawerHeader.js';
+import { ServiceDrawerTabs } from './ServiceDrawerTabs.js';
 import { api } from '../../api.js';
 import { slugify } from '../../lib/slug.js';
 import { authFromView, authToPayload, emptyAuth, isAuthNone } from '../../lib/authPresets.js';
 import { defaultGate, gateFromView } from '../../lib/callerGate.js';
 import { draftSnapshot, draftSaveBody, openPathCount } from '../../lib/drawerDraft.js';
-import { copyText } from '../../lib/clipboard.js';
+import { copyValue } from '../../lib/clipboard.js';
 import { showToast } from '../common/Toast.js';
 import { openDeleteDialog } from '../dialogs/DeleteServiceDialog.js';
+import { askUnsavedChanges } from '../dialogs/UnsavedChangesDialog.js';
 import { isMac } from '../../lib/serviceDisplay.js';
 import { setState, state, filteredServices } from '../../state.js';
 
@@ -20,10 +24,11 @@ let root = null;
 let ctrl = null;
 
 const TABS = [
-  { id: 'connection', label: 'Connection' },
-  { id: 'access', label: 'Access' },
-  { id: 'advanced', label: 'Advanced' },
-  { id: 'usage', label: 'Usage' },
+  { id: 'connection', label: 'Connection', icon: 'plug' },
+  { id: 'access', label: 'Access', icon: 'lock' },
+  { id: 'advanced', label: 'Advanced', icon: 'gear' },
+  { id: 'usage', label: 'Requests', icon: 'pulse' },
+  { id: 'docs', label: 'How to use', icon: 'book' },
 ];
 
 /** @returns {boolean} */
@@ -59,10 +64,21 @@ export function openServiceDrawer({ mode = 'edit', service = null, handlers = {}
   });
 }
 
-export function closeServiceDrawer({ skipConfirm = false } = {}) {
+async function resolveUnsaved() {
+  if (!ctrl?.isDirty?.()) return 'discard';
+  const choice = await askUnsavedChanges();
+  if (choice === 'save') {
+    const ok = await ctrl.save();
+    return ok ? 'save' : 'cancel';
+  }
+  return choice;
+}
+
+export async function closeServiceDrawer({ skipConfirm = false } = {}) {
   if (!root) return true;
-  if (!skipConfirm && ctrl?.isDirty?.()) {
-    if (!confirm('Discard unsaved changes?')) return false;
+  if (!skipConfirm) {
+    const choice = await resolveUnsaved();
+    if (choice === 'cancel') return false;
   }
   root.classList.remove('drawer-open');
   const el = root;
@@ -74,9 +90,10 @@ export function closeServiceDrawer({ skipConfirm = false } = {}) {
 }
 
 /** Switch edit target (J/K). Returns false if blocked by dirty confirm. */
-export function navigateDrawer(service) {
+export async function navigateDrawer(service) {
   if (!ctrl || ctrl.mode !== 'edit') return false;
-  if (ctrl.isDirty() && !confirm('Discard unsaved changes?')) return false;
+  const choice = await resolveUnsaved();
+  if (choice === 'cancel') return false;
   ctrl.loadService(service);
   const idx = filteredServices().findIndex((s) => s.name === service.name);
   setState({
@@ -147,44 +164,76 @@ function createController({ mode, service, handlers }) {
   function markDirty() {
     setState({ drawerDirty: isDirty() });
     paintChrome();
-    paintTabs();
   }
 
-  const titleEl = h('h2', { className: 'drawer-title font-display m-0' }, isEdit ? service.name : 'New service');
-  const prevBtn = Button(
-    {
-      variant: 'ghost',
-      size: 'sm',
-      square: true,
-      'aria-label': 'Previous service',
-      disabled: !isEdit,
-      onClick: () => handlers.onNavigate?.(-1),
-    },
-    Icon('chevron', { size: 16, className: 'rotate-180' }),
-  );
-  const nextBtn = Button(
-    {
-      variant: 'ghost',
-      size: 'sm',
-      square: true,
-      'aria-label': 'Next service',
-      disabled: !isEdit,
-      onClick: () => handlers.onNavigate?.(1),
-    },
-    Icon('chevron', { size: 16 }),
-  );
+  function pagerState() {
+    const items = filteredServices();
+    if (!isEdit || !savedName || !items.length) {
+      return { index: -1, total: 0, canPage: false };
+    }
+    const index = items.findIndex((s) => s.name === savedName);
+    return { index, total: items.length, canPage: items.length > 1 };
+  }
+
   const errBox = h('p', { className: 'text-danger-text text-sm m-0 min-h-5 px-1' });
   const testResult = h('p', { className: 'text-sm m-0 min-h-5' });
   const wasUrl = h('p', { className: 'm-0 text-xs text-muted' });
   const renameHint = h('p', { className: 'm-0 text-xs text-muted leading-relaxed' });
   const dirtyLabel = h('span', { className: 'drawer-dirty-label' }, '');
-  const tabsHost = h('div', { className: 'drawer-tabs', role: 'tablist', 'aria-label': 'Service settings' });
   const panelHost = h('div', { className: 'drawer-tab-panel flex flex-col gap-4' });
-  const proxyCode = h('code', { className: 'input flex-1 font-mono text-[13px] truncate py-2' }, publicBase());
+  const proxyInput = h('input', {
+    className: 'copy-field-value',
+    type: 'text',
+    readOnly: true,
+    value: publicBase(),
+    'aria-label': 'Proxy URL',
+    onFocus: (e) => e.currentTarget.select(),
+  });
+  const proxyCopyBtn = h(
+    'button',
+    {
+      type: 'button',
+      className: 'copy-field-btn',
+      onClick: async () => {
+        try {
+          await copyValue(publicBase());
+        } catch {
+          /* toast already shown */
+        }
+      },
+    },
+    Icon('copy', { size: 14 }),
+    'Copy',
+  );
+  const proxyField = h('div', { className: 'copy-field' }, proxyInput, proxyCopyBtn);
   const deleteHost = h('div', { className: 'drawer-footer-delete' });
 
   let accessPanel = null;
   let usagePanel = null;
+  let docsPanel = null;
+
+  const header = ServiceDrawerHeader({
+    name: isEdit ? service.name : 'New service',
+    enabled: draft.enabled,
+    ...pagerState(),
+    onToggle: (on) => setLive(on),
+    onPrev: () => handlers.onNavigate?.(-1),
+    onNext: () => handlers.onNavigate?.(1),
+    onClose: async () => {
+      if (await closeServiceDrawer()) handlers.onClose?.();
+    },
+  });
+
+  const tabs = ServiceDrawerTabs({
+    tabs: TABS,
+    activeId: activeTab,
+    getBadge: (id) => (id === 'advanced' ? pathCount() : 0),
+    onSelect: (id) => {
+      if (activeTab === id) return;
+      activeTab = id;
+      renderActiveTab();
+    },
+  });
 
   const nameInput = h('input', {
     className: 'input w-full font-mono',
@@ -192,36 +241,65 @@ function createController({ mode, service, handlers }) {
     placeholder: 'sonarr',
     onInput: (e) => {
       draft.name = e.target.value;
-      titleEl.textContent = slugify(draft.name) || draft.name || (isEdit ? savedName : 'New service');
+      const label = slugify(draft.name) || draft.name || (isEdit ? savedName : 'New service');
+      header.update({ name: label });
       updateHints();
-      proxyCode.textContent = publicBase();
+      proxyInput.value = publicBase();
       if (activeTab === 'access') renderAccess();
       if (activeTab === 'usage') renderUsage();
+      if (activeTab === 'docs') renderDocs();
       markDirty();
     },
   });
 
   const urlInput = h('input', {
-    className: 'input w-full font-mono flex-1 min-w-0',
+    className: 'copy-field-value',
     value: draft.url,
     placeholder: 'http://192.168.1.10:8989',
+    'aria-label': 'Upstream URL',
     onInput: (e) => {
       draft.url = e.target.value;
       updateHints();
       markDirty();
     },
   });
-
-  const liveToggle = h('input', {
-    type: 'checkbox',
-    className: 'toggle toggle-sm',
-    checked: draft.enabled,
-    'aria-label': 'Live',
-    onChange: (e) => {
-      draft.enabled = e.target.checked;
-      markDirty();
+  const urlTestBtn = h(
+    'button',
+    {
+      type: 'button',
+      className: 'copy-field-btn',
+      onClick: () => runTest(),
     },
-  });
+    Icon('pulse', { size: 14 }),
+    'Test',
+  );
+  const urlField = h('div', { className: 'copy-field' }, urlInput, urlTestBtn);
+
+  async function setLive(on) {
+    const next = !!on;
+    if (draft.enabled === next) return;
+    const prev = draft.enabled;
+    draft.enabled = next;
+    header.update({ enabled: next });
+    if (!savedName) return;
+    const optimistic = state.services.map((s) => (s.name === savedName ? { ...s, enabled: next } : s));
+    setState({ services: optimistic });
+    try {
+      const updated = await api.setEnabled(savedName, next);
+      setState({
+        services: state.services.map((s) => (s.name === savedName ? updated : s)),
+      });
+      draft.enabled = !!updated.enabled;
+      header.update({ enabled: draft.enabled });
+    } catch (err) {
+      draft.enabled = prev;
+      header.update({ enabled: prev });
+      setState({
+        services: state.services.map((s) => (s.name === savedName ? { ...s, enabled: prev } : s)),
+      });
+      showToast(err.message || 'Could not update status', 'error');
+    }
+  }
 
   function updateHints() {
     const slug = slugify(draft.name) || draft.name;
@@ -249,40 +327,11 @@ function createController({ mode, service, handlers }) {
     }
   }
 
-  function paintTabs() {
-    const count = pathCount();
-    tabsHost.replaceChildren(
-      ...TABS.map((t) => {
-        const selected = activeTab === t.id;
-        const badge =
-          t.id === 'advanced' && count
-            ? h('span', { className: 'drawer-tab-badge' }, String(count))
-            : null;
-        return h(
-          'button',
-          {
-            type: 'button',
-            role: 'tab',
-            'aria-selected': selected,
-            className: `drawer-tab${selected ? ' drawer-tab-active' : ''}`,
-            onClick: () => {
-              if (activeTab === t.id) return;
-              activeTab = t.id;
-              paintTabs();
-              renderActiveTab();
-            },
-          },
-          t.label,
-          badge,
-        );
-      }),
-    );
-  }
-
   function renderActiveTab() {
     if (activeTab === 'connection') renderConnection();
     else if (activeTab === 'access') renderAccess();
     else if (activeTab === 'advanced') renderAdvanced();
+    else if (activeTab === 'docs') renderDocs();
     else renderUsage();
   }
 
@@ -290,62 +339,49 @@ function createController({ mode, service, handlers }) {
     panelHost.replaceChildren(
       h(
         'div',
-        { className: 'flex flex-col gap-2' },
-        h('label', { className: 'label text-cream-dim' }, 'Name'),
-        nameInput,
-        renameHint,
-      ),
-      h(
-        'div',
-        { className: 'flex flex-col gap-2' },
-        h('span', { className: 'label-caps' }, 'Proxy URL'),
+        { className: 'flex flex-col gap-3' },
         h(
           'div',
-          { className: 'flex gap-2 items-center' },
-          proxyCode,
-          Button(
-            {
-              size: 'sm',
-              className: 'shrink-0',
-              onClick: async () => {
-                try {
-                  await copyText(publicBase());
-                  showToast('Copied');
-                } catch {
-                  showToast('Copy failed', 'error');
-                }
-              },
-            },
-            'Copy',
-          ),
+          { className: 'flex flex-col gap-1.5' },
+          h('label', { className: 'field-label' }, 'Name'),
+          nameInput,
+          renameHint,
         ),
-      ),
-      h(
-        'div',
-        { className: 'flex flex-col gap-2' },
-        h('label', { className: 'label text-cream-dim' }, 'Upstream URL'),
         h(
           'div',
-          { className: 'flex gap-2 items-center' },
-          urlInput,
-          Button({ size: 'sm', className: 'shrink-0', onClick: runTest }, 'Test'),
+          { className: 'flex flex-col gap-1.5' },
+          h('label', { className: 'field-label', htmlFor: 'svc-proxy-url' }, 'Proxy URL'),
+          (() => {
+            proxyInput.id = 'svc-proxy-url';
+            proxyInput.readOnly = true;
+            proxyInput.value = publicBase();
+            return proxyField;
+          })(),
         ),
-        wasUrl,
-        testResult,
+        h(
+          'div',
+          { className: 'flex flex-col gap-1.5' },
+          h('label', { className: 'field-label', htmlFor: 'svc-upstream-url' }, 'Upstream URL'),
+          (() => {
+            urlInput.id = 'svc-upstream-url';
+            return urlField;
+          })(),
+          wasUrl,
+          testResult,
+        ),
+        AuthRowsEditor({
+          auth: draft.auth,
+          editing: !!savedName,
+          showPresets: !savedName,
+          serviceLabel: serviceLabel(),
+          onChange: () => {
+            if (isAuthNone(draft.auth) && draft.access === 'upstream') draft.access = 'postern';
+            markDirty();
+          },
+        }),
+        errBox,
       ),
-      AuthRowsEditor({
-        auth: draft.auth,
-        editing: !!savedName,
-        showPresets: !savedName,
-        serviceLabel: serviceLabel(),
-        onChange: () => {
-          if (isAuthNone(draft.auth) && draft.access === 'upstream') draft.access = 'postern';
-          markDirty();
-        },
-      }),
-      errBox,
     );
-    proxyCode.textContent = publicBase();
   }
 
   function renderAccess() {
@@ -357,7 +393,7 @@ function createController({ mode, service, handlers }) {
       serviceLabel,
       onChange: () => {
         markDirty();
-        if (activeTab === 'usage') renderUsage();
+        if (activeTab === 'docs') renderDocs();
       },
       onTokensUpdated: (svc) => {
         token = svc.token || '';
@@ -375,7 +411,7 @@ function createController({ mode, service, handlers }) {
     panelHost.replaceChildren(
       h(
         'div',
-        { className: 'flex flex-col gap-2' },
+        { className: 'open-paths-panel flex flex-col gap-3' },
         h('span', { className: 'label-caps' }, 'Open paths'),
         h(
           'p',
@@ -387,8 +423,8 @@ function createController({ mode, service, handlers }) {
           errors: fieldErrors,
           onChange: () => {
             markDirty();
-            paintTabs();
-            if (activeTab === 'usage') renderUsage();
+            tabs.refresh();
+            if (activeTab === 'docs') renderDocs();
           },
         }),
       ),
@@ -397,8 +433,13 @@ function createController({ mode, service, handlers }) {
   }
 
   function renderUsage() {
-    usagePanel = UsagePanel({ draft, savedName });
+    usagePanel = UsagePanel({ savedName });
     panelHost.replaceChildren(usagePanel, errBox);
+  }
+
+  function renderDocs() {
+    docsPanel = DocsPanel({ draft });
+    panelHost.replaceChildren(docsPanel, errBox);
   }
 
   function renderDelete() {
@@ -409,11 +450,11 @@ function createController({ mode, service, handlers }) {
     }
     deleteHost.hidden = false;
     deleteHost.replaceChildren(
-      Button(
+      h(
+        'button',
         {
-          variant: 'error',
-          size: 'sm',
-          className: 'drawer-delete-btn gap-1.5',
+          type: 'button',
+          className: 'drawer-delete-link',
           'aria-label': `Delete ${savedName}`,
           onClick: () =>
             openDeleteDialog({
@@ -424,8 +465,7 @@ function createController({ mode, service, handlers }) {
               },
             }),
         },
-        Icon('trash', { size: 16 }),
-        h('span', { className: 'drawer-delete-label' }, `Delete ${savedName}`),
+        h('span', { className: 'drawer-delete-label' }, `Delete ${savedName}…`),
       ),
     );
   }
@@ -472,26 +512,28 @@ function createController({ mode, service, handlers }) {
       token = saved.token || token;
       tokens = saved.tokens || tokens;
       draft.name = saved.name;
+      draft.enabled = !!saved.enabled;
       nameInput.value = saved.name;
-      titleEl.textContent = saved.name;
       baseline = snapshot();
       markDirty();
       renderDelete();
       updateHints();
-      proxyCode.textContent = publicBase();
+      proxyInput.value = publicBase();
       isEdit = true;
       origUrl = saved.url || draft.url;
-      prevBtn.disabled = false;
-      nextBtn.disabled = false;
       panel.setAttribute('aria-label', `Edit ${savedName}`);
+      header.update({ name: saved.name, enabled: draft.enabled, ...pagerState() });
+      tabs.refresh();
       handlers.onSaved?.(saved, { created: creating, renamed: !!(prevName && saved.name !== prevName) });
       showToast(creating ? 'Service created' : 'Saved');
       setState({ drawer: { mode: 'edit', name: savedName } });
       renderActiveTab();
+      return true;
     } catch (e) {
       fieldErrors = e.errors || null;
       errBox.textContent = e.errors ? Object.values(e.errors).join(' · ') : e.message;
       if (fieldErrors && activeTab === 'advanced') renderAdvanced();
+      return false;
     }
   }
 
@@ -514,71 +556,69 @@ function createController({ mode, service, handlers }) {
     draft.gate = gateFromView(svc.gate);
     nameInput.value = draft.name;
     urlInput.value = draft.url;
-    liveToggle.checked = draft.enabled;
-    titleEl.textContent = svc.name;
-    prevBtn.disabled = false;
-    nextBtn.disabled = false;
     panel.setAttribute('aria-label', `Edit ${svc.name}`);
     baseline = snapshot();
     errBox.textContent = '';
     testResult.textContent = '';
-    proxyCode.textContent = publicBase();
+    proxyInput.value = publicBase();
     updateHints();
     renderDelete();
     paintChrome();
-    paintTabs();
+    header.update({ name: svc.name, enabled: draft.enabled, ...pagerState() });
+    tabs.refresh();
     renderActiveTab();
   }
 
+  const mod = isMac() ? '⌘' : 'Ctrl';
+  const discardBtn = Button(
+    {
+      size: 'sm',
+      onClick: () => {
+        if (isDirty() && !confirm('Discard unsaved changes?')) return;
+        if (savedName) {
+          const svc = state.services.find((s) => s.name === savedName);
+          if (svc) loadService(svc);
+          else void closeServiceDrawer({ skipConfirm: true });
+        } else {
+          void closeServiceDrawer({ skipConfirm: true });
+          handlers.onClose?.();
+        }
+      },
+    },
+    'Discard',
+  );
+  const saveBtn = Button(
+    {
+      variant: 'primary',
+      size: 'sm',
+      className: 'gap-1.5',
+      onClick: () => save(),
+    },
+    'Save',
+    h('kbd', { className: 'kbd-hint kbd-hint-on-primary' }, `${mod}S`),
+  );
+
   function paintChrome() {
+    const dirty = isDirty();
     const n = dirtyCount();
+    const creating = !savedName;
     dirtyLabel.textContent = n ? `● ${n} unsaved change${n === 1 ? '' : 's'}` : '';
     dirtyLabel.className = n ? 'drawer-dirty-label is-dirty' : 'drawer-dirty-label';
+    // Edit: Save/Discard only when dirty. Add: Save always on; Discard always on.
+    discardBtn.disabled = creating ? false : !dirty;
+    saveBtn.disabled = creating ? false : !dirty;
+    header.update({ ...pagerState(), enabled: draft.enabled });
   }
-
-  const mod = isMac() ? '⌘' : 'Ctrl';
 
   const footer = h(
     'div',
     { className: 'drawer-footer' },
     deleteHost,
     dirtyLabel,
-    h(
-      'div',
-      { className: 'flex items-center gap-2 ml-auto' },
-      Button(
-        {
-          size: 'sm',
-          onClick: () => {
-            if (!isDirty() || confirm('Discard unsaved changes?')) {
-              if (savedName) {
-                const svc = state.services.find((s) => s.name === savedName);
-                if (svc) loadService(svc);
-                else closeServiceDrawer({ skipConfirm: true });
-              } else {
-                closeServiceDrawer({ skipConfirm: true });
-                handlers.onClose?.();
-              }
-            }
-          },
-        },
-        'Discard',
-      ),
-      Button(
-        {
-          variant: 'primary',
-          size: 'sm',
-          className: 'gap-1.5',
-          onClick: () => save(),
-        },
-        'Save',
-        h('kbd', { className: 'kbd-hint kbd-hint-on-primary' }, `${mod}S`),
-      ),
-    ),
+    h('div', { className: 'flex items-center gap-2 ml-auto' }, discardBtn, saveBtn),
   );
 
   updateHints();
-  paintTabs();
   renderActiveTab();
   renderDelete();
   paintChrome();
@@ -591,36 +631,8 @@ function createController({ mode, service, handlers }) {
       'aria-modal': 'true',
       'aria-label': isEdit ? `Edit ${service.name}` : 'Add service',
     },
-    h(
-      'div',
-      { className: 'drawer-header' },
-      h(
-        'div',
-        { className: 'flex items-center gap-2.5 min-w-0 flex-1' },
-        titleEl,
-        h('span', { className: 'text-xs text-muted shrink-0' }, 'Live'),
-        liveToggle,
-      ),
-      h(
-        'div',
-        { className: 'flex items-center gap-1 shrink-0' },
-        prevBtn,
-        nextBtn,
-        Button(
-          {
-            variant: 'ghost',
-            size: 'sm',
-            square: true,
-            'aria-label': 'Close',
-            onClick: () => {
-              if (closeServiceDrawer()) handlers.onClose?.();
-            },
-          },
-          Icon('close', { size: 16 }),
-        ),
-      ),
-    ),
-    tabsHost,
+    header.el,
+    tabs.el,
     h('div', { className: 'drawer-body' }, panelHost),
     footer,
   );
@@ -629,9 +641,9 @@ function createController({ mode, service, handlers }) {
     'div',
     {
       className: 'drawer-root',
-      onClick: (e) => {
+      onClick: async (e) => {
         if (e.target === el) {
-          if (closeServiceDrawer()) handlers.onClose?.();
+          if (await closeServiceDrawer()) handlers.onClose?.();
         }
       },
     },

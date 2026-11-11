@@ -4,7 +4,40 @@ import { Icon } from '../common/Icon.js';
 
 /** Editable list of open-path rules. Mutates `paths` in place; calls onChange after structural edits. */
 export function OpenPathsEditor({ paths, onChange, errors }) {
-  const list = h('div', { className: 'flex flex-col gap-2' });
+  const list = h('div', { className: 'open-paths-list' });
+
+  function normalizedPath(rule) {
+    if (!rule.path) return '';
+    return rule.path.startsWith('/') ? rule.path : `/${rule.path}`;
+  }
+
+  function hintNodes(rule) {
+    const isRegex = rule.match === 'regex';
+    const path = normalizedPath(rule);
+    if (!path) return null;
+    if (!isRegex) {
+      return [
+        'Matches ',
+        h('span', { className: 'open-path-hint-path' }, path),
+        ' and anything under it.',
+      ];
+    }
+    if (!rule.path.startsWith('^')) {
+      return ['Regex must start with ^ — matches only paths that fit this pattern.'];
+    }
+    return ['Matches any request path that fits this pattern.'];
+  }
+
+  function paintHint(el, rule) {
+    const nodes = hintNodes(rule);
+    if (!nodes) {
+      el.hidden = true;
+      el.replaceChildren();
+      return;
+    }
+    el.hidden = false;
+    el.replaceChildren(...nodes);
+  }
 
   function redraw() {
     list.replaceChildren();
@@ -13,7 +46,8 @@ export function OpenPathsEditor({ paths, onChange, errors }) {
       const matchSel = h(
         'select',
         {
-          className: 'auth-row-select w-auto max-w-none shrink-0',
+          className: 'open-path-select',
+          'aria-label': 'Match type',
           onChange: (e) => {
             rule.match = e.target.value;
             redraw();
@@ -23,14 +57,19 @@ export function OpenPathsEditor({ paths, onChange, errors }) {
         h('option', { value: 'prefix', selected: !isRegex }, 'Prefix'),
         h('option', { value: 'regex', selected: isRegex }, 'Regex'),
       );
-      const pathError = (errors && (errors[`openPaths.${i}.path`] || errors[`openPaths.${i}.match`])) || '';
+      const pathError =
+        (errors && (errors[`openPaths.${i}.path`] || errors[`openPaths.${i}.match`])) || '';
+      const hint = h('p', { className: 'open-path-hint m-0', 'data-open-path-hint': '1' });
+      paintHint(hint, rule);
       const pathInput = h('input', {
-        className: `input w-full min-w-0 font-mono text-[13px]${pathError ? ' input-error' : ''}`,
+        className: `open-path-input${pathError ? ' input-error' : ''}`,
         value: rule.path || '',
         placeholder: rule.match === 'regex' ? '^/webhooks/[^/]+$' : '/health',
+        'aria-label': 'Open path',
         'aria-invalid': pathError ? 'true' : 'false',
         onInput: (e) => {
           rule.path = e.target.value;
+          paintHint(hint, rule);
           onChange?.();
         },
       });
@@ -39,7 +78,7 @@ export function OpenPathsEditor({ paths, onChange, errors }) {
           variant: 'ghost',
           size: 'sm',
           square: true,
-          className: 'text-muted shrink-0',
+          className: 'open-path-remove text-muted',
           'aria-label': 'Remove path',
           title: 'Remove path',
           onClick: () => {
@@ -50,16 +89,6 @@ export function OpenPathsEditor({ paths, onChange, errors }) {
         },
         Icon('close', { size: 14 }),
       );
-      const hint =
-        rule.path && !isRegex
-          ? h(
-              'p',
-              { className: 'm-0 text-xs text-muted leading-relaxed' },
-              'Opens ',
-              h('span', { className: 'font-mono' }, rule.path.startsWith('/') ? rule.path : `/${rule.path}`),
-              ' and anything under it.',
-            )
-          : null;
 
       list.append(
         h(
@@ -84,12 +113,13 @@ export function OpenPathsEditor({ paths, onChange, errors }) {
 
   return h(
     'div',
-    { className: 'flex flex-col gap-3' },
+    { className: 'open-paths-editor' },
     list,
-    Button(
+    h(
+      'button',
       {
-        size: 'sm',
-        className: 'w-fit',
+        type: 'button',
+        className: 'btn-add-row',
         onClick: () => {
           if (paths.length >= 20) return;
           paths.push({ match: 'prefix', path: '' });
@@ -102,7 +132,7 @@ export function OpenPathsEditor({ paths, onChange, errors }) {
     ),
     h(
       'p',
-      { className: 'm-0 text-xs text-muted leading-relaxed' },
+      { className: 'open-paths-footnote m-0' },
       'Prefix matches the start of a path. A regex must start with ',
       h('code', { className: 'font-mono text-[12px]' }, '^'),
       '.',

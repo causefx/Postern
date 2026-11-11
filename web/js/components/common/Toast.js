@@ -5,7 +5,7 @@ let root;
 
 export function mountToast(parent) {
   root = h('div', {
-    className: 'toast toast-end toast-bottom z-50',
+    className: 'toast toast-end toast-bottom postern-toast',
     'aria-live': 'polite',
   });
   parent.append(root);

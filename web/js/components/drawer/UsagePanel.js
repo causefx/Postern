@@ -1,248 +1,138 @@
 import { h } from '../../lib/h.js';
-import { Button } from '../common/Button.js';
-import { slugify } from '../../lib/slug.js';
-import { isAuthNone } from '../../lib/authPresets.js';
-import { usageSnippet, usageSendOptions } from '../../lib/usageSnippet.js';
-import { copyText } from '../../lib/clipboard.js';
 import { showToast } from '../common/Toast.js';
-import { state } from '../../state.js';
 import { api } from '../../api.js';
 import { blankServiceRecent } from '../../lib/liveList.js';
-import { requestWhen } from '../../lib/serviceDisplay.js';
+import {
+  activityErrorCount,
+  activityWhoFilters,
+  groupActivityByDay,
+  isActivityError,
+  matchActivity,
+  requestClock,
+  requestWhen,
+} from '../../lib/serviceDisplay.js';
+import { Icon } from '../common/Icon.js';
+import { StatusBadge } from '../common/StatusBadge.js';
 
 /**
- * Usage tab: examples derived only from the current draft config.
+ * Requests tab: recent proxy requests for this service.
  */
-export function UsagePanel({ draft, savedName }) {
-  const wrap = h('div', { className: 'flex flex-col gap-5' });
-  let lang = 'curl';
-  let sendAs = 'bearer';
+export function UsagePanel({ savedName }) {
+  const wrap = h('div', { className: 'usage-panel flex min-h-0 flex-1 flex-col gap-3' });
   let events = [];
   let eventsLoaded = false;
-  let live = false;
+  let following = false;
   let liveTimer = 0;
   let logSig = '';
   let generation = 0;
-
-  function publicBase() {
-    const name = slugify(draft.name) || draft.name || savedFallback();
-    const origin = state.meta.publicOrigin || location.origin;
-    return `${origin.replace(/\/$/, '')}/p/${name}/`;
-  }
-
-  function savedFallback() {
-    return '<name>';
-  }
-
-  function serviceLabel() {
-    return slugify(draft.name) || draft.name || 'the service';
-  }
-
-  function sendOptions() {
-    return usageSendOptions(draft);
-  }
-
-  function samplePath() {
-    return `${publicBase()}api/…`;
-  }
-
-  function buildSnippet() {
-    const url = samplePath();
-    const opts = sendOptions();
-    if (!opts.find((o) => o.id === sendAs) && opts[0]) sendAs = opts[0].id;
-    return usageSnippet({ draft, lang, sendAs, url });
-  }
-
-  function paint() {
-    const base = publicBase();
-    const opts = sendOptions();
-    if (!opts.find((o) => o.id === sendAs) && opts[0]) sendAs = opts[0].id;
-    const snippet = buildSnippet();
-    const open = (draft.openPaths || []).filter((p) => (p.path || '').trim());
-
-    const sections = [
-      h(
-        'div',
-        { className: 'flex flex-col gap-2' },
-        h('span', { className: 'label-caps' }, 'Base URL'),
-        h(
-          'div',
-          { className: 'flex gap-2 items-center' },
-          h('code', { className: 'input flex-1 font-mono text-[13px] truncate py-2' }, base),
-          copyBtn(base),
-        ),
-        h(
-          'p',
-          { className: 'm-0 text-xs text-muted leading-relaxed' },
-          'Anything after it goes to ',
-          serviceLabel(),
-          ' unchanged — e.g. ',
-          h('span', { className: 'font-mono' }, `${base}api/v3/…`),
-          ' reaches its ',
-          h('span', { className: 'font-mono' }, '/api/v3/…'),
-          '.',
-        ),
-      ),
-    ];
-
-    if (opts.length) {
-      sections.push(
-        h(
-          'div',
-          { className: 'flex flex-col gap-2.5' },
-          h('span', { className: 'label-caps' }, 'Make a request'),
-          h(
-            'div',
-            { className: 'access-seg w-fit' },
-            ...['curl', 'js', 'python'].map((id) =>
-              h(
-                'button',
-                {
-                  type: 'button',
-                  className: `access-seg-btn${lang === id ? ' access-seg-active' : ''}`,
-                  onClick: () => {
-                    lang = id;
-                    paint();
-                  },
-                },
-                id === 'js' ? 'JavaScript' : id === 'python' ? 'Python' : 'curl',
-              ),
-            ),
-          ),
-          h('span', { className: 'text-xs text-muted' }, 'Send the token as'),
-          h(
-            'div',
-            { className: 'access-seg flex-wrap' },
-            ...opts.map((o) =>
-              h(
-                'button',
-                {
-                  type: 'button',
-                  className: `access-seg-btn${sendAs === o.id ? ' access-seg-active' : ''}`,
-                  onClick: () => {
-                    sendAs = o.id;
-                    paint();
-                  },
-                },
-                o.label,
-              ),
-            ),
-          ),
-          h('pre', { className: 'code-block m-0' }, snippet),
-          h(
-            'div',
-            { className: 'flex flex-wrap items-center gap-2' },
-            h(
-              'p',
-              { className: 'm-0 text-xs text-muted flex-1' },
-              draft.access === 'postern'
-                ? 'Replace $POSTERN_TOKEN with the token from the Access tab.'
-                : 'Use the Postern token or the real upstream value in that place.',
-            ),
-            copyBtn(snippet, 'Copy'),
-          ),
-        ),
-      );
-    }
-
-    if (draft.access === 'postern' && !isAuthNone(draft.auth)) {
-      sections.push(
-        h(
-          'div',
-          { className: 'flex flex-col gap-1.5' },
-          h('span', { className: 'font-semibold text-sm text-eggshell' }, `In an app (nzb360, LunaSea…)`),
-          h(
-            'p',
-            { className: 'm-0 text-[13px] text-muted leading-relaxed' },
-            'If the app can only speak ',
-            serviceLabel(),
-            '’s own auth shape, switch Access to “Same as ',
-            serviceLabel(),
-            '”.',
-          ),
-        ),
-      );
-    }
-
-    if (open.length) {
-      sections.push(
-        h(
-          'div',
-          { className: 'flex flex-col gap-1.5' },
-          h('span', { className: 'font-semibold text-sm text-eggshell' }, 'No token needed'),
-          h(
-            'p',
-            { className: 'm-0 text-[13px] text-muted leading-relaxed' },
-            'Open paths from Advanced skip the caller token (upstream credential still attached):',
-          ),
-          h(
-            'ul',
-            { className: 'm-0 pl-4 flex flex-col gap-1 text-[13px] font-mono text-cream-dim' },
-            ...open.map((p) =>
-              h('li', {}, `${p.match === 'regex' ? 'regex' : 'prefix'} · ${base.replace(/\/$/, '')}${p.path.startsWith('/') ? p.path : '/' + p.path}`),
-            ),
-          ),
-        ),
-      );
-    }
-
-    sections.push(
-      h(
-        'div',
-        { className: 'flex flex-col gap-2' },
-        h('span', { className: 'font-semibold text-sm text-eggshell' }, 'What callers might get back from Postern'),
-        h(
-          'div',
-          { className: 'flex flex-col gap-1.5 text-[13px]' },
-          statusLine('401', 'Token missing or wrong.'),
-          statusLine('502', `Postern couldn’t reach ${serviceLabel()} at its upstream URL.`),
-          statusLine('403', 'Service switched off, or this caller token is paused.'),
-        ),
-      ),
-    );
-
-    sections.push(recentRequests());
-
-    wrap.replaceChildren(...sections);
-  }
+  let query = '';
+  /** '' | 'errors' | token who */
+  let whoFilter = '';
 
   function eventSig(ev) {
     return `${ev.time}|${ev.status}|${ev.who}|${ev.reason || ''}|${ev.method}|${ev.path}`;
   }
 
-  function callerBits(ev) {
-    const paused = ev.reason === 'paused' || ev.who === 'paused';
-    const name = ev.who && ev.who !== 'paused' ? ev.who : '';
-    const bits = [];
-    if (name) bits.push(h('span', { className: 'text-muted max-w-24 shrink-0 truncate', title: name }, name));
-    if (paused) bits.push(h('span', { className: 'text-warn shrink-0 text-xs' }, 'paused'));
-    if (!bits.length) bits.push(h('span', { className: 'text-muted w-16 shrink-0 truncate' }, ev.who || ''));
-    return bits;
-  }
-
-  function logNodes() {
-    if (!events.length) return [h('p', { className: 'm-0 text-xs text-muted' }, 'No requests yet.')];
+  function visibleEvents() {
     return events
       .slice()
       .reverse()
-      .map((ev) =>
+      .filter((ev) => {
+        if (whoFilter === 'errors') {
+          if (!isActivityError(ev)) return false;
+        } else if (whoFilter && String(ev.who || '') !== whoFilter) {
+          return false;
+        }
+        return matchActivity(ev, query);
+      });
+  }
+
+  function rowEl(ev, kind, zebra) {
+    const paused = ev.reason === 'paused' || ev.who === 'paused';
+    const who = ev.who && ev.who !== 'paused' ? ev.who : '';
+    const timeLabel = kind === 'older' ? requestWhen(ev.time) : requestClock(ev.time);
+    return h(
+      'div',
+      { className: `req-row${zebra ? ' is-zebra' : ''}` },
+      StatusBadge(ev.status),
+      h('span', { className: 'req-who', title: who || '' }, who || '—'),
+      paused
+        ? h('span', { className: 'req-paused' }, 'paused')
+        : h('span', { className: 'req-paused is-empty', 'aria-hidden': 'true' }),
+      h(
+        'span',
+        { className: 'req-path', title: `${ev.method || ''} ${ev.path || ''}` },
+        `${ev.method || ''} ${ev.path || ''}`.trim() || '—',
+      ),
+      h('span', { className: 'req-time', title: ev.time || '' }, timeLabel),
+    );
+  }
+
+  function logNodes() {
+    if (!events.length) {
+      return [h('p', { className: 'm-0 text-xs text-muted px-1' }, 'No requests yet.')];
+    }
+    const rows = visibleEvents();
+    if (!rows.length) {
+      return [h('p', { className: 'm-0 text-xs text-muted px-1' }, 'No matching requests.')];
+    }
+    const groups = groupActivityByDay(rows);
+    return groups.map((g) =>
+      h(
+        'section',
+        { className: 'req-day-card', 'aria-label': g.label },
+        h('h3', { className: 'req-day-label' }, g.label),
         h(
           'div',
-          { className: 'flex gap-3 text-[13px] font-mono' },
-          h('span', { className: 'text-cream-dim w-10 shrink-0' }, String(ev.status || '')),
-          ...callerBits(ev),
-          h('span', { className: 'text-eggshell truncate' }, `${ev.method || ''} ${ev.path || ''}`),
-          h(
-            'span',
-            { className: 'text-muted ml-auto shrink-0 whitespace-nowrap text-xs', title: ev.time || '' },
-            requestWhen(ev.time),
-          ),
+          { className: 'req-day-rows' },
+          ...g.events.map((ev, i) => rowEl(ev, g.kind, i % 2 === 1)),
         ),
-      );
+      ),
+    );
+  }
+
+  function metaText() {
+    if (!events.length || (!query.trim() && !whoFilter)) return '';
+    return `${visibleEvents().length} of ${events.length}`;
   }
 
   function renderLog() {
     wrap.querySelector('[data-activity-log]')?.replaceChildren(...logNodes());
+    const meta = wrap.querySelector('[data-activity-meta]');
+    if (meta) meta.textContent = metaText();
+    const filters = wrap.querySelector('[data-activity-filters]');
+    if (filters) filters.replaceChildren(...filterNodes());
+  }
+
+  function filterNodes() {
+    const errCount = activityErrorCount(events);
+    const chips = [
+      { id: '', label: 'All' },
+      {
+        id: 'errors',
+        label: 'Errors',
+        count: errCount,
+      },
+      ...activityWhoFilters(events).map((who) => ({ id: who, label: who })),
+    ];
+    return chips.map((chip) =>
+      h(
+        'button',
+        {
+          type: 'button',
+          className: `activity-filter-chip${whoFilter === chip.id ? ' is-active' : ''}`,
+          'aria-pressed': whoFilter === chip.id ? 'true' : 'false',
+          onClick: () => {
+            whoFilter = chip.id;
+            renderLog();
+          },
+        },
+        chip.label,
+        chip.count != null
+          ? h('span', { className: 'activity-filter-count' }, String(chip.count))
+          : null,
+      ),
+    );
   }
 
   function stopLive() {
@@ -264,17 +154,28 @@ export function UsagePanel({ draft, savedName }) {
       if (nextSig === logSig) return;
       logSig = nextSig;
       events = next;
+      if (
+        whoFilter &&
+        whoFilter !== 'errors' &&
+        !activityWhoFilters(events).includes(whoFilter)
+      ) {
+        whoFilter = '';
+      }
       renderLog();
     } catch {
       /* keep the lines already shown */
     }
   }
 
-  function paintLive(button) {
-    button.setAttribute('aria-pressed', live ? 'true' : 'false');
-    button.setAttribute('aria-label', live ? 'Live updates on' : 'Live updates off');
-    const word = button.querySelector('[data-live-state]');
-    if (word) word.textContent = live ? 'On' : 'Off';
+  function paintFollowing(button) {
+    button.setAttribute('aria-pressed', following ? 'true' : 'false');
+    button.setAttribute('aria-label', following ? 'Stop following' : 'Follow new requests');
+    const iconHost = button.querySelector('[data-follow-icon]');
+    if (iconHost) {
+      iconHost.replaceChildren(Icon(following ? 'pause' : 'play', { size: 14 }));
+    }
+    const label = button.querySelector('[data-follow-label]');
+    if (label) label.textContent = following ? 'Following' : 'Follow';
   }
 
   async function clearRecent(button) {
@@ -286,6 +187,7 @@ export function UsagePanel({ draft, savedName }) {
       generation += 1;
       events = [];
       logSig = '';
+      whoFilter = '';
       renderLog();
       blankServiceRecent(savedName);
     } catch (err) {
@@ -295,90 +197,86 @@ export function UsagePanel({ draft, savedName }) {
     }
   }
 
-  function toggleLive(button) {
-    live = !live;
-    paintLive(button);
+  function toggleFollowing(button) {
+    following = !following;
+    paintFollowing(button);
     stopLive();
-    if (!live) return;
+    if (!following) return;
     pullActivity();
     liveTimer = window.setInterval(pullActivity, 2000);
   }
 
-  function recentRequests() {
+  function paint() {
     if (!savedName) {
-      return h('p', { className: 'm-0 text-xs text-muted' }, 'Save the service to see recent requests.');
+      wrap.replaceChildren(
+        h('p', { className: 'm-0 text-xs text-muted' }, 'Save the service to see recent requests.'),
+      );
+      return;
     }
-    return h(
-      'div',
-      { className: 'flex flex-col gap-2' },
+    wrap.replaceChildren(
       h(
         'div',
-        { className: 'flex items-center justify-between gap-2' },
-        h('span', { className: 'font-semibold text-sm text-eggshell' }, 'Recent requests'),
+        { className: 'flex min-h-0 flex-1 flex-col gap-2.5' },
         h(
           'div',
-          { className: 'flex items-center gap-2' },
-          Button(
+          { className: 'flex shrink-0 flex-wrap items-center gap-2' },
+          h(
+            'label',
+            { className: 'activity-search min-w-0 flex-1' },
+            Icon('search', { size: 15, className: 'text-muted' }),
+            h('input', {
+              type: 'search',
+              placeholder: 'Token, path, or status',
+              autocomplete: 'off',
+              'aria-label': 'Search recent requests',
+              value: query,
+              onInput: (e) => {
+                query = e.currentTarget.value;
+                renderLog();
+              },
+            }),
+          ),
+          h(
+            'button',
             {
-              size: 'sm',
+              type: 'button',
+              className: 'following-toggle',
+              'aria-pressed': following ? 'true' : 'false',
+              'aria-label': following ? 'Stop following' : 'Follow new requests',
+              onClick: (e) => toggleFollowing(e.currentTarget),
+            },
+            h('span', { 'data-follow-icon': '1', className: 'inline-flex' }, Icon(following ? 'pause' : 'play', { size: 14 })),
+            h('span', { 'data-follow-label': '1' }, following ? 'Following' : 'Follow'),
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'activity-clear-link',
               'aria-label': 'Clear recent requests',
               onClick: (e) => clearRecent(e.currentTarget),
             },
-            'Clear',
-          ),
-          Button(
-            {
-              size: 'sm',
-              className: 'live-toggle gap-1.5',
-              'aria-pressed': live ? 'true' : 'false',
-              'aria-label': live ? 'Live updates on' : 'Live updates off',
-              onClick: (e) => toggleLive(e.currentTarget),
-            },
-            h('span', { className: 'status-dot', 'aria-hidden': 'true' }),
-            'Live',
-            h('span', { 'data-live-state': '1' }, live ? 'On' : 'Off'),
+            'Clear…',
           ),
         ),
+        h('div', { className: 'activity-filters shrink-0', 'data-activity-filters': '1' }, ...filterNodes()),
+        h('div', { className: 'activity-log-scroll', 'data-activity-log': '1' }, ...logNodes()),
+        h('p', { className: 'm-0 min-h-4 shrink-0 text-xs text-muted', 'data-activity-meta': '1' }, metaText()),
       ),
-      h('div', { className: 'flex flex-col gap-1.5', 'data-activity-log': '1' }, ...logNodes()),
-    );
-  }
-
-  function statusLine(code, text) {
-    return h(
-      'div',
-      { className: 'flex gap-3' },
-      h('span', { className: 'font-mono text-cream-dim w-8 shrink-0' }, code),
-      h('span', { className: 'text-muted' }, text),
-    );
-  }
-
-  function copyBtn(text, label = 'Copy') {
-    return Button(
-      {
-        size: 'sm',
-        className: 'shrink-0',
-        onClick: async () => {
-          try {
-            await copyText(typeof text === 'function' ? text() : text);
-            showToast('Copied');
-          } catch {
-            showToast('Copy failed', 'error');
-          }
-        },
-      },
-      label,
     );
   }
 
   paint();
   if (savedName && !eventsLoaded) {
     eventsLoaded = true;
-    api.activity(savedName).then((list) => {
-      events = Array.isArray(list) ? list : [];
-      logSig = events.map(eventSig).join('\n');
-      paint();
-    }).catch(() => {});
+    api
+      .activity(savedName)
+      .then((list) => {
+        events = Array.isArray(list) ? list : [];
+        logSig = events.map(eventSig).join('\n');
+        paint();
+      })
+      .catch(() => {});
   }
   wrap._refresh = paint;
   return wrap;

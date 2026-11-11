@@ -1,6 +1,6 @@
 import { api } from '../api.js';
 import { state, setState, clearSelection } from '../state.js';
-import { copyText } from './clipboard.js';
+import { copyValue } from './clipboard.js';
 import { showToast } from '../components/common/Toast.js';
 
 export async function copyServiceToken(service) {
@@ -9,10 +9,9 @@ export async function copyServiceToken(service) {
     return;
   }
   try {
-    await copyText(service.token);
-    showToast(`Copied token for ${service.name}`);
+    await copyValue(service.token);
   } catch {
-    showToast('Copy failed', 'error');
+    /* toast already shown */
   }
 }
 

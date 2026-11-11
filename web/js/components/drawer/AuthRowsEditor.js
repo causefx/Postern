@@ -134,7 +134,7 @@ export function AuthRowsEditor({ auth, editing, onChange, serviceLabel = 'servic
     const head = h(
       'div',
       { className: 'flex flex-wrap items-center justify-between gap-2' },
-      h('span', { className: 'label-caps' }, 'Upstream credentials'),
+      h('span', { className: 'field-label' }, 'Upstream credentials'),
     );
     if (showPresets) {
       const sel = h(
@@ -155,8 +155,9 @@ export function AuthRowsEditor({ auth, editing, onChange, serviceLabel = 'servic
     const nodes = [head, ...rows.map((row, idx) => rowEl(row, idx, rows))];
     if (rows.length < 3) {
       nodes.push(
-        Button(
-          { size: 'sm', className: 'w-fit', onClick: addRow },
+        h(
+          'button',
+          { type: 'button', className: 'btn-add-row', onClick: addRow },
           Icon('plus', { size: 14 }),
           'Add credential',
         ),
@@ -234,11 +235,12 @@ export function AuthRowsEditor({ auth, editing, onChange, serviceLabel = 'servic
             });
 
     const missing = secretMissing(row);
+    const stored = hadSecret[slotKey(row.type)];
     const secret = h('input', {
       type: 'password',
-      className: 'input font-mono flex-1 min-w-0',
+      className: 'input font-mono',
       autocomplete: 'off',
-      placeholder: missing ? 'Required' : hadSecret[slotKey(row.type)] ? '•••••••• unchanged' : 'value',
+      placeholder: missing ? 'Required' : stored ? '••••••••' : 'value',
       value: row.secret || '',
       'aria-invalid': missing ? 'true' : null,
       'aria-label': missing ? `${labelFor(row.type)} value is required` : `${labelFor(row.type)} value`,
@@ -246,19 +248,29 @@ export function AuthRowsEditor({ auth, editing, onChange, serviceLabel = 'servic
         row.secret = e.target.value;
         applyRows(rows);
         const still = secretMissing(row);
-        e.target.placeholder = still ? 'Required' : hadSecret[slotKey(row.type)] ? '•••••••• unchanged' : 'value';
+        e.target.placeholder = still ? 'Required' : stored ? '••••••••' : 'value';
         if (still) e.target.setAttribute('aria-invalid', 'true');
         else e.target.removeAttribute('aria-invalid');
+        const chip = e.target.parentElement?.querySelector('.auth-secret-chip');
+        if (chip) chip.hidden = !stored || !!row.secret;
         soft();
       },
     });
+    const secretWrap = h(
+      'div',
+      { className: 'auth-secret-wrap' },
+      secret,
+      stored
+        ? h('span', { className: 'auth-secret-chip', hidden: !!row.secret }, 'unchanged')
+        : null,
+    );
 
     return h(
       'div',
       { className: 'auth-row' },
       typeSel,
       nameOrUser,
-      secret,
+      secretWrap,
       Button(
         {
           variant: 'ghost',

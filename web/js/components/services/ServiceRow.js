@@ -1,9 +1,9 @@
 import { h } from '../../lib/h.js';
 import { Button } from '../common/Button.js';
+import { Icon } from '../common/Icon.js';
 import { setState, isSelected, toggleSelect } from '../../state.js';
 import { accessLabel, credBits, recentLabel, recentTitle, upstreamHost } from '../../lib/serviceDisplay.js';
 import { copyServiceToken } from '../../lib/serviceActions.js';
-import { flashCopied } from '../../lib/clipboard.js';
 import { getDrawerName, isDrawerDirty } from '../drawer/ServiceDrawer.js';
 
 export function ServiceRow({ service, index, focused, onOpen }) {
@@ -114,12 +114,13 @@ export function ServiceRow({ service, index, focused, onOpen }) {
       Button(
         {
           size: 'sm',
+          className: 'gap-1.5',
           onClick: async (e) => {
             e.stopPropagation();
             await copyServiceToken(service);
-            flashCopied(e.currentTarget, 'Copied');
           },
         },
+        Icon('copy', { size: 14 }),
         'Copy token',
       ),
     ),

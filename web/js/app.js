@@ -52,23 +52,23 @@ const drawerHandlers = {
     showToast('Service deleted');
   },
   onClose: () => {},
-  onNavigate: (delta) => {
+  onNavigate: async (delta) => {
     const items = filteredServices();
     if (!items.length) return;
     const curName = getDrawerName();
     let idx = items.findIndex((s) => s.name === curName);
     if (idx < 0) idx = state.focusIndex;
     const next = items[((idx + delta) % items.length + items.length) % items.length];
-    if (navigateDrawer(next)) setState({ focusIndex: items.indexOf(next) });
+    if (await navigateDrawer(next)) setState({ focusIndex: items.indexOf(next) });
   },
 };
 
-function openSettingsDrawer() {
+async function openSettingsDrawer() {
   if (isSettingsOpen()) {
     closeSettings();
     return;
   }
-  if (isDrawerOpen() && !closeServiceDrawer()) return;
+  if (isDrawerOpen() && !(await closeServiceDrawer())) return;
   setState({ commandOpen: false });
   openSettings();
 }
@@ -129,12 +129,12 @@ function onKeydown(e) {
     }
     if (e.key === 'Escape') {
       e.preventDefault();
-      closeServiceDrawer();
+      void closeServiceDrawer();
       return;
     }
     if (!typingTarget(e.target) && (e.key === 'j' || e.key === 'J' || e.key === 'k' || e.key === 'K')) {
       e.preventDefault();
-      drawerHandlers.onNavigate(e.key.toLowerCase() === 'j' ? 1 : -1);
+      void drawerHandlers.onNavigate(e.key.toLowerCase() === 'j' ? 1 : -1);
       return;
     }
     return;

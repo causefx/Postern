@@ -13,7 +13,6 @@ export function draftSnapshot(draft) {
   return JSON.stringify({
     name: slugify(draft.name) || draft.name,
     url: draft.url.trim(),
-    enabled: draft.enabled,
     access: draft.access,
     openPaths: cleanPaths(draft.openPaths),
     auth: authToPayload(draft.auth),
