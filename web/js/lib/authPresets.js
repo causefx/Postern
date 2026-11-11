@@ -49,13 +49,14 @@ export function emptyAuth() {
 export function authFromView(view) {
   const a = view || {};
   return {
-    header: a.header ? { name: a.header.name || 'X-Api-Key', secret: '' } : null,
-    query: a.query ? { name: a.query.name || 'apikey', secret: '' } : null,
+    header: a.header ? { name: a.header.name || 'X-Api-Key', secret: '', stored: !!a.header.hasSecret } : null,
+    query: a.query ? { name: a.query.name || 'apikey', secret: '', stored: !!a.query.hasSecret } : null,
     authz: a.authz
       ? {
           kind: a.authz.kind === 'basic' ? 'basic' : 'bearer',
           username: a.authz.username || '',
           secret: '',
+          stored: !!a.authz.hasSecret,
         }
       : null,
   };

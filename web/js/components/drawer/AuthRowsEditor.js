@@ -16,6 +16,21 @@ const TYPES = [
  */
 export function AuthRowsEditor({ auth, editing, onChange, serviceLabel = 'service', showPresets = true }) {
   const wrap = h('div', { className: 'flex flex-col gap-2.5' });
+  const hadSecret = {
+    header: !!auth.header?.stored,
+    query: !!auth.query?.stored,
+    authz: !!auth.authz?.stored,
+  };
+
+  function rememberStored() {
+    if (auth.header) auth.header.stored = hadSecret.header;
+    if (auth.query) auth.query.stored = hadSecret.query;
+    if (auth.authz) auth.authz.stored = hadSecret.authz;
+  }
+
+  function secretMissing(row) {
+    return !hadSecret[slotKey(row.type)] && !String(row.secret || '').trim();
+  }
 
   function bump() {
     redraw();
@@ -51,13 +66,13 @@ export function AuthRowsEditor({ auth, editing, onChange, serviceLabel = 'servic
     auth.authz = null;
     for (const r of rows) {
       if (r.type === 'header') {
-        auth.header = { name: r.name || 'X-Api-Key', secret: r.secret || '' };
+        auth.header = { name: r.name || 'X-Api-Key', secret: r.secret || '', stored: hadSecret.header };
       } else if (r.type === 'query') {
-        auth.query = { name: r.name || 'apikey', secret: r.secret || '' };
+        auth.query = { name: r.name || 'apikey', secret: r.secret || '', stored: hadSecret.query };
       } else if (r.type === 'basic') {
-        auth.authz = { kind: 'basic', username: r.username || '', secret: r.secret || '' };
+        auth.authz = { kind: 'basic', username: r.username || '', secret: r.secret || '', stored: hadSecret.authz };
       } else {
-        auth.authz = { kind: 'bearer', username: '', secret: r.secret || '' };
+        auth.authz = { kind: 'bearer', username: '', secret: r.secret || '', stored: hadSecret.authz };
       }
     }
   }
@@ -71,6 +86,10 @@ export function AuthRowsEditor({ auth, editing, onChange, serviceLabel = 'servic
       else set.add('authz'); // bearer and basic share authz slot
     });
     return set;
+  }
+
+  function labelFor(type) {
+    return TYPES.find((t) => t.id === type)?.label || 'Credential';
   }
 
   function slotKey(type) {
@@ -106,6 +125,7 @@ export function AuthRowsEditor({ auth, editing, onChange, serviceLabel = 'servic
     auth.header = p.auth.header ? { ...p.auth.header, secret: auth.header?.secret || '' } : null;
     auth.query = p.auth.query ? { ...p.auth.query, secret: auth.query?.secret || '' } : null;
     auth.authz = p.auth.authz ? { ...p.auth.authz, secret: auth.authz?.secret || '' } : null;
+    rememberStored();
     bump();
   }
 
@@ -132,24 +152,26 @@ export function AuthRowsEditor({ auth, editing, onChange, serviceLabel = 'servic
       );
       head.append(sel);
     }
-    wrap.replaceChildren(
-      head,
-      ...rows.map((row, idx) => rowEl(row, idx, rows)),
-      rows.length < 3
-        ? Button(
-            { size: 'sm', className: 'w-fit', onClick: addRow },
-            Icon('plus', { size: 14 }),
-            'Add credential',
-          )
-        : null,
+    const nodes = [head, ...rows.map((row, idx) => rowEl(row, idx, rows))];
+    if (rows.length < 3) {
+      nodes.push(
+        Button(
+          { size: 'sm', className: 'w-fit', onClick: addRow },
+          Icon('plus', { size: 14 }),
+          'Add credential',
+        ),
+      );
+    }
+    nodes.push(
       h(
         'p',
         { className: 'm-0 text-xs text-muted leading-relaxed' },
         isAuthNone(auth)
           ? 'No credentials — the upstream needs none, or add a slot above.'
-          : 'Stored values are never shown. Type a new one to replace it.',
+          : 'Stored values are never shown. A new credential needs a value before it can be saved.',
       ),
     );
+    wrap.replaceChildren(...nodes);
   }
 
   function rowEl(row, idx, rows) {
@@ -211,15 +233,22 @@ export function AuthRowsEditor({ auth, editing, onChange, serviceLabel = 'servic
               },
             });
 
+    const missing = secretMissing(row);
     const secret = h('input', {
       type: 'password',
       className: 'input font-mono flex-1 min-w-0',
       autocomplete: 'off',
-      placeholder: editing ? '•••••••• unchanged' : 'value',
+      placeholder: missing ? 'Required' : hadSecret[slotKey(row.type)] ? '•••••••• unchanged' : 'value',
       value: row.secret || '',
+      'aria-invalid': missing ? 'true' : null,
+      'aria-label': missing ? `${labelFor(row.type)} value is required` : `${labelFor(row.type)} value`,
       onInput: (e) => {
         row.secret = e.target.value;
         applyRows(rows);
+        const still = secretMissing(row);
+        e.target.placeholder = still ? 'Required' : hadSecret[slotKey(row.type)] ? '•••••••• unchanged' : 'value';
+        if (still) e.target.setAttribute('aria-invalid', 'true');
+        else e.target.removeAttribute('aria-invalid');
         soft();
       },
     });
