@@ -4,4 +4,4 @@ package main
 // number on each release. Override a local build at link time:
 //
 //	go build -ldflags "-X main.Version=1.2.3"
-var Version = "0.1.0" // x-release-please-version
+var Version = "0.2.0" // x-release-please-version
