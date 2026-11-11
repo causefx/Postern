@@ -14,7 +14,7 @@ RUN npm run build:css
 
 # --- Go binary ---
 FROM golang:1.22-alpine AS build
-ARG VERSION=0.3.0 # x-release-please-version
+ARG VERSION=0.4.0 # x-release-please-version
 WORKDIR /src
 COPY go.mod ./
 COPY cmd ./cmd
