@@ -32,10 +32,11 @@ export function resolveTheme(pref = getThemePreference()) {
 export function applyTheme() {
   const root = document.documentElement;
   root.dataset.theme = resolveTheme();
-  // Browser chrome follows the page background of whichever theme is showing.
+  // Browser chrome follows the page background of whichever theme is showing. The page ships one
+  // theme-color per system scheme; both get the same value so a forced theme wins over the system.
   const page = getComputedStyle(root).getPropertyValue('--bg-page').trim();
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta && page) meta.setAttribute('content', page);
+  if (!page) return;
+  for (const meta of document.querySelectorAll('meta[name="theme-color"]')) meta.setAttribute('content', page);
 }
 
 export function setThemePreference(pref) {

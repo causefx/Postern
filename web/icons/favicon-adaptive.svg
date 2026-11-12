@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    .tile{fill:#212529} .door{stroke:#F8F9FA}
+    @media (prefers-color-scheme: dark){ .tile{fill:#F8F9FA} .door{stroke:#212529} }
+  </style>
+  <rect class="tile" width="64" height="64" rx="14"/>
+  <g class="door" transform="translate(8 6) scale(2)" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 21V11a6 6 0 0 1 12 0v10"/><path d="M3 21h18"/>
+    <circle cx="12" cy="13" r="1.6"/><path d="M12 14.6V17"/>
+  </g>
+</svg>
