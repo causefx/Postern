@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.6.0](https://github.com/causefx/Postern/compare/v0.5.0...v0.6.0) (2026-11-12)
+
+
+### Features
+
+* implement dark and light theme support with UI enhancements ([f99a0e9](https://github.com/causefx/Postern/commit/f99a0e9e031ab7dd246f902c70aca498b975e9bf))
+* update favicon and theme color handling ([cb773e6](https://github.com/causefx/Postern/commit/cb773e672a9d891605867eb5de5e48d191f66343))
+
+
+### Bug Fixes
+
+* streamline CSS and enhance component behavior ([c1d4720](https://github.com/causefx/Postern/commit/c1d4720903a56b6396f3b0251d62de96256b973b))
+
 ## [0.5.0](https://github.com/causefx/Postern/compare/v0.4.0...v0.5.0) (2026-11-11)
 
 
