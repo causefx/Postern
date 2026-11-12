@@ -259,9 +259,18 @@ export function UsagePanel({ savedName }) {
             'Clear…',
           ),
         ),
-        h('div', { className: 'activity-filters shrink-0', 'data-activity-filters': '1' }, ...filterNodes()),
+        h(
+          'div',
+          { className: 'flex shrink-0 gap-2' },
+          h('div', { className: 'activity-filters min-w-0 flex-1', 'data-activity-filters': '1' }, ...filterNodes()),
+          // The "3 of 20" count sits beside the chips so the list keeps the full height below.
+          h(
+            'span',
+            { className: 'shrink-0 self-start whitespace-nowrap text-xs leading-7 text-muted', 'data-activity-meta': '1' },
+            metaText(),
+          ),
+        ),
         h('div', { className: 'activity-log-scroll', 'data-activity-log': '1' }, ...logNodes()),
-        h('p', { className: 'm-0 min-h-4 shrink-0 text-xs text-muted', 'data-activity-meta': '1' }, metaText()),
       ),
     );
   }

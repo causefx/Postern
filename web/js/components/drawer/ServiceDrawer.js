@@ -175,7 +175,8 @@ function createController({ mode, service, handlers }) {
     return { index, total: items.length, canPage: items.length > 1 };
   }
 
-  const errBox = h('p', { className: 'text-danger text-sm m-0 min-h-5 px-1' });
+  // Hidden while empty so it does not hold a blank line (plus the panel gap) under every tab.
+  const errBox = h('p', { className: 'text-danger text-sm m-0 min-h-5 px-1 empty:hidden' });
   const testResult = h('p', { className: 'text-sm m-0 min-h-5' });
   const wasUrl = h('p', { className: 'm-0 text-xs text-muted' });
   const renameHint = h('p', { className: 'm-0 text-xs text-muted leading-relaxed' });

@@ -1394,7 +1394,10 @@
   gap: 0.75rem;
   padding-right: 0.15rem;
 }
+/* The cards must not shrink: with overflow hidden a flex item's minimum height is 0, so the column
+   would squash them to fit instead of letting .activity-log-scroll scroll. */
 .req-day-card {
+  flex-shrink: 0;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--bg-sunken);
@@ -1987,6 +1990,11 @@
 .drawer-tab-panel {
   flex: 1 1 auto;
   min-height: 0;
+}
+/* Requests fills the drawer and scrolls its own list. In a short window keep room for a few rows and
+   let the drawer body scroll instead of squeezing the list to nothing. */
+.drawer-tab-panel:has(.activity-log-scroll) {
+  min-height: 20rem;
 }
 .drawer-section {
   padding: 1rem 1.1rem;
