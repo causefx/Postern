@@ -63,7 +63,7 @@ export function openServiceCreated({ service, trigger, onAddAnother, onDone }) {
     h(
       'div',
       { className: 'flex items-center gap-2' },
-      h('code', { className: 'font-mono text-sm text-cream-dim' }, base),
+      h('code', { className: 'font-mono text-sm text-soft' }, base),
       CopyButton({
         text: base,
         icon: true,

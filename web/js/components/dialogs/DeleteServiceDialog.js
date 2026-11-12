@@ -5,7 +5,7 @@ import { api } from '../../api.js';
 import { showToast } from '../common/Toast.js';
 
 export function openDeleteDialog({ service, trigger, onDeleted }) {
-  const err = h('p', { className: 'text-danger-text text-sm m-0' });
+  const err = h('p', { className: 'text-danger text-sm m-0' });
   const delBtn = Button(
     {
       variant: 'error',
@@ -41,7 +41,7 @@ export function openDeleteDialog({ service, trigger, onDeleted }) {
       { className: 'm-0 text-sm text-muted leading-relaxed' },
       `This removes the public route /p/${service.name}/, the caller token, and the stored upstream credential. The upstream service itself is untouched.`,
     ),
-    h('label', { className: 'label text-cream-dim' }, `Type ${service.name} to confirm`),
+    h('label', { className: 'label text-soft' }, `Type ${service.name} to confirm`),
     input,
     err,
   );

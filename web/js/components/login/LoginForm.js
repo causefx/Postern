@@ -32,14 +32,14 @@ export function LoginForm() {
     password,
     h(
       'label',
-      { className: 'flex items-center gap-2.5 min-h-11 text-sm text-cream-dim cursor-pointer' },
+      { className: 'flex items-center gap-2.5 min-h-11 text-sm text-soft cursor-pointer' },
       h('input', {
         id: 'remember',
         type: 'checkbox',
         name: 'remember',
         value: '1',
         checked: true,
-        className: 'checkbox checkbox-sm border-slate bg-ink-raised checked:bg-eggshell checked:text-ink checked:border-eggshell',
+        className: 'checkbox checkbox-sm border-line-strong bg-sunken checked:bg-primary checked:text-primary-content checked:border-primary',
       }),
       'Keep me signed in on this device',
     ),

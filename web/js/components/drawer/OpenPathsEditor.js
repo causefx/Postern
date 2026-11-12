@@ -100,7 +100,7 @@ export function OpenPathsEditor({ paths, onChange, errors }) {
             { className: 'open-path-main' },
             pathInput,
             pathError
-              ? h('p', { className: 'm-0 text-xs text-danger-text leading-relaxed' }, pathError)
+              ? h('p', { className: 'm-0 text-xs text-danger leading-relaxed' }, pathError)
               : hint,
           ),
           removeBtn,

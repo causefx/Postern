@@ -88,7 +88,7 @@ export function CallerGateEditor({ gate, onChange }) {
         { className: 'gate-row' },
         h('input', {
           type: 'checkbox',
-          className: 'checkbox checkbox-sm border-slate shrink-0',
+          className: 'checkbox checkbox-sm border-line-strong shrink-0',
           checked,
           onChange: (e) => onToggle(e.target.checked),
         }),

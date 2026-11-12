@@ -84,7 +84,7 @@ export function CommandPalette({ onAdd, onReload, onEdit, onSettings }) {
               },
               onClick: () => run(item),
             },
-            Icon(item.icon || 'search', { size: 16, className: 'shrink-0 text-denim' }),
+            Icon(item.icon || 'search', { size: 16, className: 'shrink-0 text-muted' }),
             h('span', { className: 'flex-1 text-left truncate' }, item.label),
           ),
         );

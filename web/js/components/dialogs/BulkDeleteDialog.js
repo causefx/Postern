@@ -5,7 +5,7 @@ import { deleteMany } from '../../lib/serviceActions.js';
 
 export function openBulkDeleteDialog({ names, trigger }) {
   const phrase = 'DELETE';
-  const err = h('p', { className: 'text-danger-text text-sm m-0' });
+  const err = h('p', { className: 'text-danger text-sm m-0' });
   const delBtn = Button(
     {
       variant: 'error',
@@ -46,12 +46,12 @@ export function openBulkDeleteDialog({ names, trigger }) {
         { className: 'm-0 text-sm text-muted leading-relaxed' },
         'This removes the Postern routes and tokens. Upstream services are not touched.',
       ),
-      h('p', { className: 'm-0 text-sm font-mono text-cream-dim' }, names.join(', ')),
+      h('p', { className: 'm-0 text-sm font-mono text-soft' }, names.join(', ')),
       h(
         'p',
         { className: 'm-0 text-sm text-muted' },
         'Type ',
-        h('span', { className: 'font-mono text-eggshell' }, phrase),
+        h('span', { className: 'font-mono text-base-content' }, phrase),
         ' to confirm.',
       ),
       input,

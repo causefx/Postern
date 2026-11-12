@@ -3,7 +3,9 @@ import { Icon } from './Icon.js';
 
 /**
  * Lightweight action menu.
- * items: [{ label, onSelect, danger?, disabled?, icon?, separator? }]
+ * items: [{ label, onSelect, danger?, disabled?, icon?, separator?, checked? }], or a function returning
+ * that list, read each time the menu opens. An item with `checked` set is one of a set of choices and
+ * the current one shows a tick.
  */
 export function MenuButton({ label = 'More actions', className = '', items = [] }, triggerChild) {
   const menu = h('div', {
@@ -48,16 +50,19 @@ export function MenuButton({ label = 'More actions', className = '', items = [] 
   }
 
   function open() {
+    const list = typeof items === 'function' ? items() : items;
     menu.replaceChildren(
-      ...items.map((item) => {
+      ...list.map((item) => {
         if (item.separator) {
           return h('div', { className: 'menu-sep', role: 'separator' });
         }
+        const choice = typeof item.checked === 'boolean';
         return h(
           'button',
           {
             type: 'button',
-            role: 'menuitem',
+            role: choice ? 'menuitemradio' : 'menuitem',
+            'aria-checked': choice ? String(item.checked) : null,
             className: `menu-item${item.danger ? ' is-danger' : ''}`,
             disabled: !!item.disabled,
             onClick: (e) => {
@@ -67,7 +72,8 @@ export function MenuButton({ label = 'More actions', className = '', items = [] 
             },
           },
           item.icon ? Icon(item.icon, { size: 14 }) : null,
-          h('span', {}, item.label),
+          h('span', { className: 'menu-item-label' }, item.label),
+          item.checked ? Icon('check', { size: 14, className: 'menu-item-check' }) : null,
         );
       }),
     );

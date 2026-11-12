@@ -7,7 +7,7 @@ import { api } from '../../api.js';
 import { showToast } from '../common/Toast.js';
 
 export function openRotateDialog({ service, trigger, onRotated }) {
-  const err = h('p', { className: 'text-danger-text text-sm m-0' });
+  const err = h('p', { className: 'text-danger text-sm m-0' });
 
   const confirmBody = h(
     'div',

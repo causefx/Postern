@@ -12,7 +12,7 @@ function suggestName(name) {
 }
 
 export function openDuplicateDialog({ service, trigger, onDuplicated }) {
-  const err = h('p', { className: 'text-danger-text text-sm m-0 min-h-5' });
+  const err = h('p', { className: 'text-danger text-sm m-0 min-h-5' });
   const input = h('input', {
     className: 'input w-full font-mono',
     value: suggestName(service.name),
@@ -27,7 +27,7 @@ export function openDuplicateDialog({ service, trigger, onDuplicated }) {
       { className: 'm-0 text-sm text-muted leading-relaxed' },
       `Copies the upstream URL, credentials, access, and open paths from ${service.name}. The copy gets its own caller token.`,
     ),
-    h('label', { className: 'label text-cream-dim' }, 'New name'),
+    h('label', { className: 'label text-soft' }, 'New name'),
     input,
     err,
   );

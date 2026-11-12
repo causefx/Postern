@@ -1,6 +1,7 @@
 import { h } from '../../lib/h.js';
 import { Button } from '../common/Button.js';
 import { Icon } from '../common/Icon.js';
+import { ThemeToggle } from '../common/ThemeToggle.js';
 import { api } from '../../api.js';
 import { state, counts } from '../../state.js';
 import { isMac } from '../../lib/serviceDisplay.js';
@@ -15,7 +16,7 @@ export function DashboardHeader({ onAdd, onOpenCommand, onSettings }) {
 
   return h(
     'header',
-    { className: 'dash-header border-b border-line bg-ink-raised/80' },
+    { className: 'dash-header border-b border-line-subtle bg-sunken' },
     h(
       'div',
       { className: 'dash-inner dash-header-grid py-3.5' },
@@ -25,7 +26,7 @@ export function DashboardHeader({ onAdd, onOpenCommand, onSettings }) {
         h(
           'div',
           {
-            className: 'w-8 h-8 rounded-[9px] bg-eggshell text-ink flex items-center justify-center shrink-0',
+            className: 'w-8 h-8 rounded-[9px] bg-primary text-primary-content flex items-center justify-center shrink-0',
             'aria-hidden': 'true',
           },
           Icon('door', { size: 18 }),
@@ -33,16 +34,16 @@ export function DashboardHeader({ onAdd, onOpenCommand, onSettings }) {
         h(
           'div',
           { className: 'flex items-center gap-2 min-w-0' },
-          h('span', { className: 'font-display text-[15px] font-semibold text-eggshell desktop-only' }, 'Postern'),
+          h('span', { className: 'font-display text-[15px] font-semibold text-base-content desktop-only' }, 'Postern'),
           h('span', { className: 'text-muted/60 desktop-only', 'aria-hidden': 'true' }, '/'),
-          h('span', { className: 'font-display text-[15px] font-semibold text-eggshell' }, 'Services'),
+          h('span', { className: 'font-display text-[15px] font-semibold text-base-content' }, 'Services'),
           h('span', { className: 'count-badge' }, String(c.all)),
           drawerName
             ? h(
                 'span',
                 { className: 'desktop-only inline-flex items-center gap-2 min-w-0' },
                 h('span', { className: 'text-muted/60' }, '/'),
-                h('span', { className: 'font-display text-[15px] font-semibold text-eggshell truncate' }, drawerName),
+                h('span', { className: 'font-display text-[15px] font-semibold text-base-content truncate' }, drawerName),
               )
             : null,
         ),
@@ -87,13 +88,14 @@ export function DashboardHeader({ onAdd, onOpenCommand, onSettings }) {
             variant: 'ghost',
             size: 'sm',
             square: true,
-            className: 'h-9 w-9 text-cream-dim',
+            className: 'h-9 w-9 text-soft',
             'aria-label': 'Settings',
             title: 'Settings',
             onClick: onSettings,
           },
           Icon('gear', { size: 16 }),
         ),
+        ThemeToggle(),
         Button(
           {
             variant: 'primary',
@@ -110,7 +112,7 @@ export function DashboardHeader({ onAdd, onOpenCommand, onSettings }) {
             variant: 'ghost',
             size: 'sm',
             square: true,
-            className: 'h-9 w-9 text-cream-dim',
+            className: 'h-9 w-9 text-soft',
             'aria-label': 'Sign out',
             title: 'Sign out',
             onClick: async () => {

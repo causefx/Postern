@@ -6,7 +6,7 @@ export function InsecureNotice() {
   if (location.protocol === 'https:') return null;
   return h(
     'span',
-    { className: 'flex items-center gap-1.5 text-warn' },
+    { className: 'flex items-center gap-1.5 text-warning' },
     Icon('warn', { size: 13, className: 'shrink-0' }),
     'Not encrypted — use HTTPS before signing in remotely',
   );

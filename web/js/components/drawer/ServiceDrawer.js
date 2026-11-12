@@ -175,7 +175,7 @@ function createController({ mode, service, handlers }) {
     return { index, total: items.length, canPage: items.length > 1 };
   }
 
-  const errBox = h('p', { className: 'text-danger-text text-sm m-0 min-h-5 px-1' });
+  const errBox = h('p', { className: 'text-danger text-sm m-0 min-h-5 px-1' });
   const testResult = h('p', { className: 'text-sm m-0 min-h-5' });
   const wasUrl = h('p', { className: 'm-0 text-xs text-muted' });
   const renameHint = h('p', { className: 'm-0 text-xs text-muted leading-relaxed' });
@@ -316,10 +316,14 @@ function createController({ mode, service, handlers }) {
     } else {
       renameHint.textContent = '';
     }
+    nameInput.classList.toggle('is-changed', !!(isEdit && slug && savedName && slug !== savedName));
 
-    if (draft.url.trim() && origUrl && draft.url.trim().replace(/\/$/, '') !== origUrl.replace(/\/$/, '')) {
+    const urlChanged =
+      !!draft.url.trim() && !!origUrl && draft.url.trim().replace(/\/$/, '') !== origUrl.replace(/\/$/, '');
+    urlField.classList.toggle('is-changed', urlChanged);
+    if (urlChanged) {
       wasUrl.replaceChildren(
-        h('span', { className: 'inline-block w-1.5 h-1.5 rounded-full bg-warn mr-1.5 align-middle' }),
+        h('span', { className: 'inline-block w-1.5 h-1.5 rounded-full bg-warning mr-1.5 align-middle' }),
         h('span', { className: 'line-through' }, `was ${origUrl}`),
       );
     } else {
@@ -480,17 +484,17 @@ function createController({ mode, service, handlers }) {
         name: savedName || undefined,
       });
       if (res.authRejected) {
-        testResult.className = 'text-sm m-0 min-h-5 text-warn';
+        testResult.className = 'text-sm m-0 min-h-5 text-warning';
         testResult.textContent = res.warning || `Reached the service, but it rejected the credential (HTTP ${res.status})`;
       } else if (res.ok) {
-        testResult.className = 'text-sm m-0 min-h-5 text-live';
+        testResult.className = 'text-sm m-0 min-h-5 text-success';
         testResult.textContent = `✓ Reachable · HTTP ${res.status}`;
       } else {
-        testResult.className = 'text-sm m-0 min-h-5 text-danger-text';
+        testResult.className = 'text-sm m-0 min-h-5 text-danger';
         testResult.textContent = res.error || 'Unreachable';
       }
     } catch (e) {
-      testResult.className = 'text-sm m-0 min-h-5 text-danger-text';
+      testResult.className = 'text-sm m-0 min-h-5 text-danger';
       testResult.textContent = e.message;
     }
   }
@@ -517,10 +521,10 @@ function createController({ mode, service, handlers }) {
       baseline = snapshot();
       markDirty();
       renderDelete();
-      updateHints();
       proxyInput.value = publicBase();
       isEdit = true;
       origUrl = saved.url || draft.url;
+      updateHints();
       panel.setAttribute('aria-label', `Edit ${savedName}`);
       header.update({ name: saved.name, enabled: draft.enabled, ...pagerState() });
       tabs.refresh();

@@ -274,5 +274,5 @@ async function boot() {
 }
 
 boot().catch((err) => {
-  root.replaceChildren(h('p', { className: 'p-8 text-danger-text' }, err.message));
+  root.replaceChildren(h('p', { className: 'p-8 text-danger' }, err.message));
 });

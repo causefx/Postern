@@ -7,7 +7,7 @@ export function BrandPanel() {
     'aside',
     {
       className:
-        'login-brand flex flex-col gap-2 px-12 py-10 max-md:px-6 max-md:py-7 bg-ink-raised border-r border-line max-md:border-r-0',
+        'login-brand flex flex-col gap-2 px-12 py-10 max-md:px-6 max-md:py-7 bg-surface border-r border-line max-md:border-r-0',
     },
     h(
       'div',
@@ -15,7 +15,7 @@ export function BrandPanel() {
       h(
         'div',
         {
-          className: 'size-10 rounded-[11px] bg-eggshell text-ink grid place-items-center',
+          className: 'size-10 rounded-[11px] bg-primary text-primary-content grid place-items-center',
           'aria-hidden': 'true',
         },
         Icon('door', { size: 22 }),
@@ -34,7 +34,7 @@ export function BrandPanel() {
         'h2',
         {
           className:
-            'm-0 font-display text-[34px] max-md:text-[26px] leading-tight font-semibold tracking-tight text-balance text-eggshell',
+            'm-0 font-display text-[34px] max-md:text-[26px] leading-tight font-semibold tracking-tight text-balance text-base-content',
         },
         'A quiet side door for your private services.',
       ),

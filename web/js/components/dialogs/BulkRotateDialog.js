@@ -5,7 +5,7 @@ import { rotateMany } from '../../lib/serviceActions.js';
 
 export function openBulkRotateDialog({ names, trigger }) {
   const list = names.join(', ');
-  const err = h('p', { className: 'text-danger-text text-sm m-0' });
+  const err = h('p', { className: 'text-danger text-sm m-0' });
 
   const footer = h('div', { className: 'flex gap-2' });
   const dlg = Modal({
@@ -18,7 +18,7 @@ export function openBulkRotateDialog({ names, trigger }) {
         { className: 'm-0 text-sm text-muted leading-relaxed' },
         'New caller tokens are issued and the current ones stop working immediately. Upstream credentials are not changed.',
       ),
-      h('p', { className: 'm-0 text-sm font-mono text-cream-dim' }, list),
+      h('p', { className: 'm-0 text-sm font-mono text-soft' }, list),
       err,
     ),
     footer,

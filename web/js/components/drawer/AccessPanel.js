@@ -295,7 +295,7 @@ export function AccessPanel({ draft, token, tokens = [], savedName, serviceLabel
         h(
           'div',
           { className: 'flex flex-col gap-1 min-w-0 flex-1' },
-          h('span', { className: 'text-sm font-semibold text-eggshell' }, title),
+          h('span', { className: 'text-sm font-semibold text-base-content' }, title),
           h('span', { className: 'text-[13px] text-muted leading-relaxed' }, body),
         ),
       ),

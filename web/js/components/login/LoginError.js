@@ -9,7 +9,7 @@ export function LoginError() {
       role: 'alert',
       hidden: true,
       className:
-        'login-error flex gap-2.5 items-start rounded-[10px] border border-danger-line bg-danger/10 px-3.5 py-3 text-sm text-danger-text',
+        'login-error flex gap-2.5 items-start rounded-[10px] border border-danger-line bg-danger-bg px-3.5 py-3 text-sm text-danger',
     },
     Icon('alert', { size: 16, className: 'mt-0.5 flex-none' }),
     h('span', { className: 'login-error-text' }, ''),

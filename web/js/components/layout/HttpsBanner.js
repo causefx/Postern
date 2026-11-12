@@ -11,13 +11,13 @@ export function HttpsBanner() {
   const el = h(
     'div',
     {
-      className: 'flex flex-wrap gap-3.5 items-center p-3.5 rounded-xl bg-warn/10 border border-warn/20',
+      className: 'flex flex-wrap gap-3.5 items-center p-3.5 rounded-xl bg-warning-bg border border-warning/30',
       role: 'status',
     },
-    Icon('warn', { size: 20, className: 'text-warn' }),
+    Icon('warn', { size: 20, className: 'text-warning' }),
     h(
       'p',
-      { className: 'm-0 flex-1 min-w-[280px] text-sm leading-relaxed text-warn' },
+      { className: 'm-0 flex-1 min-w-[280px] text-sm leading-relaxed text-warning' },
       'Postern is serving plain HTTP, so tokens travel unencrypted. Put a TLS proxy (Caddy, Traefik, nginx) in front before exposing port 8080.',
     ),
     h(
@@ -27,7 +27,7 @@ export function HttpsBanner() {
         'a',
         {
           href: 'https://github.com/search?q=postern+https+caddy&type=repositories',
-          className: buttonClass({ size: 'sm', className: 'border-warn/35 text-warn bg-transparent' }),
+          className: buttonClass({ size: 'sm', className: 'border-warning/40 text-warning bg-transparent' }),
           target: '_blank',
           rel: 'noopener',
         },

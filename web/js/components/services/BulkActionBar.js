@@ -22,7 +22,7 @@ export function BulkActionBar() {
     h(
       'div',
       { className: 'flex items-center gap-2 min-w-0 flex-1' },
-      h('span', { className: 'font-semibold text-sm text-eggshell whitespace-nowrap' }, `${names.length} selected`),
+      h('span', { className: 'font-semibold text-sm text-base-content whitespace-nowrap' }, `${names.length} selected`),
       h('span', { className: 'text-sm text-muted truncate' }, label),
     ),
     h(

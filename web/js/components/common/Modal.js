@@ -18,7 +18,7 @@ export function Modal({ title, body, footer, wide = false }) {
     ),
     h('div', { className: 'px-6 pb-4 flex flex-col gap-4' }, body),
     footer
-      ? h('div', { className: 'modal-action bg-space-sunk px-6 py-4 m-0 justify-end gap-2 border-t border-line' }, footer)
+      ? h('div', { className: 'modal-action bg-hover px-6 py-4 m-0 justify-end gap-2 border-t border-line' }, footer)
       : null,
   );
 

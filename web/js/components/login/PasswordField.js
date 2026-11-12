@@ -11,7 +11,7 @@ export function PasswordField() {
     required: true,
     'aria-describedby': 'password-hint',
     className:
-      'input w-full h-12 pr-13 font-mono text-[15px] bg-ink-raised border-slate focus:border-denim',
+      'input w-full h-12 pr-13 font-mono text-[15px] bg-sunken border-line-strong focus:border-muted',
   });
 
   const eyeHost = h('span', { className: 'grid place-items-center' }, Icon('eye', { size: 16 }));
@@ -39,13 +39,13 @@ export function PasswordField() {
   const root = h(
     'div',
     { className: 'flex flex-col gap-2' },
-    h('label', { className: 'text-sm font-semibold text-cream-dim', htmlFor: 'password' }, 'Admin password'),
+    h('label', { className: 'text-sm font-semibold text-soft', htmlFor: 'password' }, 'Admin password'),
     h('div', { className: 'relative' }, input, reveal),
     h(
       'span',
       { id: 'password-hint', className: 'text-[13px] leading-normal text-muted' },
       'Set with ',
-      h('code', { className: 'font-mono text-cream-dim' }, 'ADMIN_PASSWORD'),
+      h('code', { className: 'font-mono text-soft' }, 'ADMIN_PASSWORD'),
       ' when Postern starts.',
     ),
   );

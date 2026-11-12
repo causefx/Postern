@@ -5,7 +5,7 @@ import { CopyButton } from './CopyButton.js';
 
 export function SecretField({ value, masked = true, onToggle, showCopy = true }) {
   let revealed = !masked;
-  const text = h('code', { className: 'flex-1 truncate text-cream-dim' }, revealed ? value : mask(value));
+  const text = h('code', { className: 'flex-1 truncate text-soft' }, revealed ? value : mask(value));
   const wrap = h('div', { className: 'secret-field' }, text);
 
   const eye = Button(

@@ -14,7 +14,7 @@ export function EmptyState({ onAdd }) {
       { className: 'flex flex-col gap-3 max-w-xl' },
       h(
         'h1',
-        { className: 'font-display m-0 text-[30px] sm:text-[34px] font-bold tracking-tight text-eggshell' },
+        { className: 'font-display m-0 text-[30px] sm:text-[34px] font-bold tracking-tight text-base-content' },
         'Put a front door on your first service',
       ),
       h(
@@ -31,22 +31,22 @@ export function EmptyState({ onAdd }) {
       },
       flowCard({
         icon: Icon('globe', { size: 18 }),
-        iconWrap: 'w-9 h-9 rounded-full bg-space-raised text-denim border border-line',
+        iconWrap: 'w-9 h-9 rounded-full bg-raised text-muted border border-line',
         title: 'Caller on the internet',
         sub: 'sends a Postern token',
       }),
-      Icon('arrow', { size: 18, className: 'text-denim hidden sm:block shrink-0' }),
+      Icon('arrow', { size: 18, className: 'text-muted hidden sm:block shrink-0' }),
       flowCard({
         icon: Icon('door', { size: 20 }),
-        iconWrap: 'w-10 h-10 rounded-[10px] bg-eggshell text-ink',
+        iconWrap: 'w-10 h-10 rounded-[10px] bg-primary text-primary-content',
         title: 'Postern',
         sub: 'swaps token for real key',
         highlight: true,
       }),
-      Icon('arrow', { size: 18, className: 'text-denim hidden sm:block shrink-0' }),
+      Icon('arrow', { size: 18, className: 'text-muted hidden sm:block shrink-0' }),
       flowCard({
         icon: Icon('lock', { size: 18 }),
-        iconWrap: 'w-9 h-9 rounded-full bg-space-raised text-denim border border-line',
+        iconWrap: 'w-9 h-9 rounded-full bg-raised text-muted border border-line',
         title: 'Your private service',
         sub: 'never exposed directly',
       }),
@@ -76,15 +76,15 @@ function flowCard({ icon, iconWrap, title, sub, highlight = false }) {
       className: [
         'flex flex-col items-center gap-2.5 px-5 py-5 rounded-[14px] border flex-1 min-w-0',
         highlight
-          ? 'border-line-strong bg-space-raised shadow-[0_0_0_1px_rgba(240,235,216,0.04)]'
-          : 'border-line bg-base-200',
+          ? 'border-line-strong bg-surface-2'
+          : 'border-line bg-surface',
       ].join(' '),
     },
     h('div', { className: `flex items-center justify-center ${iconWrap}`, 'aria-hidden': 'true' }, icon),
     h(
       'div',
       { className: 'flex flex-col gap-0.5' },
-      h('span', { className: 'font-semibold text-sm text-eggshell' }, title),
+      h('span', { className: 'font-semibold text-sm text-base-content' }, title),
       h('span', { className: 'text-xs text-muted' }, sub),
     ),
   );
@@ -98,12 +98,12 @@ function step(n, title, body) {
       'div',
       {
         className:
-          'w-7 h-7 rounded-full border border-slate bg-ink-raised text-cream-dim text-xs font-semibold flex items-center justify-center',
+          'w-7 h-7 rounded-full border border-line-strong bg-surface text-soft text-xs font-semibold flex items-center justify-center',
         'aria-hidden': 'true',
       },
       String(n),
     ),
-    h('div', { className: 'font-semibold text-[15px] text-eggshell' }, title),
+    h('div', { className: 'font-semibold text-[15px] text-base-content' }, title),
     h('p', { className: 'm-0 text-sm text-muted leading-relaxed' }, body),
   );
 }

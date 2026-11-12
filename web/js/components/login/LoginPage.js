@@ -1,5 +1,6 @@
 import { h } from '../../lib/h.js';
 import { Icon } from '../common/Icon.js';
+import { ThemeToggle } from '../common/ThemeToggle.js';
 import { BrandPanel } from './BrandPanel.js';
 import { LoginForm } from './LoginForm.js';
 import { InsecureNotice } from './InsecureNotice.js';
@@ -11,7 +12,7 @@ function MobileLogo() {
     h(
       'div',
       {
-        className: 'size-10 rounded-[11px] bg-eggshell text-ink grid place-items-center',
+        className: 'size-10 rounded-[11px] bg-primary text-primary-content grid place-items-center',
         'aria-hidden': 'true',
       },
       Icon('door', { size: 22 }),
@@ -27,7 +28,8 @@ export function LoginPage() {
     BrandPanel(),
     h(
       'main',
-      { className: 'login-form-side flex flex-col justify-between items-center gap-8 px-6 py-10' },
+      { className: 'login-form-side relative flex flex-col justify-between items-center gap-8 px-6 py-10' },
+      h('div', { className: 'absolute top-4 right-4' }, ThemeToggle()),
       MobileLogo(),
       LoginForm(),
       h(
