@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.14.0](https://github.com/causefx/Postern/compare/v0.13.0...v0.14.0) (2026-11-13)
+
+
+### Features
+
+* add embedding settings for admin UI ([361f3c0](https://github.com/causefx/Postern/commit/361f3c05667f02dfc611d71828eabd3b6d211c2b))
+* enhance token management with scope editing and improved UI ([fe57167](https://github.com/causefx/Postern/commit/fe57167d813de296cad87813ba4334f1b7e12f71))
+
 ## [0.13.0](https://github.com/causefx/Postern/compare/v0.12.0...v0.13.0) (2026-11-13)
 
 
