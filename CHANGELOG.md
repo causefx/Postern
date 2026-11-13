@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/causefx/Postern/compare/v0.11.0...v0.12.0) (2026-11-13)
+
+
+### Features
+
+* implement account menu and settings shortcut ([c29d2fb](https://github.com/causefx/Postern/commit/c29d2fb329376f871d607f1fd4170f81a4a25f39))
+
 ## [0.11.0](https://github.com/causefx/Postern/compare/v0.10.0...v0.11.0) (2026-11-13)
 
 
