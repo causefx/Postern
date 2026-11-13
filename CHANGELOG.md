@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.9.0](https://github.com/causefx/Postern/compare/v0.8.0...v0.9.0) (2026-11-13)
+
+
+### Features
+
+* encrypt the data file at rest ([951f0e7](https://github.com/causefx/Postern/commit/951f0e7d5949d67c290a645c985c6fd397b6503a))
+* move settings into their own file ([1b02991](https://github.com/causefx/Postern/commit/1b029918fbb432e86806f9d1e989380cbb69f3ea))
+
+
+### Bug Fixes
+
+* enhance request display and activity handling ([c6fc255](https://github.com/causefx/Postern/commit/c6fc25518373f6607178478c732a80df35097c66))
+* improve token display logic in DocsPanel ([a56e299](https://github.com/causefx/Postern/commit/a56e299214df86e3502d22b1bdadc6892017926d))
+
 ## [0.8.0](https://github.com/causefx/Postern/compare/v0.7.0...v0.8.0) (2026-11-13)
 
 
