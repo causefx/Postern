@@ -121,6 +121,28 @@ Session cookies are `HttpOnly` + `SameSite=Lax`. The `Secure` flag follows `POST
 export POSTERN_SECURE=1
 ```
 
+### Behind a reverse proxy: client addresses
+
+The rate limit, the admin sign-in lockout and the log lines all key on the caller's address. By default that is the address of the connection, and `X-Forwarded-For` and `X-Real-IP` are ignored, because any caller can send them. Behind Caddy, Traefik, nginx or Cloudflare the connection comes from the proxy, so **every caller looks like one client**: they share one rate limit bucket per service, and five failed sign-ins lock everyone out.
+
+Set `POSTERN_TRUSTED_PROXIES` to the address of your proxy and Postern reads the real client from the headers it adds, but only when the connection comes from one of those addresses.
+
+```bash
+# One proxy, a range, or several (comma or space separated)
+export POSTERN_TRUSTED_PROXIES=172.18.0.2
+export POSTERN_TRUSTED_PROXIES=172.18.0.0/16,fd00::/8
+# "private" trusts loopback, 10/8, 172.16/12, 192.168/16 and fc00::/7: handy for a proxy on the same host or Docker network
+export POSTERN_TRUSTED_PROXIES=private
+```
+
+- `X-Forwarded-For` is read from the right, skipping trusted proxies, so entries a caller wrote themselves are never believed. `X-Real-IP` is used when there is no `X-Forwarded-For`. If every address in the chain is a trusted proxy, the leftmost one is the client, which is a machine on the same network as the proxy.
+- A request from an address that is not listed is never believed, whatever headers it carries.
+- A range that covers every address (`0.0.0.0/0`) is refused, and an entry that is not an address or range stops startup, so a typo cannot silently leave the setting off.
+- Your proxy must set or append `X-Forwarded-For` itself and not pass through one from the caller. Caddy, Traefik and nginx's `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for` do that.
+- In Docker the peer is the proxy container's address on the Docker network (see `docker network inspect`), not `127.0.0.1`.
+
+Postern logs one line when a client first goes over the rate limit in a window (`rate limit: <ip> went over N requests per 1m0s to "<service>"`) and one when an address is locked out of sign-in, so you can see whose traffic is being counted.
+
 ### Caller tokens on `/p/...`
 
 - Default access mode requires a Postern-issued caller token. By default that is accepted as `Authorization: Bearer …`, `X-Proxy-Token`, or `?token=`. Per service you can narrow or rename those places (any one enabled place is enough).
@@ -130,7 +152,7 @@ export POSTERN_SECURE=1
 - A token can have a **scope** that limits what it may do: some HTTP methods (`GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`), some paths (prefix or `^` regex, like open paths, matched against the path after `/p/<service>`), or both. Leaving a list empty allows everything in it, and a token with no scope has full access, as before. Set it from the token's menu in the Access tab, or with `PATCH /admin/api/services/{name}/tokens/{id}` and `{"scope": {"methods": ["GET","HEAD"], "paths": [{"match": "prefix", "path": "/api/v3/series"}]}}`; `{"scope": null}` removes it. A request outside the scope is refused with `403` and `token scope` before it reaches the upstream, the Recent column and Usage list show `scope`, and it does not count as use. Rotating a token keeps its scope. Scope applies to every Postern token in both access modes; a real upstream key presented in `access: upstream` has no token and no scope, and open paths skip the token check altogether.
 - A proxied path that contains a `.` or `..` segment, plain or percent-encoded, is refused with `400` and `bad path`, so a request cannot step out of an open path or a token scope.
 - A switched-off service answers `403` with `service disabled`. An unknown name is `404`.
-- Each service and client IP can make `rateLimit` (a setting) proxy requests per minute (default 120, at most 10000), including open paths. Set it to 0 to turn the limit off. The next request over the limit is `429` with an empty body. Admin routes are not counted. The limit uses the connection address, not a forwarded header. The Settings drawer saves it immediately. A hand edit of the settings file applies on restart.
+- Each service and client IP can make `rateLimit` (a setting) proxy requests per minute (default 120, at most 10000), including open paths. Set it to 0 to turn the limit off. The next request over the limit is `429` with an empty body. Admin routes are not counted. The limit is per client address: the connection's, or the real client behind a proxy listed in `POSTERN_TRUSTED_PROXIES` (see above). The Settings drawer saves it immediately. A hand edit of the settings file applies on restart.
 - Caller `Cookie` headers are removed before the upstream credential is added.
 - Dial and TLS handshake wait 10s, response headers 60s, and idle connections 90s. Streams keep flushing after the headers arrive. An upstream that never sends headers returns `502`.
 - Prefer **Bearer** or a dedicated header. Query-string tokens can leak via access logs, `Referer`, and browser history.
@@ -271,5 +293,7 @@ Set `POSTERN_UPDATE_CHECK=off` to turn it off: no request is ever made, and the 
 | `POSTERN_UPDATE_CHECK` | _(on)_ | `off` stops the daily GitHub release check. See Update checks |
 | `POSTERN_CONTAINER` | _(auto)_ | Set by the image. Tells the update dialog to suggest `docker pull` |
 | `POSTERN_SECURE` | _(auto)_ | Cookie / origin HTTPS mode (see above) |
+| `POSTERN_TRUSTED_PROXIES` | _(none)_ | Proxy addresses, CIDR ranges or `private` whose `X-Forwarded-For` / `X-Real-IP` is believed. See Behind a reverse proxy |
+| `POSTERN_SHUTDOWN_TIMEOUT` | `8s` | How long requests in progress get to finish after SIGTERM or Ctrl+C, as a Go duration such as `20s`. Keep it under your container runtime's stop timeout (Docker waits 10s) |
 | `POSTERN_DEV` | _(off)_ | Serve UI from `./web` on disk (no rebuild for JS/HTML/CSS). Run from repo root. `npm run dev` sets it for you. |
 | `POSTERN_OIDC_ISSUER` | _(off)_ | OpenID Connect issuer. Also set `POSTERN_OIDC_CLIENT_ID`. See above |

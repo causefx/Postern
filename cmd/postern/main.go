@@ -9,9 +9,11 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"postern/web"
@@ -78,10 +80,26 @@ func main() {
 			os.Exit(rekeyMain(dataPath))
 		}
 	}
+	proxies, err := parseTrustedProxies(os.Getenv(trustedProxiesEnv))
+	if err != nil {
+		log.Fatal(err)
+	}
+	trustedProxies = proxies
+	if len(proxies) > 0 {
+		log.Printf("trusting forwarded client addresses from %d proxy range(s) (%s)", len(proxies), trustedProxiesEnv)
+	}
 	store, err := OpenStore(dataPath)
 	if err != nil {
 		log.Fatal(err)
 	}
+	// A stop signal ends the servers cleanly (see serveUntil). Once it arrives the default handling
+	// comes back, so a second Ctrl+C or `kill` stops the process at once.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	go func() {
+		<-ctx.Done()
+		stop()
+	}()
 	if store.Encrypted() {
 		log.Printf("data file is encrypted at rest")
 	} else {
@@ -105,7 +123,7 @@ func main() {
 		log.Printf("update check skipped: %q is not a release version", Version)
 	default:
 		log.Printf("update check is on: asks GitHub for new releases daily (set POSTERN_UPDATE_CHECK=off to disable)")
-		go app.updates.run(context.Background())
+		go app.updates.run(ctx)
 	}
 	app.audit.setLimit(store.AuditLimit())
 	if app.adminPass == "" {
@@ -192,19 +210,28 @@ func main() {
 	proxyAddr := env("LISTEN", ":8080")
 	adminAddr := os.Getenv("ADMIN_LISTEN")
 
+	var servers []*http.Server
 	if adminAddr == "" {
 		proxyMux.Handle("/admin/", app.adminAuth(adminMux))
 		proxyMux.Handle("/{$}", adminMux)
 		log.Printf("listening on %s (proxy at /p/<name>/..., UI at /admin/)", proxyAddr)
-		log.Fatal(newServer(proxyAddr, withHealth(proxyMux)).ListenAndServe())
+		servers = []*http.Server{newServer(proxyAddr, withHealth(proxyMux))}
+	} else {
+		log.Printf("admin UI on %s/admin/", adminAddr)
+		log.Printf("proxy on %s (/p/<name>/...)", proxyAddr)
+		servers = []*http.Server{
+			newServer(adminAddr, withHealth(app.adminAuth(adminMux))),
+			newServer(proxyAddr, withHealth(proxyMux)),
+		}
 	}
 
-	go func() {
-		log.Printf("admin UI on %s/admin/", adminAddr)
-		log.Fatal(newServer(adminAddr, withHealth(app.adminAuth(adminMux))).ListenAndServe())
-	}()
-	log.Printf("proxy on %s (/p/<name>/...)", proxyAddr)
-	log.Fatal(newServer(proxyAddr, withHealth(proxyMux)).ListenAndServe())
+	serveErr := serveUntil(ctx, shutdownGrace(), servers...)
+	// Last-used times are written up to 30 seconds after a call; write any that are waiting now.
+	app.usage.close()
+	if serveErr != nil {
+		log.Fatal(serveErr)
+	}
+	log.Printf("stopped")
 }
 
 func healthz(w http.ResponseWriter, r *http.Request) {

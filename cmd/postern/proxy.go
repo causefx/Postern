@@ -92,10 +92,16 @@ func (a *App) proxy(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad path", http.StatusBadRequest)
 		return
 	}
-	if a.hits != nil && !a.hits.allow(name, clientIP(r)) {
-		a.noteActivity(name, r.Method, path, "limited", http.StatusTooManyRequests)
-		w.WriteHeader(http.StatusTooManyRequests)
-		return
+	if a.hits != nil {
+		ip := clientIP(r)
+		if ok, first := a.hits.check(name, ip); !ok {
+			if first {
+				log.Printf("rate limit: %s went over %d requests per %s to %q (further refusals in this window are not logged)", ip, a.hits.limit(), proxyRateWindow, name)
+			}
+			a.noteActivity(name, r.Method, path, "limited", http.StatusTooManyRequests)
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
 	}
 	if !svc.Enabled {
 		a.noteActivity(name, r.Method, path, "off", http.StatusForbidden)

@@ -1,8 +1,7 @@
 package main
 
 import (
-	"net"
-	"net/http"
+	"log"
 	"sync"
 	"time"
 )
@@ -24,14 +23,6 @@ type loginLimiter struct {
 
 func newLoginLimiter() *loginLimiter {
 	return &loginLimiter{byIP: map[string]*loginAttempt{}}
-}
-
-func clientIP(r *http.Request) string {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
 }
 
 // blocked reports whether this IP is currently locked out.
@@ -81,8 +72,9 @@ type proxyLimiter struct {
 }
 
 type proxyWindow struct {
-	n     int
-	start time.Time
+	n      int
+	start  time.Time
+	warned bool // the limit was logged for this window already
 }
 
 func newProxyLimiter(max int) *proxyLimiter {
@@ -129,21 +121,43 @@ func (l *proxyLimiter) setMax(n int) {
 
 // allow reports whether this request is inside the current window.
 func (l *proxyLimiter) allow(service, ip string) bool {
+	ok, _ := l.check(service, ip)
+	return ok
+}
+
+// limit is the number of requests one client may make to one service per window, 0 when off.
+func (l *proxyLimiter) limit() int {
+	if l == nil {
+		return 0
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.maxLocked()
+}
+
+func (l *proxyLimiter) maxLocked() int {
+	if l.configured {
+		return l.max
+	}
+	if proxyRateMax > 0 {
+		return proxyRateMax
+	}
+	return defaultRateLimit
+}
+
+// check is allow, plus whether this is the first refusal in the client's current window. That is
+// the one the caller should log, so a client hammering a closed door is one line, not thousands.
+func (l *proxyLimiter) check(service, ip string) (ok, firstRefusal bool) {
 	if l == nil || service == "" {
-		return true
+		return true, false
 	}
 	now := time.Now()
 	key := service + "\n" + ip
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	max := defaultRateLimit
-	if l.configured {
-		max = l.max
-	} else if proxyRateMax > 0 {
-		max = proxyRateMax
-	}
+	max := l.maxLocked()
 	if max == 0 {
-		return true
+		return true, false
 	}
 	if len(l.by) > proxyLimitSweep {
 		for k, w := range l.by {
@@ -155,13 +169,15 @@ func (l *proxyLimiter) allow(service, ip string) bool {
 	w := l.by[key]
 	if w == nil || now.Sub(w.start) >= proxyRateWindow {
 		l.by[key] = &proxyWindow{n: 1, start: now}
-		return true
+		return true, false
 	}
 	if w.n >= max {
-		return false
+		first := !w.warned
+		w.warned = true
+		return false, first
 	}
 	w.n++
-	return true
+	return true, false
 }
 
 func (l *loginLimiter) failure(ip string) {
@@ -176,5 +192,6 @@ func (l *loginLimiter) failure(ip string) {
 	if a.fails >= loginMaxFails {
 		a.lockUntil = time.Now().Add(loginLockFor)
 		a.fails = 0
+		log.Printf("login: %s is locked out for %s after %d failed attempts", ip, loginLockFor, loginMaxFails)
 	}
 }

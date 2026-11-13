@@ -91,6 +91,22 @@ func (u *tokenUsage) forget(ids ...string) {
 	}
 }
 
+// close writes any use that is still waiting for its delayed write, so a stop does not lose it. With
+// nothing waiting it does nothing.
+func (u *tokenUsage) close() {
+	if u == nil {
+		return
+	}
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	if u.timer == nil {
+		return
+	}
+	u.timer.Stop()
+	u.timer = nil
+	u.saveLocked()
+}
+
 func (u *tokenUsage) flush() {
 	u.mu.Lock()
 	defer u.mu.Unlock()
