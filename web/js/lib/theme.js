@@ -4,6 +4,7 @@
  * before first paint, and this module keeps <html data-theme> right after that.
  */
 const KEY = 'postern.theme';
+const THEME_EVENT = 'postern:theme';
 
 export const THEME_OPTIONS = [
   { id: 'light', label: 'Light', icon: 'sun' },
@@ -39,6 +40,12 @@ export function applyTheme() {
   for (const meta of document.querySelectorAll('meta[name="theme-color"]')) meta.setAttribute('content', page);
 }
 
+/** Calls fn whenever the theme preference changes, wherever the change came from. */
+export function onThemeChange(fn) {
+  window.addEventListener(THEME_EVENT, fn);
+  return () => window.removeEventListener(THEME_EVENT, fn);
+}
+
 export function setThemePreference(pref) {
   try {
     if (pref === 'light' || pref === 'dark') localStorage.setItem(KEY, pref);
@@ -47,6 +54,7 @@ export function setThemePreference(pref) {
     /* storage blocked: the choice lasts for this page only */
   }
   applyTheme();
+  window.dispatchEvent(new Event(THEME_EVENT));
 }
 
 // Follow the OS when it changes, and a choice made in another tab.

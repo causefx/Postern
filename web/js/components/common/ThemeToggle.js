@@ -1,7 +1,7 @@
 import { h } from '../../lib/h.js';
 import { Icon } from './Icon.js';
 import { MenuButton } from './Menu.js';
-import { THEME_OPTIONS, getThemePreference, setThemePreference } from '../../lib/theme.js';
+import { THEME_OPTIONS, getThemePreference, onThemeChange, setThemePreference } from '../../lib/theme.js';
 
 /** Icon button that opens Light / Dark / System. The icon shows the current choice. */
 export function ThemeToggle() {
@@ -30,6 +30,12 @@ export function ThemeToggle() {
     },
     iconHost,
   );
+
+  // The command palette can change the theme too; keep the icon in step, and stop once removed.
+  const off = onThemeChange(() => {
+    if (!wrap.isConnected) return off();
+    paint();
+  });
 
   paint();
   return wrap;

@@ -1,6 +1,7 @@
 import { api } from '../api.js';
 import { state, setState, clearSelection, filteredServices, toggleSelect } from '../state.js';
 import { copyServiceToken, toggleServiceEnabled, setManyEnabled } from './serviceActions.js';
+import { THEME_OPTIONS, getThemePreference, resolveTheme, setThemePreference } from './theme.js';
 import { openBulkRotateDialog } from '../components/dialogs/BulkRotateDialog.js';
 import { openBulkDeleteDialog } from '../components/dialogs/BulkDeleteDialog.js';
 import { openRotateDialog } from '../components/dialogs/RotateTokenDialog.js';
@@ -121,6 +122,28 @@ export function commandSections({ query = '', onAdd, onReload, onEdit, onSetting
         run: () => setState({ filter: f.id, focusIndex: -1 }),
       });
     }
+  }
+  const themePref = getThemePreference();
+  const nextTheme = resolveTheme() === 'dark' ? 'light' : 'dark';
+  const themeLabel = (id) => THEME_OPTIONS.find((o) => o.id === id).label;
+  if (matches(query, 'toggle theme dark light')) {
+    actions.push({
+      id: 'theme-toggle',
+      section: 'actions',
+      label: `Toggle theme (${themeLabel(nextTheme)})`,
+      icon: nextTheme === 'dark' ? 'moon' : 'sun',
+      run: () => setThemePreference(nextTheme),
+    });
+  }
+  for (const o of THEME_OPTIONS) {
+    if (o.id === themePref || !matches(query, `theme: ${o.label}`)) continue;
+    actions.push({
+      id: `theme-${o.id}`,
+      section: 'actions',
+      label: `Theme: ${o.label}`,
+      icon: o.icon,
+      run: () => setThemePreference(o.id),
+    });
   }
   if (matches(query, 'sign out')) {
     actions.push({
