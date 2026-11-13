@@ -99,6 +99,8 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository }}
+          labels: |
+            org.opencontainers.image.licenses=PolyForm-Shield-1.0.0
           tags: |
             type=raw,value=${{ needs.release-please.outputs.version }},enable=${{ env.RELEASED == 'true' }}
             type=raw,value=${{ needs.release-please.outputs.major }}.${{ needs.release-please.outputs.minor }},enable=${{ env.RELEASED == 'true' }}

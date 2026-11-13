@@ -68,6 +68,8 @@ docker run --rm -p 8080:8080 \
 
 ## Security
 
+To report a vulnerability, use GitHub's private reporting; see [SECURITY.md](SECURITY.md).
+
 ### Admin UI
 
 - Sign-in uses `ADMIN_PASSWORD` (required in production; a random one is generated for the run if unset).
@@ -314,3 +316,15 @@ Set `POSTERN_UPDATE_CHECK=off` to turn it off: no request is ever made, and the 
 | `POSTERN_SHUTDOWN_TIMEOUT` | `8s` | How long requests in progress get to finish after SIGTERM or Ctrl+C, as a Go duration such as `20s`. Keep it under your container runtime's stop timeout (Docker waits 10s) |
 | `POSTERN_DEV` | _(off)_ | Serve UI from `./web` on disk (no rebuild for JS/HTML/CSS). Run from repo root. `npm run dev` sets it for you. |
 | `POSTERN_OIDC_ISSUER` | _(off)_ | OpenID Connect issuer. Also set `POSTERN_OIDC_CLIENT_ID`. See above |
+
+## License
+
+Postern is **source-available** under the [PolyForm Shield License 1.0.0](LICENSE), not an open-source license. In plain terms:
+
+- You can use it, run it for yourself or your company, read it, change it and share your changes, for free.
+- You cannot use it to provide a product or service that competes with Postern. That covers selling it, selling a modified version, or offering it as a hosted service, and it applies even if you give the competing product away.
+- The license text is the only authority. This summary is not legal advice and does not change it.
+
+Contributions are welcome under a simple contributor agreement; see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+If you find Postern useful, donations and sponsorships are what keep it going.

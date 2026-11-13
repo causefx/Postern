@@ -34,6 +34,9 @@ COPY --from=build /out/postern /postern
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
+LABEL org.opencontainers.image.licenses="PolyForm-Shield-1.0.0" \
+      org.opencontainers.image.source="https://github.com/causefx/Postern"
+
 ENV LISTEN=:8080 \
     POSTERN_DATA=/data/postern-data.json \
     POSTERN_CONTAINER=1
