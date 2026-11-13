@@ -24,7 +24,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
       -ldflags="-s -w -X main.Version=${VERSION}" \
       -o /out/postern ./cmd/postern
 
-FROM alpine:3.21
+FROM alpine:3.24
 RUN apk add --no-cache ca-certificates tzdata su-exec \
  && adduser -D -H -u 65532 postern \
  && mkdir -p /data \
