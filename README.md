@@ -20,19 +20,19 @@ One release is one git tag, one GitHub Release, and one container image:
 |---|---|
 | Git tag | `v1.2.3` |
 | GitHub Release | `v1.2.3`, with the changelog |
-| Image | `ghcr.io/causefx/postern:1.2.3`, also tagged `1.2` and `latest` |
+| Image | `ghcr.io/causefx/postern:1.2.3` (linux/amd64 and linux/arm64), also tagged `1.2` and `latest` |
 
-Every push to `main` also publishes `ghcr.io/causefx/postern:edge`. That tag moves continuously and is not a release. A new GHCR package is private until its visibility is changed in the package settings.
+Every other push to `main` publishes `ghcr.io/causefx/postern:edge` (and `sha-<short>`). Those tags move continuously and are not releases. Tests (`go vet`, `go test -race`) must pass before anything is published. A new GHCR package is private until its visibility is changed in the package settings.
 
 1. Open a pull request whose title is a [Conventional Commit](https://www.conventionalcommits.org/). Squash-merge it so that title is the commit on `main`.
    - `fix:` patch, `0.1.0` → `0.1.1`
    - `feat:` minor, `0.1.0` → `0.2.0`
    - `feat!:` or a `BREAKING CHANGE:` footer bumps the minor while the version is still `0.x`. Put `Release-As: 1.0.0` in the commit footer to cut the first stable major.
    - `docs:`, `chore:`, `refactor:`, `test:`, `ci:` do not cut a release
-2. Release Please opens a Release pull request that bumps `cmd/postern/version.go`, the Dockerfile default, and `CHANGELOG.md`.
+2. Release Please opens a Release pull request that bumps `cmd/postern/version.go` and `CHANGELOG.md`.
 3. Merge that pull request. GitHub creates tag `vX.Y.Z` and the Release, then builds the image with that version and adds the image name to the Release notes.
 
-Pushing a `vX.Y.Z` tag yourself publishes the same image and opens a GitHub Release if one does not already exist. Prefer the Release pull request so the changelog and the binary version stay together.
+Do not push `vX.Y.Z` tags by hand. Releases are published only by the Release workflow, so the changelog, tag, binary version and image stay together.
 
 ```bash
 go build -ldflags "-X main.Version=1.2.3" -o postern ./cmd/postern

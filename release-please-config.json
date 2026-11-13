@@ -10,10 +10,6 @@
         {
           "type": "generic",
           "path": "cmd/postern/version.go"
-        },
-        {
-          "type": "generic",
-          "path": "Dockerfile"
         }
       ]
     }
