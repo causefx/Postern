@@ -145,7 +145,7 @@ func TestPasswordLoginRequiresOIDCSession(t *testing.T) {
 		t.Fatalf("password session %d %s", rec.Code, rec.Body.String())
 	}
 
-	oidcSession, err := sessions.createFromOIDC(true)
+	oidcSession, err := sessions.createFromOIDC(true, "")
 	if err != nil {
 		t.Fatal(err)
 	}

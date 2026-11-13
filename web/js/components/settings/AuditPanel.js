@@ -48,7 +48,7 @@ export function AuditPanel({ entries, service, onService }) {
   );
 }
 
-/** One card per local day, newest first: a heading, then one row per change. */
+/** One card per local day, newest first: the day label inside the card, then one row per change. */
 function entryList(entries) {
   const days = [];
   for (const ev of entries) {
@@ -63,9 +63,9 @@ function entryList(entries) {
     ...days.map((day) =>
       h(
         'section',
-        { className: 'audit-day-group', 'aria-label': day.label },
+        { className: 'audit-day-card', 'aria-label': day.label },
         h('h3', { className: 'audit-day' }, day.label),
-        h('div', { className: 'audit-day-card' }, ...day.events.map(entryRow)),
+        h('div', { className: 'audit-day-rows' }, ...day.events.map(entryRow)),
       ),
     ),
   );

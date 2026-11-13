@@ -383,6 +383,7 @@ func (a *App) meta(w http.ResponseWriter, r *http.Request) {
 		"secure":       secure,
 		"listen":       r.Host,
 		"publicOrigin": scheme + "://" + r.Host,
+		"email":        a.sessions.email(sessionID(r)),
 	})
 }
 

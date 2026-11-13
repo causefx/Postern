@@ -280,7 +280,7 @@ func TestSessionHMACSurvivesRestart(t *testing.T) {
 	if err != nil || a.remember(short) {
 		t.Fatal("short session looked like remember")
 	}
-	expired := a.seal(time.Now().Add(-time.Second), sessionTTLShort, false)
+	expired := a.seal(time.Now().Add(-time.Second), sessionTTLShort, false, "")
 	if a.valid(expired) {
 		t.Fatal("expired cookie accepted")
 	}

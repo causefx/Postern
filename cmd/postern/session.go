@@ -31,56 +31,90 @@ func newSessionStore(password string) *sessionStore {
 }
 
 func (s *sessionStore) create(remember bool) (string, error) {
-	return s.issue(remember, false)
+	return s.issue(sessionInfo{Remember: remember})
 }
 
-func (s *sessionStore) createFromOIDC(remember bool) (string, error) {
-	return s.issue(remember, true)
+// createFromOIDC starts a session for a person who signed in through the identity provider. The
+// email, when the provider sent one, is kept in the cookie so the admin UI can show who is signed in.
+func (s *sessionStore) createFromOIDC(remember bool, email string) (string, error) {
+	return s.issue(sessionInfo{Remember: remember, OIDC: true, Email: cleanEmail(email)})
 }
 
 func (s *sessionStore) refresh(raw string) (string, error) {
-	ok, remember, oidc := s.parse(raw)
+	info, ok := s.read(raw)
 	if !ok {
 		return "", errSession
 	}
-	return s.issue(remember, oidc)
+	return s.issue(info)
 }
 
-func (s *sessionStore) issue(remember, oidc bool) (string, error) {
+// sessionInfo is what a valid cookie says about the session.
+type sessionInfo struct {
+	Remember bool
+	OIDC     bool
+	Email    string
+}
+
+const maxSessionEmail = 254
+
+// cleanEmail drops anything that is not a plausible address, so an odd claim never ends up in a cookie.
+func cleanEmail(email string) string {
+	email = strings.TrimSpace(email)
+	if email == "" || len(email) > maxSessionEmail || strings.ContainsAny(email, " \t\r\n<>\"") || !strings.Contains(email, "@") {
+		return ""
+	}
+	return email
+}
+
+func (s *sessionStore) issue(info sessionInfo) (string, error) {
 	ttl := sessionTTLShort
-	if remember {
+	if info.Remember {
 		ttl = sessionTTLRemember
 	}
-	return s.seal(time.Now().Add(ttl), ttl, oidc), nil
+	return s.seal(time.Now().Add(ttl), ttl, info.OIDC, info.Email), nil
 }
 
-func (s *sessionStore) seal(exp time.Time, ttl time.Duration, oidc bool) string {
+func (s *sessionStore) seal(exp time.Time, ttl time.Duration, oidc bool, email string) string {
 	flag := "p"
 	if oidc {
 		flag = "o"
 	}
 	payload := strconv.FormatInt(exp.Unix(), 10) + "." + strconv.Itoa(int(ttl.Seconds())) + "." + flag
+	if email != "" {
+		// Hex keeps the address free of dots, which separate the cookie's fields.
+		payload += "." + hex.EncodeToString([]byte(email))
+	}
 	mac := hmac.New(sha256.New, s.key)
 	mac.Write([]byte(payload))
 	return payload + "." + hex.EncodeToString(mac.Sum(nil))
 }
 
 func (s *sessionStore) valid(raw string) bool {
-	ok, _, _ := s.parse(raw)
+	_, ok := s.read(raw)
 	return ok
 }
 
 func (s *sessionStore) remember(raw string) bool {
-	ok, remember, _ := s.parse(raw)
-	return ok && remember
+	info, ok := s.read(raw)
+	return ok && info.Remember
 }
 
 func (s *sessionStore) viaOIDC(raw string) bool {
-	ok, _, oidc := s.parse(raw)
-	return ok && oidc
+	info, ok := s.read(raw)
+	return ok && info.OIDC
 }
 
-func (s *sessionStore) parse(raw string) (ok bool, remember bool, oidc bool) {
+// email is the address the person signed in with, or "" for a password session.
+func (s *sessionStore) email(raw string) string {
+	info, ok := s.read(raw)
+	if !ok {
+		return ""
+	}
+	return info.Email
+}
+
+func (s *sessionStore) read(raw string) (sessionInfo, bool) {
+	var info sessionInfo
 	parts := strings.Split(raw, ".")
 	var payload, macHex string
 	switch len(parts) {
@@ -88,34 +122,43 @@ func (s *sessionStore) parse(raw string) (ok bool, remember bool, oidc bool) {
 		// Cookies issued before the sign-in method was stored.
 		payload = parts[0] + "." + parts[1]
 		macHex = parts[2]
-	case 4:
+	case 4, 5:
 		if parts[2] != "p" && parts[2] != "o" {
-			return false, false, false
+			return info, false
 		}
-		payload = parts[0] + "." + parts[1] + "." + parts[2]
-		macHex = parts[3]
-		oidc = parts[2] == "o"
+		n := len(parts) - 1
+		payload = strings.Join(parts[:n], ".")
+		macHex = parts[n]
+		info.OIDC = parts[2] == "o"
+		if len(parts) == 5 {
+			b, err := hex.DecodeString(parts[3])
+			if err != nil || cleanEmail(string(b)) != string(b) {
+				return info, false
+			}
+			info.Email = string(b)
+		}
 	default:
-		return false, false, false
+		return info, false
 	}
 	mac, err := hex.DecodeString(macHex)
 	if err != nil || len(mac) != sha256.Size {
-		return false, false, false
+		return info, false
 	}
 	expect := hmac.New(sha256.New, s.key)
 	expect.Write([]byte(payload))
 	if !hmac.Equal(mac, expect.Sum(nil)) {
-		return false, false, false
+		return info, false
 	}
 	expUnix, err1 := strconv.ParseInt(parts[0], 10, 64)
 	ttlSec, err2 := strconv.Atoi(parts[1])
 	if err1 != nil || err2 != nil || ttlSec <= 0 {
-		return false, false, false
+		return info, false
 	}
 	if time.Now().Unix() > expUnix {
-		return false, false, false
+		return info, false
 	}
-	return true, ttlSec >= int(sessionTTLRemember.Seconds()), oidc
+	info.Remember = ttlSec >= int(sessionTTLRemember.Seconds())
+	return info, true
 }
 
 func (s *sessionStore) revoke(string) {}

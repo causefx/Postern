@@ -14,6 +14,7 @@ export const LIST_SHORTCUTS = [
   { keys: ['Space'], label: 'on/off' },
   { keys: ['C'], label: 'copy token' },
   { keys: ['Enter'], label: 'open' },
+  { keys: [','], label: 'settings' },
 ];
 
 export const DRAWER_SHORTCUTS = [

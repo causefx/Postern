@@ -262,7 +262,7 @@ func (a *App) oidcCallback(w http.ResponseWriter, r *http.Request) {
 		oidcFail(w, r, "allow")
 		return
 	}
-	id, err := a.sessions.createFromOIDC(pending.Remember)
+	id, err := a.sessions.createFromOIDC(pending.Remember, claims.Email)
 	if err != nil {
 		oidcFail(w, r, "failed")
 		return

@@ -1,8 +1,7 @@
 import { h } from '../../lib/h.js';
 import { Button } from '../common/Button.js';
 import { Icon } from '../common/Icon.js';
-import { ThemeToggle } from '../common/ThemeToggle.js';
-import { api } from '../../api.js';
+import { AccountMenu } from './AccountMenu.js';
 import { state, counts } from '../../state.js';
 import { isMac } from '../../lib/serviceDisplay.js';
 import { isDrawerOpen, getDrawerName } from '../drawer/ServiceDrawer.js';
@@ -10,7 +9,6 @@ import { isSettingsOpen } from '../settings/SettingsDrawer.js';
 
 export function DashboardHeader({ onAdd, onOpenCommand, onSettings, onUpdate }) {
   const c = counts();
-  const secure = state.meta.secure;
   const mod = isMac() ? '⌘' : 'Ctrl';
   const drawerName = isDrawerOpen() ? getDrawerName() : isSettingsOpen() ? 'Settings' : null;
 
@@ -48,9 +46,10 @@ export function DashboardHeader({ onAdd, onOpenCommand, onSettings, onUpdate }) 
             : null,
         ),
       ),
+      // The search box is desktop only; a phone gets the search icon in the right-hand group.
       h(
         'div',
-        { className: 'dash-header-center' },
+        { className: 'dash-header-center desktop-only' },
         h(
           'button',
           {
@@ -62,7 +61,7 @@ export function DashboardHeader({ onAdd, onOpenCommand, onSettings, onUpdate }) 
           h('span', { className: 'flex-1 text-left text-muted truncate' }, 'Search or run a command'),
           h(
             'span',
-            { className: 'desktop-only inline-flex items-center gap-1 shrink-0' },
+            { className: 'inline-flex items-center gap-1 shrink-0' },
             h('kbd', { className: 'kbd-hint' }, mod),
             h('kbd', { className: 'kbd-hint' }, 'K'),
           ),
@@ -71,18 +70,6 @@ export function DashboardHeader({ onAdd, onOpenCommand, onSettings, onUpdate }) 
       h(
         'div',
         { className: 'dash-header-right flex items-center justify-end gap-2.5' },
-        !secure
-          ? h(
-              'span',
-              {
-                className: 'http-warn-icon',
-                title: 'HTTP only — add HTTPS before exposing this admin UI remotely',
-                'aria-label': 'HTTP only — add HTTPS before exposing this admin UI remotely',
-                role: 'img',
-              },
-              Icon('warn', { size: 20 }),
-            )
-          : null,
         state.update?.available
           ? h(
               'button',
@@ -103,44 +90,26 @@ export function DashboardHeader({ onAdd, onOpenCommand, onSettings, onUpdate }) 
             variant: 'ghost',
             size: 'sm',
             square: true,
-            className: 'h-9 w-9 text-soft',
-            'aria-label': 'Settings',
-            title: 'Settings',
-            onClick: onSettings,
+            className: 'h-9 w-9 text-soft mobile-only',
+            'aria-label': 'Search or run a command',
+            title: 'Search',
+            onClick: () => onOpenCommand?.(),
           },
-          Icon('gear', { size: 16 }),
+          Icon('search', { size: 18 }),
         ),
-        ThemeToggle(),
         Button(
           {
             variant: 'primary',
             size: 'sm',
             className: 'gap-1.5 h-9 px-3',
+            'aria-label': 'Add service',
             onClick: onAdd,
           },
           Icon('plus', { size: 14 }),
           h('span', { className: 'desktop-only' }, 'Add'),
           h('kbd', { className: 'kbd-hint kbd-hint-on-primary desktop-only' }, 'N'),
         ),
-        Button(
-          {
-            variant: 'ghost',
-            size: 'sm',
-            square: true,
-            className: 'h-9 w-9 text-soft',
-            'aria-label': 'Sign out',
-            title: 'Sign out',
-            onClick: async () => {
-              try {
-                await api.logout();
-              } catch {
-                /* leave */
-              }
-              location.replace('/admin/login');
-            },
-          },
-          Icon('logout', { size: 16 }),
-        ),
+        AccountMenu({ onSettings }),
       ),
     ),
   );

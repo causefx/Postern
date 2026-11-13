@@ -12,7 +12,6 @@ import {
 } from './state.js';
 import { h, clear } from './lib/h.js';
 import { DashboardHeader } from './components/layout/DashboardHeader.js';
-import { HttpsBanner } from './components/layout/HttpsBanner.js';
 import { KeyboardHints } from './components/layout/KeyboardHints.js';
 import { FilterBar } from './components/services/FilterBar.js';
 import { ServiceList } from './components/services/ServiceList.js';
@@ -176,6 +175,11 @@ function onKeydown(e) {
     openCreate();
     return;
   }
+  if (key === ',') {
+    e.preventDefault();
+    void openSettingsDrawer();
+    return;
+  }
 
   const items = filteredServices();
   if (!items.length) return;
@@ -232,13 +236,10 @@ function render() {
   );
 
   const main = h('main', { className: 'dash-main flex flex-col gap-4' });
-  const banner = HttpsBanner();
 
   if (!state.services.length) {
-    if (banner) main.append(banner);
     main.append(EmptyState({ onAdd: () => openCreate() }));
   } else {
-    if (banner) main.append(banner);
     main.append(FilterBar());
     const bulk = BulkActionBar();
     if (bulk) main.append(bulk);
