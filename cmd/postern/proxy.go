@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -84,6 +85,13 @@ func (a *App) proxy(w http.ResponseWriter, r *http.Request) {
 	}
 	rest := "/" + r.PathValue("rest")
 	path := activityPath(rest, r, svc)
+	// Paths are matched here and then forwarded unchanged, so a path that only means something else
+	// after the upstream resolves "." and ".." could slip past an open path or a token scope.
+	if hasDotSegment(rest) {
+		a.noteActivity(name, r.Method, path, "rejected", http.StatusBadRequest)
+		http.Error(w, "bad path", http.StatusBadRequest)
+		return
+	}
 	if a.hits != nil && !a.hits.allow(name, clientIP(r)) {
 		a.noteActivity(name, r.Method, path, "limited", http.StatusTooManyRequests)
 		w.WriteHeader(http.StatusTooManyRequests)
@@ -111,6 +119,11 @@ func (a *App) proxy(w http.ResponseWriter, r *http.Request) {
 			a.noteActivity(name, r.Method, path, "rejected", http.StatusUnauthorized)
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 		}
+		return
+	}
+	if !caller.Scope.Allows(r.Method, rest) {
+		a.noteCaller(name, r.Method, path, caller.Name, "scope", http.StatusForbidden)
+		http.Error(w, "token scope", http.StatusForbidden)
 		return
 	}
 	a.usage.touch(caller.ID, time.Now())
@@ -161,4 +174,16 @@ func activityPath(rest string, r *http.Request, svc Service) string {
 		return rest
 	}
 	return rest + "?" + enc
+}
+
+// hasDotSegment reports whether a proxied path contains a "." or ".." segment, written plainly or
+// percent-encoded (rest is already decoded). A backslash counts as a separator because some upstreams
+// treat it like one.
+func hasDotSegment(rest string) bool {
+	for _, seg := range strings.Split(strings.ReplaceAll(rest, "\\", "/"), "/") {
+		if seg == "." || seg == ".." {
+			return true
+		}
+	}
+	return false
 }

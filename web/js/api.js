@@ -61,6 +61,12 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ expiresAt }),
     }),
+  /** `scope` is { methods, paths }, or null to remove the limit. Rotating a token keeps its scope. */
+  setTokenScope: (name, id, scope) =>
+    request('services/' + encodeURIComponent(name) + '/tokens/' + encodeURIComponent(id), {
+      method: 'PATCH',
+      body: JSON.stringify({ scope }),
+    }),
   activity: (name) => request('services/' + encodeURIComponent(name) + '/activity'),
   clearActivity: (name) => request('services/' + encodeURIComponent(name) + '/activity', { method: 'DELETE' }),
   deleteService: (name) => request('services/' + encodeURIComponent(name), { method: 'DELETE' }),

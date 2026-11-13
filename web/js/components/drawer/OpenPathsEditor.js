@@ -2,8 +2,21 @@ import { h } from '../../lib/h.js';
 import { Button } from '../common/Button.js';
 import { Icon } from '../common/Icon.js';
 
-/** Editable list of open-path rules. Mutates `paths` in place; calls onChange after structural edits. */
-export function OpenPathsEditor({ paths, onChange, errors }) {
+/**
+ * Editable list of path rules. Mutates `paths` in place; calls onChange after structural edits.
+ * Open paths and token scopes share it: `errorKey` is the prefix server errors use for this list
+ * ("openPaths" or "scope.paths"), `label` names a row for screen readers, and `placeholder` is the
+ * example prefix shown in an empty row.
+ */
+export function OpenPathsEditor({
+  paths,
+  onChange,
+  errors,
+  errorKey = 'openPaths',
+  label = 'Open path',
+  placeholder = '/health',
+  max = 20,
+}) {
   const list = h('div', { className: 'open-paths-list' });
 
   function normalizedPath(rule) {
@@ -58,14 +71,14 @@ export function OpenPathsEditor({ paths, onChange, errors }) {
         h('option', { value: 'regex', selected: isRegex }, 'Regex'),
       );
       const pathError =
-        (errors && (errors[`openPaths.${i}.path`] || errors[`openPaths.${i}.match`])) || '';
+        (errors && (errors[`${errorKey}.${i}.path`] || errors[`${errorKey}.${i}.match`])) || '';
       const hint = h('p', { className: 'open-path-hint m-0', 'data-open-path-hint': '1' });
       paintHint(hint, rule);
       const pathInput = h('input', {
         className: `open-path-input${pathError ? ' input-error' : ''}`,
         value: rule.path || '',
-        placeholder: rule.match === 'regex' ? '^/webhooks/[^/]+$' : '/health',
-        'aria-label': 'Open path',
+        placeholder: rule.match === 'regex' ? '^/webhooks/[^/]+$' : placeholder,
+        'aria-label': label,
         'aria-invalid': pathError ? 'true' : 'false',
         onInput: (e) => {
           rule.path = e.target.value;
@@ -121,7 +134,7 @@ export function OpenPathsEditor({ paths, onChange, errors }) {
         type: 'button',
         className: 'btn-add-row',
         onClick: () => {
-          if (paths.length >= 20) return;
+          if (paths.length >= max) return;
           paths.push({ match: 'prefix', path: '' });
           redraw();
           onChange?.();

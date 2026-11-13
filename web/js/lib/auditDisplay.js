@@ -35,6 +35,9 @@ export function auditTitle(ev) {
         text(` token to expire ${new Date(ev.expires).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} for `),
         ...svc,
       ];
+    case 'token_scope':
+      if (!ev.scope) return [text('Removed the scope on the '), token, text(' token for '), ...svc];
+      return [text('Limited the '), token, text(' token for '), ...svc];
     case 'create':
       return [text('Created '), ...svc];
     case 'delete':
@@ -57,6 +60,7 @@ const KNOWN_ACTIONS = new Set([
   'token_revoke',
   'token_pause',
   'token_expiry',
+  'token_scope',
   'create',
   'delete',
   'enable',
@@ -81,6 +85,7 @@ export function auditChips(ev) {
       .filter(([key, value]) => !BASE_FIELDS.has(key) && value != null && value !== '')
       .map(([key, value]) => `${key} ${value}`);
   }
+  if (ev.action === 'token_scope') return ev.scope ? [ev.scope] : [];
   return ev.url ? [`url → ${ev.url}`] : [];
 }
 
@@ -100,6 +105,8 @@ export function auditIcon(ev) {
       return { icon: 'trash', tone: 'neutral' };
     case 'token_expiry':
       return { icon: 'clock', tone: 'neutral' };
+    case 'token_scope':
+      return { icon: 'lock', tone: 'neutral' };
     case 'create':
     case 'token_add':
       return { icon: 'plus', tone: 'neutral' };

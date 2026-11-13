@@ -53,6 +53,109 @@ type CallerToken struct {
 	Paused bool   `json:"paused,omitempty"`
 	// ExpiresAt is when the token stops working. The zero value never expires.
 	ExpiresAt time.Time `json:"expiresAt,omitzero"`
+	// Scope limits what this token may do. Nil means unrestricted, so files written before scopes
+	// existed behave as they always did.
+	Scope *TokenScope `json:"scope,omitempty"`
+}
+
+// TokenScope narrows a caller token to some methods and some paths. An empty list means "any", so a
+// scope with only methods allows every path, and the reverse. A scope with neither is stored as nil.
+type TokenScope struct {
+	Methods []string   `json:"methods,omitempty"`
+	Paths   []OpenPath `json:"paths,omitempty"`
+}
+
+const maxScopePaths = 20
+
+// scopeMethods is the fixed set a scope may name, in the order they are stored and shown.
+var scopeMethods = []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
+
+// Allows reports whether the request fits the scope. A nil scope allows everything. path is the
+// proxied path, the same one open paths are matched against.
+func (sc *TokenScope) Allows(method, path string) bool {
+	if sc == nil {
+		return true
+	}
+	if len(sc.Methods) > 0 {
+		ok := false
+		for _, m := range sc.Methods {
+			if strings.EqualFold(m, method) {
+				ok = true
+				break
+			}
+		}
+		if !ok {
+			return false
+		}
+	}
+	if len(sc.Paths) > 0 && !pathMatches(sc.Paths, path) {
+		return false
+	}
+	return true
+}
+
+// Summary is a short, secret-free description for the audit log, such as "GET, HEAD · 2 paths".
+// Empty means unrestricted.
+func (sc *TokenScope) Summary() string {
+	if sc == nil || (len(sc.Methods) == 0 && len(sc.Paths) == 0) {
+		return ""
+	}
+	var parts []string
+	if len(sc.Methods) > 0 {
+		parts = append(parts, strings.Join(sc.Methods, ", "))
+	}
+	switch n := len(sc.Paths); n {
+	case 0:
+	case 1:
+		parts = append(parts, "1 path")
+	default:
+		parts = append(parts, strconv.Itoa(n)+" paths")
+	}
+	return strings.Join(parts, " · ")
+}
+
+// normalizeScope validates a scope and returns its stored form: methods upper-cased, de-duplicated
+// and in a fixed order, paths checked like open paths. A scope that restricts nothing comes back nil.
+func normalizeScope(in *TokenScope) (*TokenScope, error) {
+	if in == nil {
+		return nil, nil
+	}
+	var methods []string
+	if len(in.Methods) > 0 {
+		seen := map[string]bool{}
+		for _, raw := range in.Methods {
+			m := strings.ToUpper(strings.TrimSpace(raw))
+			known := false
+			for _, k := range scopeMethods {
+				if k == m {
+					known = true
+					break
+				}
+			}
+			if !known {
+				return nil, FieldError{"scope.methods": "methods can be " + strings.Join(scopeMethods, ", ")}
+			}
+			seen[m] = true
+		}
+		for _, k := range scopeMethods {
+			if seen[k] {
+				methods = append(methods, k)
+			}
+		}
+	}
+	paths, err := normalizePathRules(in.Paths, pathRuleLimits{
+		key:     "scope.paths",
+		max:     maxScopePaths,
+		maxMsg:  "at most 20 paths",
+		rootMsg: "prefix / matches every path; leave the list empty instead",
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(methods) == 0 && len(paths) == 0 {
+		return nil, nil
+	}
+	return &TokenScope{Methods: methods, Paths: paths}, nil
 }
 
 // Expired reports whether the token has passed its expiry at now.
@@ -113,15 +216,33 @@ func (s *Service) validate(requireAuthSecret bool) error {
 }
 
 func normalizeOpenPaths(in []OpenPath) ([]OpenPath, error) {
+	return normalizePathRules(in, pathRuleLimits{
+		key:     "openPaths",
+		max:     maxOpenPaths,
+		maxMsg:  "at most 20 open paths",
+		rootMsg: "prefix / would open the whole service",
+	})
+}
+
+// pathRuleLimits names a list of path rules in error messages: open paths and token scopes share
+// the same matching rules but report problems under their own field.
+type pathRuleLimits struct {
+	key     string
+	max     int
+	maxMsg  string
+	rootMsg string
+}
+
+func normalizePathRules(in []OpenPath, lim pathRuleLimits) ([]OpenPath, error) {
 	if len(in) == 0 {
 		return nil, nil
 	}
-	if len(in) > maxOpenPaths {
-		return nil, FieldError{"openPaths": "at most 20 open paths"}
+	if len(in) > lim.max {
+		return nil, FieldError{lim.key: lim.maxMsg}
 	}
 	out := make([]OpenPath, 0, len(in))
 	for i, raw := range in {
-		key := "openPaths." + strconv.Itoa(i)
+		key := lim.key + "." + strconv.Itoa(i)
 		match := strings.ToLower(strings.TrimSpace(raw.Match))
 		if match == "" {
 			match = OpenMatchPrefix
@@ -139,7 +260,7 @@ func normalizeOpenPaths(in []OpenPath) ([]OpenPath, error) {
 				return nil, FieldError{key + ".path": "prefix must start with /"}
 			}
 			if path == "/" {
-				return nil, FieldError{key + ".path": "prefix / would open the whole service"}
+				return nil, FieldError{key + ".path": lim.rootMsg}
 			}
 		case OpenMatchRegex:
 			if !strings.HasPrefix(path, "^") {
@@ -804,6 +925,17 @@ func (s *Store) SetTokenExpiry(serviceName, id string, at time.Time) (Service, e
 		return cur, FieldError{"expiresAt": "expiry must be in the future"}
 	}
 	return s.mutateToken(serviceName, id, func(t *CallerToken) { t.ExpiresAt = at.UTC() })
+}
+
+// SetTokenScope limits what one token may do. A nil or empty scope removes the limit. Rotating the
+// token keeps its scope.
+func (s *Store) SetTokenScope(serviceName, id string, scope *TokenScope) (Service, error) {
+	norm, err := normalizeScope(scope)
+	if err != nil {
+		cur, _ := s.Get(serviceName)
+		return cur, err
+	}
+	return s.mutateToken(serviceName, id, func(t *CallerToken) { t.Scope = norm })
 }
 
 func (s *Store) DeleteToken(serviceName, id string) (Service, error) {

@@ -565,7 +565,18 @@ func PathIsOpen(svc Service, path string) bool {
 	} else if !strings.HasPrefix(path, "/") {
 		path = "/" + path
 	}
-	for _, rule := range svc.OpenPaths {
+	return pathMatches(svc.OpenPaths, path)
+}
+
+// pathMatches reports whether any rule matches the proxied path. Open paths and token scopes both
+// use it, so a path means the same thing in each.
+func pathMatches(rules []OpenPath, path string) bool {
+	if path == "" {
+		path = "/"
+	} else if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	for _, rule := range rules {
 		switch rule.Match {
 		case OpenMatchRegex:
 			re, err := regexp.Compile(rule.Path)
@@ -595,10 +606,13 @@ type callerResult struct {
 	Name    string // token name, "upstream" for a real upstream key, empty if nothing matched
 	Allowed bool
 	Reason  string // why a recognised token was refused: "paused" or "expired"
+	// Scope is the matched token's limit, nil when unrestricted. The proxy checks it once the
+	// token itself is accepted; it is not part of Allowed.
+	Scope *TokenScope
 }
 
 func judgeToken(tok CallerToken, now time.Time) callerResult {
-	res := callerResult{ID: tok.ID, Name: tok.Name}
+	res := callerResult{ID: tok.ID, Name: tok.Name, Scope: tok.Scope}
 	switch {
 	case tok.Paused:
 		res.Reason = "paused"

@@ -3,6 +3,7 @@ import { Button } from '../common/Button.js';
 import { Icon } from '../common/Icon.js';
 import { MenuButton } from '../common/Menu.js';
 import { CallerGateEditor } from './CallerGateEditor.js';
+import { OpenPathsEditor } from './OpenPathsEditor.js';
 import { isAuthNone } from '../../lib/authPresets.js';
 import { copyValue } from '../../lib/clipboard.js';
 import { showToast } from '../common/Toast.js';
@@ -12,7 +13,12 @@ import {
   endOfDayISO,
   expiryDateValue,
   expiryLabel,
-  lastUsedLabel,
+  expiryShort,
+  isScoped,
+  lastUsedShort,
+  READ_ONLY_METHODS,
+  SCOPE_METHODS,
+  scopeLabel,
   tokenState,
 } from '../../lib/tokenDisplay.js';
 
@@ -23,6 +29,8 @@ export function AccessPanel({ draft, token, tokens = [], savedName, serviceLabel
   const wrap = h('div', { className: 'flex flex-col gap-4' });
   let adding = false;
   let editingExpiry = '';
+  /** Draft of the scope being edited: { id, methods: Set, paths, errors }, or null. */
+  let editingScope = null;
 
   function paint() {
     const label = serviceLabel();
@@ -159,6 +167,182 @@ export function AccessPanel({ draft, token, tokens = [], savedName, serviceLabel
     );
   }
 
+  /** What the draft would allow, in the shape a token's `scope` has. */
+  function liveScope() {
+    return {
+      methods: SCOPE_METHODS.filter((m) => editingScope.methods.has(m)),
+      paths: editingScope.paths.filter((p) => String(p.path || '').trim()),
+    };
+  }
+
+  /** The scope chip of the token being edited; it follows the draft while you type. */
+  let scopeChipEl = null;
+
+  function paintScopeChip(el, scope, open) {
+    const limited = isScoped({ scope });
+    el.textContent = limited ? scopeLabel({ scope }) : 'Full access';
+    el.classList.toggle('is-chip', limited);
+    el.classList.toggle('is-open', !!open);
+  }
+
+  function refreshScopeChip() {
+    if (editingScope && scopeChipEl?.isConnected) paintScopeChip(scopeChipEl, liveScope(), true);
+  }
+
+  function closeScope() {
+    editingScope = null;
+    paint();
+  }
+
+  function scopeControl(t) {
+    const editing = editingScope?.id === t.id;
+    const btn = h('button', {
+      type: 'button',
+      className: 'tok-scope',
+      disabled: !t.id,
+      'aria-expanded': editing ? 'true' : 'false',
+      title: editing ? 'Close the scope editor' : 'Edit what this token may do',
+      onClick: () => (editing ? closeScope() : startScope(t)),
+    });
+    paintScopeChip(btn, editing ? liveScope() : t.scope, editing);
+    if (editing) scopeChipEl = btn;
+    return btn;
+  }
+
+  function startScope(t) {
+    const s = t.scope || {};
+    editingScope = {
+      id: t.id,
+      methods: new Set(s.methods || []),
+      paths: (s.paths || []).map((p) => ({ ...p })),
+      errors: null,
+    };
+    editingExpiry = '';
+    paint();
+  }
+
+  async function saveScope(t) {
+    const draft = editingScope;
+    // A row left blank is not a rule; drop it so error rows line up with what is sent.
+    draft.paths = draft.paths.filter((p) => String(p.path || '').trim());
+    const body = {
+      methods: SCOPE_METHODS.filter((m) => draft.methods.has(m)),
+      paths: draft.paths.map((p) => ({ match: p.match || 'prefix', path: p.path.trim() })),
+    };
+    const open = !body.methods.length && !body.paths.length;
+    try {
+      const updated = await api.setTokenScope(savedName, t.id, open ? null : body);
+      editingScope = null;
+      showToast(open ? `${t.name || 'Token'} has full access` : `Limited ${t.name || 'token'}`);
+      onTokensUpdated?.(updated);
+    } catch (err) {
+      draft.errors = err.errors || {};
+      showToast(err.message, 'error');
+      paint();
+    }
+  }
+
+  function scopeEditor(t) {
+    const draft = editingScope;
+    const chip = (method) => {
+      const on = draft.methods.has(method);
+      return h(
+        'button',
+        {
+          type: 'button',
+          className: `activity-filter-chip${on ? ' is-active' : ''}`,
+          'aria-pressed': on ? 'true' : 'false',
+          onClick: () => {
+            if (on) draft.methods.delete(method);
+            else draft.methods.add(method);
+            paint();
+          },
+        },
+        method,
+      );
+    };
+    const preset = (label, methods) =>
+      h(
+        'button',
+        {
+          type: 'button',
+          className: 'btn btn-ghost btn-sm',
+          onClick: () => {
+            draft.methods = new Set(methods);
+            paint();
+          },
+        },
+        label,
+      );
+    const methodError = draft.errors?.['scope.methods'];
+    return h(
+      'div',
+      { className: 'token-scope-editor' },
+      h(
+        'div',
+        { className: 'scope-block' },
+        h('span', { className: 'scope-label' }, 'Methods'),
+        h('div', { className: 'scope-chips', role: 'group', 'aria-label': 'Allowed methods' }, ...SCOPE_METHODS.map(chip)),
+        h(
+          'div',
+          { className: 'scope-presets' },
+          preset('Read only', READ_ONLY_METHODS),
+          preset('Any method', []),
+        ),
+        methodError
+          ? h('p', { className: 'm-0 text-xs text-danger' }, methodError)
+          : h('p', { className: 'scope-hint' }, 'None selected allows every method.'),
+      ),
+      h(
+        'div',
+        { className: 'scope-block' },
+        h('span', { className: 'scope-label' }, 'Paths'),
+        OpenPathsEditor({
+          paths: draft.paths,
+          errors: draft.errors,
+          errorKey: 'scope.paths',
+          label: 'Allowed path',
+          placeholder: '/api/v3/series',
+          onChange: () => {
+            if (draft.errors) draft.errors = null;
+            refreshScopeChip();
+          },
+        }),
+        h('p', { className: 'scope-hint' }, 'No paths allows every path. A request must match at least one.'),
+      ),
+      h(
+        'div',
+        { className: 'scope-actions' },
+        Button({ size: 'sm', onClick: () => saveScope(t) }, 'Save'),
+        t.scope
+          ? Button(
+              {
+                variant: 'ghost',
+                size: 'sm',
+                onClick: () => {
+                  draft.methods = new Set();
+                  draft.paths = [];
+                  saveScope(t);
+                },
+              },
+              'Remove limit',
+            )
+          : null,
+        Button(
+          {
+            variant: 'ghost',
+            size: 'sm',
+            onClick: () => {
+              editingScope = null;
+              paint();
+            },
+          },
+          'Cancel',
+        ),
+      ),
+    );
+  }
+
   async function rotateToken(t) {
     try {
       const updated = t.id ? await api.rotateTokenId(savedName, t.id) : await api.rotateToken(savedName);
@@ -200,13 +384,15 @@ export function AccessPanel({ draft, token, tokens = [], savedName, serviceLabel
         {
           type: 'button',
           className: 'btn-add-row',
+          'aria-label': 'New token',
           onClick: () => {
             adding = true;
             paint();
           },
         },
         Icon('plus', { size: 14 }),
-        'New token',
+        h('span', { className: 'desktop-only' }, 'New token'),
+        h('span', { className: 'mobile-only' }, 'New'),
       );
     }
     const nameInput = h('input', {
@@ -241,12 +427,127 @@ export function AccessPanel({ draft, token, tokens = [], savedName, serviceLabel
     );
   }
 
+  function tokenCard(t, rows) {
+    const state = tokenState(t);
+    const prefix = t.secret && t.secret.length > 4 ? `${t.secret.slice(0, 4)}····` : '••••••••';
+    const stateTitle = { active: 'Active', paused: 'Paused', expired: 'Expired' }[state];
+    const left = expiryShort(t);
+    const expiryBadge = (cls) =>
+      left
+        ? h(
+            'span',
+            { className: `tok-exp${left.soon ? ' is-soon' : ''} ${cls}`.trim(), title: expiryLabel(t) },
+            Icon('clock', { size: 12 }),
+            left.text,
+          )
+        : null;
+
+    const mid = h(
+      'div',
+      { className: 'tok-mid' },
+      state === 'active'
+        ? scopeControl(t)
+        : h('span', { className: `tok-chip is-${state}`, title: expiryLabel(t) || stateTitle }, stateTitle),
+      expiryBadge('desktop-only'),
+    );
+
+    const copyBtn = h(
+      'button',
+      {
+        type: 'button',
+        className: 'tok-icon-btn',
+        'aria-label': `Copy ${t.name || 'token'}`,
+        title: 'Copy token',
+        onClick: async () => {
+          try {
+            await copyValue(t.secret);
+          } catch {
+            /* toast already shown */
+          }
+        },
+      },
+      Icon('copy', { size: 14 }),
+    );
+    const resumeBtn = h(
+      'button',
+      { type: 'button', className: 'tok-resume', onClick: () => pauseToken(t) },
+      'Resume',
+    );
+
+    const menu = MenuButton(
+      {
+        label: `More actions for ${t.name || 'token'}`,
+        className: 'btn btn-ghost btn-sm btn-square tok-icon-btn',
+        items: [
+          {
+            label: t.paused ? 'Resume' : 'Pause',
+            icon: t.paused ? 'play' : 'pause',
+            disabled: !t.id,
+            onSelect: () => pauseToken(t),
+          },
+          {
+            label: t.expiresAt ? 'Change expiry…' : 'Set expiry…',
+            icon: 'clock',
+            disabled: !t.id,
+            onSelect: () => {
+              editingExpiry = t.id;
+              editingScope = null;
+              paint();
+            },
+          },
+          {
+            label: isScoped(t) ? 'Edit scope…' : 'Limit access…',
+            icon: 'lock',
+            disabled: !t.id,
+            onSelect: () => startScope(t),
+          },
+          { label: 'Rotate…', icon: 'rotate', onSelect: () => rotateToken(t) },
+          { separator: true },
+          {
+            label: 'Delete token…',
+            icon: 'trash',
+            danger: true,
+            disabled: rows.length < 2 || !t.id,
+            onSelect: () => deleteToken(t, rows),
+          },
+        ],
+      },
+      Icon('more', { size: 15 }),
+    );
+
+    const editing = editingScope?.id === t.id || editingExpiry === t.id;
+    return h(
+      'div',
+      { className: `tok-card is-${state}${editing ? ' is-open' : ''}` },
+      h(
+        'div',
+        { className: 'tok-row' },
+        h('span', { className: `tok-dot is-${state}`, role: 'img', 'aria-label': stateTitle, title: stateTitle }),
+        h('span', { className: 'tok-name', title: t.name || 'token' }, t.name || 'token'),
+        mid,
+        h(
+          'div',
+          { className: 'tok-meta' },
+          h('code', { className: 'tok-key' }, prefix),
+          h('span', { className: `tok-used${t.lastUsedAt ? '' : ' is-never'}` }, lastUsedShort(t)),
+          expiryBadge('mobile-only'),
+        ),
+        h('div', { className: 'tok-actions' }, state === 'paused' && t.id ? resumeBtn : copyBtn, menu),
+      ),
+      editingExpiry === t.id
+        ? h('div', { className: 'tok-panel' }, expiryEditor(t))
+        : editingScope?.id === t.id
+          ? h('div', { className: 'tok-panel' }, scopeEditor(t))
+          : null,
+    );
+  }
+
   function tokensSection(label) {
     const rows = tokenRows();
     const head = h(
       'div',
-      { className: 'flex items-center justify-between gap-2' },
-      h('span', { className: 'label-caps' }, 'Tokens'),
+      { className: 'tok-head' },
+      h('span', { className: 'tok-title' }, 'Caller tokens', h('span', { className: 'tok-count' }, ` · ${rows.length}`)),
       !adding ? newTokenControls() : null,
     );
 
@@ -254,7 +555,7 @@ export function AccessPanel({ draft, token, tokens = [], savedName, serviceLabel
       return h(
         'div',
         { className: 'flex flex-col gap-2' },
-        head,
+        h('span', { className: 'tok-title' }, 'Caller tokens'),
         h(
           'p',
           { className: 'm-0 text-xs text-muted' },
@@ -268,99 +569,11 @@ export function AccessPanel({ draft, token, tokens = [], savedName, serviceLabel
       { className: 'flex flex-col gap-2' },
       head,
       adding ? newTokenControls() : null,
-      ...rows.map((t) => {
-        const masked =
-          t.secret && t.secret.length > 8 ? `${t.secret.slice(0, 4)}••••••••••••••••` : '••••••••';
-        const state = tokenState(t);
-        const expiry = expiryLabel(t);
-        const stateTitle = { active: 'Active', paused: 'Paused', expired: 'Expired' }[state];
-        const row = h(
-          'div',
-          {
-            className:
-              state === 'active' || t.id ? 'token-field' : `token-field token-field-${state}`,
-          },
-          h('span', { className: 'token-field-name' }, t.name || 'token'),
-          h('span', { className: `token-status-chip is-${state}`, title: stateTitle }, stateTitle),
-          h('code', { className: 'token-field-value' }, masked),
-          h(
-            'button',
-            {
-              type: 'button',
-              className: 'copy-field-btn',
-              'aria-label': `Copy ${t.name || 'token'}`,
-              title: 'Copy',
-              onClick: async () => {
-                try {
-                  await copyValue(t.secret);
-                } catch {
-                  /* toast already shown */
-                }
-              },
-            },
-            Icon('copy', { size: 14 }),
-            'Copy',
-          ),
-          MenuButton(
-            {
-              label: `More actions for ${t.name || 'token'}`,
-              className: 'btn btn-ghost btn-sm btn-square token-field-btn',
-              items: [
-                {
-                  label: t.paused ? 'Resume' : 'Pause',
-                  icon: t.paused ? 'play' : 'pause',
-                  disabled: !t.id,
-                  onSelect: () => pauseToken(t),
-                },
-                {
-                  label: t.expiresAt ? 'Change expiry…' : 'Set expiry…',
-                  icon: 'clock',
-                  disabled: !t.id,
-                  onSelect: () => {
-                    editingExpiry = t.id;
-                    paint();
-                  },
-                },
-                {
-                  label: 'Rotate…',
-                  icon: 'rotate',
-                  onSelect: () => rotateToken(t),
-                },
-                { separator: true },
-                {
-                  label: 'Delete token…',
-                  icon: 'trash',
-                  danger: true,
-                  disabled: rows.length < 2 || !t.id,
-                  onSelect: () => deleteToken(t, rows),
-                },
-              ],
-            },
-            Icon('more', { size: 15 }),
-          ),
-        );
-        if (!t.id) return row;
-        return h(
-          'div',
-          { className: state === 'active' ? 'token-item' : `token-item token-item-${state}` },
-          row,
-          h(
-            'div',
-            { className: 'token-foot' },
-            h(
-              'div',
-              { className: 'token-meta' },
-              h('span', {}, lastUsedLabel(t)),
-              expiry ? h('span', { className: t.expired ? 'is-expired' : '' }, expiry) : null,
-            ),
-            editingExpiry === t.id ? expiryEditor(t) : null,
-          ),
-        );
-      }),
+      h('div', { className: 'tok-list' }, ...rows.map((t) => tokenCard(t, rows))),
       h(
         'p',
         { className: 'm-0 text-xs text-muted leading-relaxed' },
-        'Tokens work in both modes. Paused tokens get 403 and expired tokens get 401. Rotating won’t lock out callers who were given the real ',
+        'Tokens work in both modes. Paused tokens and requests outside a token’s scope get 403, and expired tokens get 401. Rotating keeps a token’s scope and won’t lock out callers who were given the real ',
         capitalize(label),
         ' key.',
       ),

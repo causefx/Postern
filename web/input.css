@@ -1469,110 +1469,194 @@ button.acct-item:focus-visible { background: var(--bg-surface-2); }
   padding-left: 1.9rem;
   cursor: default;
 }
-.token-field {
+/* Caller tokens: one row per token, an editor opening below the row it belongs to. */
+.tok-head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
-  min-height: 3.25rem;
-  padding: 0.45rem 0.5rem 0.45rem 0.95rem;
-  border-radius: 10px;
+}
+.tok-title {
+  color: var(--text);
+  font: 700 14px/1.2 Inter, system-ui, sans-serif;
+}
+.tok-count {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.tok-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.tok-card {
   border: 1px solid var(--line);
+  border-radius: 10px;
   background: var(--bg-surface-2);
 }
-.token-field-name {
-  flex-shrink: 0;
-  max-width: 5.5rem;
+.tok-card.is-paused { border-color: var(--paused-line); }
+.tok-card.is-expired { border-color: var(--danger-line); }
+.tok-row {
+  display: grid;
+  grid-template-columns: 0.6rem minmax(5rem, 9rem) minmax(0, 1fr) auto auto auto auto;
+  align-items: center;
+  gap: 0.7rem;
+  min-height: 2.9rem;
+  padding: 0.45rem 0.75rem;
+  font: 500 12px/1.3 Inter, system-ui, sans-serif;
+}
+/* On desktop the wrappers vanish so key, last used and the buttons are cells of the row itself. */
+.tok-meta,
+.tok-actions { display: contents; }
+.tok-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 999px;
+  background: var(--success);
+}
+.tok-dot.is-paused {
+  border: 2px solid var(--warning);
+  background: transparent;
+}
+.tok-dot.is-expired {
+  border: 2px solid var(--danger);
+  background: transparent;
+}
+.tok-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text);
-  font: 700 13px/1 Inter, system-ui, sans-serif;
+  font: 600 13px/1.3 Inter, system-ui, sans-serif;
 }
-.token-field-value {
-  flex: 1 1 auto;
+.tok-mid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.6rem;
   min-width: 0;
-  font: 500 13px/1.3 "JetBrains Mono", ui-monospace, Menlo, monospace;
-  color: var(--text-soft);
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+/* Unscoped: plain text. Scoped: a chip. Either opens the editor. */
+.tok-scope {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font: 500 12px/1.3 Inter, system-ui, sans-serif;
+  cursor: pointer;
+}
+.tok-scope:hover:not(:disabled) { color: var(--text); }
+.tok-scope:disabled { cursor: default; }
+.tok-scope.is-chip,
+.tok-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 1.45rem;
+  padding: 0 0.55rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font: 600 11px/1 Inter, system-ui, sans-serif;
   white-space: nowrap;
 }
-.token-field .copy-field-btn {
-  background: var(--bg-surface-2);
-  height: 2.35rem;
-}
-.token-field .copy-field-btn:hover {
-  background: var(--bg-selected);
-}
-.token-field-btn {
-  color: var(--text-muted) !important;
-}
-.token-field-btn:hover {
-  color: var(--text) !important;
-}
-.token-field-paused {
+.tok-scope.is-chip:hover { border-color: var(--text-muted); }
+.tok-scope.is-open { color: var(--text); }
+.tok-chip.is-paused {
   border-color: var(--paused-line);
-}
-.token-status-chip {
-  flex-shrink: 0;
-  padding: 0.25rem 0.55rem;
-  border-radius: 999px;
-  font: 700 10px/1 Inter, system-ui, sans-serif;
-  text-transform: capitalize;
-  letter-spacing: 0.02em;
-}
-.token-status-chip.is-active {
-  background: var(--success-bg);
-  color: var(--success);
-}
-.token-status-chip.is-paused {
-  background: var(--warning-bg);
   color: var(--warning);
 }
-.token-status-chip.is-expired {
-  background: var(--danger-bg);
+.tok-chip.is-expired {
+  border-color: var(--danger-line);
   color: var(--danger);
 }
-.token-field-expired {
-  border-color: var(--danger-line);
+.tok-exp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--text-muted);
+  font: 500 11px/1 Inter, system-ui, sans-serif;
 }
-/* One card per saved token: the row on top, a darker footer below it. */
-.token-item {
-  display: flex;
-  flex-direction: column;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: var(--bg-surface-2);
+.tok-exp.is-soon { color: var(--warning); }
+.tok-key {
+  color: var(--text-muted);
+  font: 500 11px/1 "JetBrains Mono", ui-monospace, Menlo, monospace;
 }
-.token-item-paused {
-  border-color: var(--paused-line);
+.tok-used {
+  min-width: 5.2rem;
+  color: var(--text-muted);
+  text-align: right;
 }
-.token-item-expired {
-  border-color: var(--danger-line);
-}
-.token-item > .token-field {
+.tok-used.is-never { font-style: italic; }
+.tok-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
   border: 0;
-  border-radius: 10px 10px 0 0;
+  border-radius: 8px;
   background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
 }
-.token-foot {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  padding: 0.55rem 0.95rem;
+.tok-icon-btn:hover { background: var(--bg-selected); color: var(--text); }
+.tok-resume {
+  height: 1.6rem;
+  padding: 0 0.6rem;
+  border: 1px solid var(--paused-line);
+  border-radius: 7px;
+  background: var(--warning-bg);
+  color: var(--warning);
+  font: 700 11px/1 Inter, system-ui, sans-serif;
+  cursor: pointer;
+}
+.tok-resume:hover { filter: brightness(1.15); }
+/* A paused or expired row fades back; its buttons stay at full strength. */
+.tok-card.is-paused :is(.tok-dot, .tok-name, .tok-key, .tok-used, .tok-exp),
+.tok-card.is-expired :is(.tok-name, .tok-key, .tok-used) { opacity: 0.6; }
+.tok-panel {
+  padding: 0.85rem 0.95rem 0.95rem;
   border-top: 1px solid var(--line);
   border-radius: 0 0 9px 9px;
   background: var(--bg-sunken);
 }
-.token-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.15rem 0.85rem;
-  color: var(--text-muted);
-  font: 500 12px/1.4 Inter, system-ui, sans-serif;
-}
-.token-meta .is-expired {
-  color: var(--danger);
+@media (max-width: 720px) {
+  .tok-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "dot name mid"
+      ". meta actions";
+    gap: 0.3rem 0.65rem;
+    padding: 0.6rem 0.75rem;
+  }
+  .tok-dot { grid-area: dot; }
+  .tok-name { grid-area: name; }
+  .tok-mid {
+    grid-area: mid;
+    justify-self: end;
+    justify-content: flex-end;
+  }
+  .tok-meta {
+    grid-area: meta;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.15rem 0.55rem;
+    min-width: 0;
+  }
+  .tok-actions {
+    grid-area: actions;
+    justify-self: end;
+    display: flex;
+    align-items: center;
+    gap: 0.1rem;
+  }
+  .tok-used {
+    min-width: 0;
+    text-align: left;
+  }
+  .tok-used::before { content: "· "; }
 }
 .token-expiry-editor {
   display: flex;
@@ -1583,6 +1667,37 @@ button.acct-item:focus-visible { background: var(--bg-surface-2); }
 .token-expiry-editor .input {
   width: auto;
   min-width: 9.5rem;
+}
+/* Token scope editor. */
+.token-scope-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.scope-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.scope-label {
+  color: var(--text-muted);
+  font: 700 10px/1 Inter, system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.scope-chips,
+.scope-presets,
+.scope-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+.scope-presets { gap: 0.15rem; }
+.scope-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font: 400 12px/1.4 Inter, system-ui, sans-serif;
 }
 .menu-wrap {
   position: relative;

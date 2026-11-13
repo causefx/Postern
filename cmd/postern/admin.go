@@ -412,9 +412,10 @@ type tokenView struct {
 	Paused bool   `json:"paused,omitempty"`
 	// ExpiresAt is empty for a token that never expires. Expired is decided
 	// here so the browser's clock does not matter.
-	ExpiresAt  time.Time `json:"expiresAt,omitzero"`
-	Expired    bool      `json:"expired,omitempty"`
-	LastUsedAt time.Time `json:"lastUsedAt,omitzero"`
+	ExpiresAt  time.Time   `json:"expiresAt,omitzero"`
+	Expired    bool        `json:"expired,omitempty"`
+	LastUsedAt time.Time   `json:"lastUsedAt,omitzero"`
+	Scope      *TokenScope `json:"scope,omitempty"`
 }
 
 func toView(s Service, origin string) view {
@@ -422,7 +423,7 @@ func toView(s Service, origin string) view {
 	for _, t := range s.Tokens {
 		tokens = append(tokens, tokenView{
 			ID: t.ID, Name: t.Name, Secret: t.Secret, Paused: t.Paused,
-			ExpiresAt: t.ExpiresAt, Expired: t.Expired(time.Now()),
+			ExpiresAt: t.ExpiresAt, Expired: t.Expired(time.Now()), Scope: t.Scope,
 		})
 	}
 	return view{
@@ -627,14 +628,25 @@ func (a *App) patchToken(w http.ResponseWriter, r *http.Request) {
 		Paused *bool `json:"paused"`
 		// ExpiresAt is an RFC 3339 time. An empty string clears the expiry.
 		ExpiresAt *string `json:"expiresAt"`
+		// Scope is the token's limit. An object sets it; null or an object with no methods and no
+		// paths removes it. Absent leaves it alone.
+		Scope json.RawMessage `json:"scope"`
 	}](r)
 	if err != nil {
 		writeErr(w, 400, "bad json")
 		return
 	}
-	if in.Paused == nil && in.ExpiresAt == nil {
-		writeErr(w, 400, "paused or expiresAt is required")
+	if in.Paused == nil && in.ExpiresAt == nil && in.Scope == nil {
+		writeErr(w, 400, "paused, expiresAt or scope is required")
 		return
+	}
+	var scope *TokenScope
+	if in.Scope != nil && string(bytes.TrimSpace(in.Scope)) != "null" {
+		scope = &TokenScope{}
+		if err := json.Unmarshal(in.Scope, scope); err != nil {
+			writeFieldErr(w, FieldError{"scope": "scope must be an object with methods and paths"})
+			return
+		}
 	}
 	var expires time.Time
 	if in.ExpiresAt != nil && strings.TrimSpace(*in.ExpiresAt) != "" {
@@ -670,7 +682,25 @@ func (a *App) patchToken(w http.ResponseWriter, r *http.Request) {
 		}
 		a.record(ev)
 	}
+	if in.Scope != nil {
+		svc, err = a.store.SetTokenScope(name, id, scope)
+		if err != nil {
+			a.writeTokenErr(w, err)
+			return
+		}
+		a.record(auditEvent{Action: "token_scope", Service: svc.Name, Token: label, Scope: scopeOf(svc, id).Summary()})
+	}
 	writeJSON(w, 200, a.present(svc, requestOrigin(r)))
+}
+
+// scopeOf returns the stored scope of one token, nil when it has none.
+func scopeOf(svc Service, id string) *TokenScope {
+	for _, t := range svc.Tokens {
+		if t.ID == id {
+			return t.Scope
+		}
+	}
+	return nil
 }
 
 func (a *App) writeTokenErr(w http.ResponseWriter, err error) {

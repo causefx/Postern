@@ -46,6 +46,9 @@ type auditEvent struct {
 	Paused        *bool     `json:"paused,omitempty"`
 	// Expires is the token expiry set by token_expiry. Empty means cleared.
 	Expires string `json:"expires,omitempty"`
+	// Scope summarises the limit set by token_scope, such as "GET, HEAD · 2 paths". Empty means
+	// the limit was removed. It never carries a secret.
+	Scope string `json:"scope,omitempty"`
 }
 
 type auditLog struct {
