@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.10.0](https://github.com/causefx/Postern/compare/v0.9.0...v0.10.0) (2026-11-13)
+
+
+### Features
+
+* add all activity endpoint and requests panel for service logs ([81d1568](https://github.com/causefx/Postern/commit/81d15681158b5b920780b3e9403257fbc7ceeb4b))
+* enhance audit panel with new card layout and icon updates ([a7efaf1](https://github.com/causefx/Postern/commit/a7efaf1b1aa8db1360058a8f5b90c70f3f6838f0))
+* enhance theme management with command palette integration ([1824b96](https://github.com/causefx/Postern/commit/1824b965c784cdabcae6cf149f7939eabf2e507d))
+
 ## [0.9.0](https://github.com/causefx/Postern/compare/v0.8.0...v0.9.0) (2026-11-13)
 
 
