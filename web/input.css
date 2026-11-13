@@ -1472,7 +1472,7 @@
 }
 .req-row {
   display: grid;
-  grid-template-columns: 3.1rem minmax(3.25rem, 4.75rem) 3.6rem minmax(0, 1fr) auto;
+  grid-template-columns: 3.1rem minmax(3.25rem, 4.75rem) 4.4rem minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.55rem;
   min-height: 2.35rem;
@@ -1539,7 +1539,7 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  max-width: 3.6rem;
+  max-width: 4.4rem;
   height: 1.3rem;
   padding: 0 0.35rem;
   border-radius: 6px;
@@ -1548,7 +1548,8 @@
   color: var(--warning);
   font: 700 10px/1 Inter, system-ui, sans-serif;
 }
-.req-paused.is-expired {
+.req-paused.is-expired,
+.req-paused.is-rejected {
   border-color: var(--danger-line);
   background: var(--danger-bg);
   color: var(--danger);
@@ -1577,17 +1578,18 @@
 
 @media (max-width: 560px) {
   .req-row {
-    grid-template-columns: 2.8rem minmax(0, 1fr) auto;
+    grid-template-columns: 2.8rem minmax(0, 1fr) auto auto;
     grid-template-areas:
-      "status who time"
-      "status path path";
+      "status who flag time"
+      "status path path path";
     gap: 0.25rem 0.5rem;
     padding-block: 0.55rem;
   }
   .req-status,
   .status-badge { grid-area: status; align-self: start; margin-top: 0.15rem; }
   .req-who { grid-area: who; }
-  .req-paused { display: none; }
+  .req-paused { grid-area: flag; width: auto; }
+  .req-paused.is-empty { display: none; }
   .req-path { grid-area: path; }
   .req-time { grid-area: time; }
 }

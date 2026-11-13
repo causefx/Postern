@@ -10,6 +10,7 @@ import {
   matchActivity,
   requestClock,
   requestWhen,
+  splitActivity,
 } from '../../lib/serviceDisplay.js';
 import { Icon } from '../common/Icon.js';
 import { StatusBadge } from '../common/StatusBadge.js';
@@ -40,7 +41,7 @@ export function UsagePanel({ savedName }) {
       .filter((ev) => {
         if (whoFilter === 'errors') {
           if (!isActivityError(ev)) return false;
-        } else if (whoFilter && String(ev.who || '') !== whoFilter) {
+        } else if (whoFilter && splitActivity(ev).who !== whoFilter) {
           return false;
         }
         return matchActivity(ev, query);
@@ -48,17 +49,15 @@ export function UsagePanel({ savedName }) {
   }
 
   function rowEl(ev, kind, zebra) {
-    const refused = ev.reason === 'paused' || ev.reason === 'expired' || ev.who === 'paused';
-    const refusedLabel = ev.reason === 'expired' ? 'expired' : 'paused';
-    const who = ev.who && ev.who !== 'paused' ? ev.who : '';
+    const { who, reason } = splitActivity(ev);
     const timeLabel = kind === 'older' ? requestWhen(ev.time) : requestClock(ev.time);
     return h(
       'div',
       { className: `req-row${zebra ? ' is-zebra' : ''}` },
       StatusBadge(ev.status),
       h('span', { className: 'req-who', title: who || '' }, who || '—'),
-      refused
-        ? h('span', { className: `req-paused${refusedLabel === 'expired' ? ' is-expired' : ''}` }, refusedLabel)
+      reason
+        ? h('span', { className: `req-paused is-${reason}`, title: reason }, reason)
         : h('span', { className: 'req-paused is-empty', 'aria-hidden': 'true' }),
       h(
         'span',

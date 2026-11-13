@@ -62,11 +62,29 @@ export function statusToneClass(status) {
 }
 
 /** Unique caller labels for quick filters, stable order. */
+/** Refusals the server records in `who` when no token was involved, with the status each returns. */
+const REFUSAL_BY_STATUS = { limited: 429, rejected: 401, off: 403, paused: 403 };
+
+/**
+ * Split one request into the caller to show and the refusal to flag.
+ * A refusal like "limited" is not a caller, so it goes in the flag column.
+ * Paused and expired tokens already carry `reason` and keep their name.
+ */
+export function splitActivity(ev) {
+  const who = String(ev?.who || '');
+  const reason = String(ev?.reason || '');
+  if (reason) return { who: who === reason ? '' : who, reason };
+  if (Object.hasOwn(REFUSAL_BY_STATUS, who) && Number(ev?.status) === REFUSAL_BY_STATUS[who]) {
+    return { who: '', reason: who };
+  }
+  return { who, reason: '' };
+}
+
 export function activityWhoFilters(events) {
   const seen = new Set();
   const out = [];
   for (const ev of events || []) {
-    const who = String(ev?.who || '').trim();
+    const who = splitActivity(ev).who.trim();
     if (!who || seen.has(who)) continue;
     seen.add(who);
     out.push(who);
