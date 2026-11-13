@@ -35,6 +35,7 @@ type App struct {
 	sessions  *sessionStore
 	logins    *loginLimiter
 	activity  *activityLog
+	usage     *tokenUsage
 	hits      *proxyLimiter
 	audit     *auditLog
 	adminPass string
@@ -76,6 +77,7 @@ func main() {
 		sessions:  newSessionStore(os.Getenv("ADMIN_PASSWORD")),
 		logins:    newLoginLimiter(),
 		activity:  openActivityLog(dataPath+".activity", store.ActivityLimit()),
+		usage:     openTokenUsage(dataPath + ".usage"),
 		hits:      configuredProxyLimiter(store.RateLimit()),
 		audit:     newAuditLog(dataPath + ".audit"),
 		adminPass: os.Getenv("ADMIN_PASSWORD"),

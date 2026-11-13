@@ -242,7 +242,7 @@ export function DocsPanel({ draft }) {
         h(
           'div',
           { className: 'flex flex-col gap-2' },
-          statusLine('401', 'Token missing or wrong.'),
+          statusLine('401', 'Token missing, wrong, or expired.'),
           statusLine('403', 'Service switched off, or this caller token is paused.'),
           statusLine('502', `Postern couldn’t reach ${serviceLabel()} at its upstream URL.`),
         ),

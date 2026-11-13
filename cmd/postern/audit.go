@@ -44,6 +44,8 @@ type auditEvent struct {
 	Audit         *int      `json:"audit,omitempty"`
 	PasswordLogin *bool     `json:"passwordLogin,omitempty"`
 	Paused        *bool     `json:"paused,omitempty"`
+	// Expires is the token expiry set by token_expiry. Empty means cleared.
+	Expires string `json:"expires,omitempty"`
 }
 
 type auditLog struct {

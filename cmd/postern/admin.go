@@ -406,12 +406,20 @@ type tokenView struct {
 	Name   string `json:"name"`
 	Secret string `json:"secret"`
 	Paused bool   `json:"paused,omitempty"`
+	// ExpiresAt is empty for a token that never expires. Expired is decided
+	// here so the browser's clock does not matter.
+	ExpiresAt  time.Time `json:"expiresAt,omitzero"`
+	Expired    bool      `json:"expired,omitempty"`
+	LastUsedAt time.Time `json:"lastUsedAt,omitzero"`
 }
 
 func toView(s Service, origin string) view {
 	tokens := make([]tokenView, 0, len(s.Tokens))
 	for _, t := range s.Tokens {
-		tokens = append(tokens, tokenView{ID: t.ID, Name: t.Name, Secret: t.Secret, Paused: t.Paused})
+		tokens = append(tokens, tokenView{
+			ID: t.ID, Name: t.Name, Secret: t.Secret, Paused: t.Paused,
+			ExpiresAt: t.ExpiresAt, Expired: t.Expired(time.Now()),
+		})
 	}
 	return view{
 		Name:       s.Name,
@@ -429,6 +437,9 @@ func toView(s Service, origin string) view {
 
 func (a *App) present(s Service, origin string) view {
 	v := toView(s, origin)
+	for i := range v.Tokens {
+		v.Tokens[i].LastUsedAt = a.usage.lastUsed(v.Tokens[i].ID)
+	}
 	if a != nil && a.activity != nil {
 		v.Requests, v.LastStatus, v.LastSeen, v.LastWho = a.activity.summary(s.Name)
 	}
@@ -610,30 +621,60 @@ func (a *App) rotateToken(w http.ResponseWriter, r *http.Request) {
 func (a *App) patchToken(w http.ResponseWriter, r *http.Request) {
 	in, err := decodeJSON[struct {
 		Paused *bool `json:"paused"`
+		// ExpiresAt is an RFC 3339 time. An empty string clears the expiry.
+		ExpiresAt *string `json:"expiresAt"`
 	}](r)
 	if err != nil {
 		writeErr(w, 400, "bad json")
 		return
 	}
-	if in.Paused == nil {
-		writeErr(w, 400, "paused is required")
+	if in.Paused == nil && in.ExpiresAt == nil {
+		writeErr(w, 400, "paused or expiresAt is required")
 		return
 	}
-	label := r.PathValue("id")
-	if cur, ok := a.store.Get(r.PathValue("name")); ok {
-		label = tokenLabel(cur.Tokens, r.PathValue("id"))
-	}
-	svc, err := a.store.SetTokenPaused(r.PathValue("name"), r.PathValue("id"), *in.Paused)
-	if err != nil {
-		if errors.Is(err, errNotFound) {
-			writeErr(w, 404, "not found")
+	var expires time.Time
+	if in.ExpiresAt != nil && strings.TrimSpace(*in.ExpiresAt) != "" {
+		expires, err = time.Parse(time.RFC3339, strings.TrimSpace(*in.ExpiresAt))
+		if err != nil {
+			writeFieldErr(w, FieldError{"expiresAt": "expiry must be an RFC 3339 time"})
 			return
 		}
-		writeFieldErr(w, err)
+	}
+	name, id := r.PathValue("name"), r.PathValue("id")
+	label := id
+	if cur, ok := a.store.Get(name); ok {
+		label = tokenLabel(cur.Tokens, id)
+	}
+	var svc Service
+	if in.Paused != nil {
+		svc, err = a.store.SetTokenPaused(name, id, *in.Paused)
+		if err != nil {
+			a.writeTokenErr(w, err)
+			return
+		}
+		a.record(auditEvent{Action: "token_pause", Service: svc.Name, Token: label, Paused: in.Paused})
+	}
+	if in.ExpiresAt != nil {
+		svc, err = a.store.SetTokenExpiry(name, id, expires)
+		if err != nil {
+			a.writeTokenErr(w, err)
+			return
+		}
+		ev := auditEvent{Action: "token_expiry", Service: svc.Name, Token: label}
+		if !expires.IsZero() {
+			ev.Expires = expires.UTC().Format(time.RFC3339)
+		}
+		a.record(ev)
+	}
+	writeJSON(w, 200, a.present(svc, requestOrigin(r)))
+}
+
+func (a *App) writeTokenErr(w http.ResponseWriter, err error) {
+	if errors.Is(err, errNotFound) {
+		writeErr(w, 404, "not found")
 		return
 	}
-	a.record(auditEvent{Action: "token_pause", Service: svc.Name, Token: label, Paused: in.Paused})
-	writeJSON(w, 200, a.present(svc, requestOrigin(r)))
+	writeFieldErr(w, err)
 }
 
 func (a *App) deleteToken(w http.ResponseWriter, r *http.Request) {
@@ -650,6 +691,7 @@ func (a *App) deleteToken(w http.ResponseWriter, r *http.Request) {
 		writeFieldErr(w, err)
 		return
 	}
+	a.usage.forget(r.PathValue("id"))
 	a.record(auditEvent{Action: "token_revoke", Service: svc.Name, Token: label})
 	writeJSON(w, 200, a.present(svc, requestOrigin(r)))
 }
@@ -703,10 +745,17 @@ func (a *App) duplicateService(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) deleteService(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
+	var tokenIDs []string
+	if cur, ok := a.store.Get(name); ok {
+		for _, t := range cur.Tokens {
+			tokenIDs = append(tokenIDs, t.ID)
+		}
+	}
 	if err := a.store.Delete(name); err != nil {
 		writeErr(w, 404, err.Error())
 		return
 	}
+	a.usage.forget(tokenIDs...)
 	a.record(auditEvent{Action: "delete", Service: name})
 	a.activity.forget(name)
 	w.WriteHeader(http.StatusNoContent)

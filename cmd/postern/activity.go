@@ -144,7 +144,7 @@ func (l *activityLog) list(name string) []activityEvent {
 
 // summary is the ring length plus the newest status, time, and caller.
 // who is the token name, or open, rejected, off, limited, or upstream.
-// A paused token keeps its name and sets reason to paused.
+// A paused or expired token keeps its name and sets reason to match.
 // It is empty when the service has no recorded requests.
 func (l *activityLog) summary(name string) (count, status int, last time.Time, who string) {
 	if l == nil || name == "" {
@@ -158,8 +158,8 @@ func (l *activityLog) summary(name string) (count, status int, last time.Time, w
 	}
 	lastEv := src[len(src)-1]
 	who = lastEv.Who
-	if lastEv.Reason == "paused" && who != "" && who != "paused" {
-		who += " · paused"
+	if (lastEv.Reason == "paused" || lastEv.Reason == "expired") && who != "" && who != "paused" {
+		who += " · " + lastEv.Reason
 	}
 	return len(src), lastEv.Status, lastEv.Time, who
 }

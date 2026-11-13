@@ -7,6 +7,14 @@ import { isAuthNone } from '../../lib/authPresets.js';
 import { copyValue } from '../../lib/clipboard.js';
 import { showToast } from '../common/Toast.js';
 import { api } from '../../api.js';
+import {
+  dateInputValue,
+  endOfDayISO,
+  expiryDateValue,
+  expiryLabel,
+  lastUsedLabel,
+  tokenState,
+} from '../../lib/tokenDisplay.js';
 
 /**
  * Access tab: mode cards, then shared Tokens list below.
@@ -14,6 +22,7 @@ import { api } from '../../api.js';
 export function AccessPanel({ draft, token, tokens = [], savedName, serviceLabel, onChange, onTokensUpdated }) {
   const wrap = h('div', { className: 'flex flex-col gap-4' });
   let adding = false;
+  let editingExpiry = '';
 
   function paint() {
     const label = serviceLabel();
@@ -80,6 +89,74 @@ export function AccessPanel({ draft, token, tokens = [], savedName, serviceLabel
     } catch (err) {
       showToast(err.message, 'error');
     }
+  }
+
+  async function applyExpiry(t, iso, message) {
+    try {
+      const updated = await api.setTokenExpiry(savedName, t.id, iso);
+      editingExpiry = '';
+      showToast(message);
+      onTokensUpdated?.(updated);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  function saveExpiry(t, value) {
+    const iso = endOfDayISO(value);
+    if (!iso) {
+      showToast('Pick an expiry date', 'error');
+      return;
+    }
+    return applyExpiry(t, iso, `${t.name || 'Token'} expires ${value}`);
+  }
+
+  function expiryEditor(t) {
+    const input = h('input', {
+      type: 'date',
+      className: 'input',
+      min: dateInputValue(0),
+      value: expiryDateValue(t) || dateInputValue(30),
+      'aria-label': `Expiry date for ${t.name || 'token'}`,
+    });
+    const preset = (days) =>
+      h(
+        'button',
+        {
+          type: 'button',
+          className: 'btn btn-ghost btn-sm',
+          onClick: () => {
+            input.value = dateInputValue(days);
+          },
+        },
+        `${days} days`,
+      );
+    return h(
+      'div',
+      { className: 'token-expiry-editor' },
+      input,
+      preset(7),
+      preset(30),
+      preset(90),
+      Button({ size: 'sm', onClick: () => saveExpiry(t, input.value) }, 'Save'),
+      t.expiresAt
+        ? Button(
+            { variant: 'ghost', size: 'sm', onClick: () => applyExpiry(t, '', `Removed expiry on ${t.name || 'token'}`) },
+            'Remove expiry',
+          )
+        : null,
+      Button(
+        {
+          variant: 'ghost',
+          size: 'sm',
+          onClick: () => {
+            editingExpiry = '';
+            paint();
+          },
+        },
+        'Cancel',
+      ),
+    );
   }
 
   async function rotateToken(t) {
@@ -194,18 +271,17 @@ export function AccessPanel({ draft, token, tokens = [], savedName, serviceLabel
       ...rows.map((t) => {
         const masked =
           t.secret && t.secret.length > 8 ? `${t.secret.slice(0, 4)}••••••••••••••••` : '••••••••';
-        return h(
+        const state = tokenState(t);
+        const expiry = expiryLabel(t);
+        const stateTitle = { active: 'Active', paused: 'Paused', expired: 'Expired' }[state];
+        const row = h(
           'div',
-          { className: t.paused ? 'token-field token-field-paused' : 'token-field' },
+          {
+            className:
+              state === 'active' || t.id ? 'token-field' : `token-field token-field-${state}`,
+          },
           h('span', { className: 'token-field-name' }, t.name || 'token'),
-          h(
-            'span',
-            {
-              className: `token-status-chip${t.paused ? ' is-paused' : ' is-active'}`,
-              title: t.paused ? 'Paused' : 'Active',
-            },
-            t.paused ? 'Paused' : 'Active',
-          ),
+          h('span', { className: `token-status-chip is-${state}`, title: stateTitle }, stateTitle),
           h('code', { className: 'token-field-value' }, masked),
           h(
             'button',
@@ -237,6 +313,15 @@ export function AccessPanel({ draft, token, tokens = [], savedName, serviceLabel
                   onSelect: () => pauseToken(t),
                 },
                 {
+                  label: t.expiresAt ? 'Change expiry…' : 'Set expiry…',
+                  icon: 'clock',
+                  disabled: !t.id,
+                  onSelect: () => {
+                    editingExpiry = t.id;
+                    paint();
+                  },
+                },
+                {
                   label: 'Rotate…',
                   icon: 'rotate',
                   onSelect: () => rotateToken(t),
@@ -254,11 +339,28 @@ export function AccessPanel({ draft, token, tokens = [], savedName, serviceLabel
             Icon('more', { size: 15 }),
           ),
         );
+        if (!t.id) return row;
+        return h(
+          'div',
+          { className: state === 'active' ? 'token-item' : `token-item token-item-${state}` },
+          row,
+          h(
+            'div',
+            { className: 'token-foot' },
+            h(
+              'div',
+              { className: 'token-meta' },
+              h('span', {}, lastUsedLabel(t)),
+              expiry ? h('span', { className: t.expired ? 'is-expired' : '' }, expiry) : null,
+            ),
+            editingExpiry === t.id ? expiryEditor(t) : null,
+          ),
+        );
       }),
       h(
         'p',
         { className: 'm-0 text-xs text-muted leading-relaxed' },
-        'Tokens work in both modes. Paused tokens get 403. Rotating won’t lock out callers who were given the real ',
+        'Tokens work in both modes. Paused tokens get 403 and expired tokens get 401. Rotating won’t lock out callers who were given the real ',
         capitalize(label),
         ' key.',
       ),

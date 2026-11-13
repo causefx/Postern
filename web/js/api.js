@@ -55,6 +55,12 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ paused }),
     }),
+  /** `expiresAt` is an RFC 3339 time, or '' to remove the expiry. */
+  setTokenExpiry: (name, id, expiresAt) =>
+    request('services/' + encodeURIComponent(name) + '/tokens/' + encodeURIComponent(id), {
+      method: 'PATCH',
+      body: JSON.stringify({ expiresAt }),
+    }),
   activity: (name) => request('services/' + encodeURIComponent(name) + '/activity'),
   clearActivity: (name) => request('services/' + encodeURIComponent(name) + '/activity', { method: 'DELETE' }),
   deleteService: (name) => request('services/' + encodeURIComponent(name), { method: 'DELETE' }),

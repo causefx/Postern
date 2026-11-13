@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // OpenPath is a path rule that skips Postern caller auth (upstream credential still injected).
@@ -49,6 +50,13 @@ type CallerToken struct {
 	Name   string `json:"name"`
 	Secret string `json:"secret"`
 	Paused bool   `json:"paused,omitempty"`
+	// ExpiresAt is when the token stops working. The zero value never expires.
+	ExpiresAt time.Time `json:"expiresAt,omitzero"`
+}
+
+// Expired reports whether the token has passed its expiry at now.
+func (t CallerToken) Expired(now time.Time) bool {
+	return !t.ExpiresAt.IsZero() && !now.Before(t.ExpiresAt)
 }
 
 const maxCallerTokens = 8
@@ -807,7 +815,9 @@ func (s *Store) rotateLocked(serviceName, id string) (Service, error) {
 	return cur, nil
 }
 
-func (s *Store) SetTokenPaused(serviceName, id string, paused bool) (Service, error) {
+// mutateToken applies fn to one caller token and saves, rolling back on a
+// failed save.
+func (s *Store) mutateToken(serviceName, id string, fn func(*CallerToken)) (Service, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	cur, ok := s.data[serviceName]
@@ -819,7 +829,7 @@ func (s *Store) SetTokenPaused(serviceName, id string, paused bool) (Service, er
 	found := false
 	for i := range cur.Tokens {
 		if cur.Tokens[i].ID == id {
-			cur.Tokens[i].Paused = paused
+			fn(&cur.Tokens[i])
 			found = true
 			break
 		}
@@ -833,6 +843,21 @@ func (s *Store) SetTokenPaused(serviceName, id string, paused bool) (Service, er
 		return prev, err
 	}
 	return cur, nil
+}
+
+func (s *Store) SetTokenPaused(serviceName, id string, paused bool) (Service, error) {
+	return s.mutateToken(serviceName, id, func(t *CallerToken) { t.Paused = paused })
+}
+
+// SetTokenExpiry sets when a token stops working. The zero time clears the
+// expiry. A time that has already passed is refused: use pause or delete to
+// cut a token off now.
+func (s *Store) SetTokenExpiry(serviceName, id string, at time.Time) (Service, error) {
+	if !at.IsZero() && !at.After(time.Now()) {
+		cur, _ := s.Get(serviceName)
+		return cur, FieldError{"expiresAt": "expiry must be in the future"}
+	}
+	return s.mutateToken(serviceName, id, func(t *CallerToken) { t.ExpiresAt = at.UTC() })
 }
 
 func (s *Store) DeleteToken(serviceName, id string) (Service, error) {

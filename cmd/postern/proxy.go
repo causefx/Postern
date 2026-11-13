@@ -98,18 +98,23 @@ func (a *App) proxy(w http.ResponseWriter, r *http.Request) {
 		a.serveUpstream(w, r, svc, rest, path, "open")
 		return
 	}
-	who, allowed := identifyCaller(svc, r)
-	if !allowed {
-		if who != "" {
-			a.noteCaller(name, r.Method, path, who, "paused", http.StatusForbidden)
+	caller := resolveCaller(svc, r, time.Now())
+	if !caller.Allowed {
+		switch caller.Reason {
+		case "paused":
+			a.noteCaller(name, r.Method, path, caller.Name, "paused", http.StatusForbidden)
 			http.Error(w, "token paused", http.StatusForbidden)
-			return
+		case "expired":
+			a.noteCaller(name, r.Method, path, caller.Name, "expired", http.StatusUnauthorized)
+			http.Error(w, "token expired", http.StatusUnauthorized)
+		default:
+			a.noteActivity(name, r.Method, path, "rejected", http.StatusUnauthorized)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
 		}
-		a.noteActivity(name, r.Method, path, "rejected", http.StatusUnauthorized)
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	a.serveUpstream(w, r, svc, rest, path, who)
+	a.usage.touch(caller.ID, time.Now())
+	a.serveUpstream(w, r, svc, rest, path, caller.Name)
 }
 
 func (a *App) serveUpstream(w http.ResponseWriter, r *http.Request, svc Service, rest, path, who string) {

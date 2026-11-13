@@ -1278,6 +1278,61 @@
   background: var(--warning-bg);
   color: var(--warning);
 }
+.token-status-chip.is-expired {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.token-field-expired {
+  border-color: var(--danger-line);
+}
+/* One card per saved token: the row on top, a darker footer below it. */
+.token-item {
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg-surface-2);
+}
+.token-item-paused {
+  border-color: var(--paused-line);
+}
+.token-item-expired {
+  border-color: var(--danger-line);
+}
+.token-item > .token-field {
+  border: 0;
+  border-radius: 10px 10px 0 0;
+  background: transparent;
+}
+.token-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.55rem 0.95rem;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 9px 9px;
+  background: var(--bg-sunken);
+}
+.token-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.85rem;
+  color: var(--text-muted);
+  font: 500 12px/1.4 Inter, system-ui, sans-serif;
+}
+.token-meta .is-expired {
+  color: var(--danger);
+}
+.token-expiry-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.token-expiry-editor .input {
+  width: auto;
+  min-width: 9.5rem;
+}
 .menu-wrap {
   position: relative;
   flex-shrink: 0;
@@ -1492,6 +1547,11 @@
   background: var(--warning-bg);
   color: var(--warning);
   font: 700 10px/1 Inter, system-ui, sans-serif;
+}
+.req-paused.is-expired {
+  border-color: var(--danger-line);
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 .req-paused.is-empty {
   border: 0;

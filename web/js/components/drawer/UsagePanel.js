@@ -48,7 +48,8 @@ export function UsagePanel({ savedName }) {
   }
 
   function rowEl(ev, kind, zebra) {
-    const paused = ev.reason === 'paused' || ev.who === 'paused';
+    const refused = ev.reason === 'paused' || ev.reason === 'expired' || ev.who === 'paused';
+    const refusedLabel = ev.reason === 'expired' ? 'expired' : 'paused';
     const who = ev.who && ev.who !== 'paused' ? ev.who : '';
     const timeLabel = kind === 'older' ? requestWhen(ev.time) : requestClock(ev.time);
     return h(
@@ -56,8 +57,8 @@ export function UsagePanel({ savedName }) {
       { className: `req-row${zebra ? ' is-zebra' : ''}` },
       StatusBadge(ev.status),
       h('span', { className: 'req-who', title: who || '' }, who || '—'),
-      paused
-        ? h('span', { className: 'req-paused' }, 'paused')
+      refused
+        ? h('span', { className: `req-paused${refusedLabel === 'expired' ? ' is-expired' : ''}` }, refusedLabel)
         : h('span', { className: 'req-paused is-empty', 'aria-hidden': 'true' }),
       h(
         'span',

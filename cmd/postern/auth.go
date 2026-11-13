@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // AccessMode chooses how callers authenticate to Postern before the proxy runs.
@@ -585,29 +586,46 @@ func PathIsOpen(svc Service, path string) bool {
 
 // AuthorizeCaller checks the service access mode against the incoming request.
 func AuthorizeCaller(svc Service, r *http.Request) bool {
-	_, ok := identifyCaller(svc, r)
-	return ok
+	return resolveCaller(svc, r, time.Now()).Allowed
 }
 
-// identifyCaller reports which named token matched, or "upstream" when the
+// callerResult is the outcome of matching a request to a caller.
+type callerResult struct {
+	ID      string // token ID; empty for a real upstream key or an unsaved legacy token
+	Name    string // token name, "upstream" for a real upstream key, empty if nothing matched
+	Allowed bool
+	Reason  string // why a recognised token was refused: "paused" or "expired"
+}
+
+func judgeToken(tok CallerToken, now time.Time) callerResult {
+	res := callerResult{ID: tok.ID, Name: tok.Name}
+	switch {
+	case tok.Paused:
+		res.Reason = "paused"
+	case tok.Expired(now):
+		res.Reason = "expired"
+	default:
+		res.Allowed = true
+	}
+	return res
+}
+
+// resolveCaller reports which named token matched, or "upstream" when the
 // real upstream secret was presented in upstream-access mode.
-func identifyCaller(svc Service, r *http.Request) (string, bool) {
+func resolveCaller(svc Service, r *http.Request, now time.Time) callerResult {
 	if len(svc.Tokens) == 0 && svc.Token != "" {
 		svc.Tokens = []CallerToken{{Name: "default", Secret: svc.Token}}
 	}
 	switch normalizeAccess(svc.Access) {
 	case AccessUpstream:
-		return identifyUpstream(svc, r)
+		return resolveUpstream(svc, r, now)
 	default:
 		for _, presented := range presentedCallerValues(svc, r) {
 			if tok, ok := tokenBySecret(svc, presented); ok {
-				if tok.Paused {
-					return tok.Name, false
-				}
-				return tok.Name, true
+				return judgeToken(tok, now)
 			}
 		}
-		return "", false
+		return callerResult{}
 	}
 }
 
@@ -664,19 +682,16 @@ func presentedCallerValues(svc Service, r *http.Request) []string {
 	return out
 }
 
-func identifyUpstream(svc Service, r *http.Request) (string, bool) {
+func resolveUpstream(svc Service, r *http.Request, now time.Time) callerResult {
 	for _, presented := range upstreamPresented(svc, r) {
 		if tok, ok := tokenBySecret(svc, presented); ok {
-			if tok.Paused {
-				return tok.Name, false
-			}
-			return tok.Name, true
+			return judgeToken(tok, now)
 		}
 	}
 	if svc.Auth.authorizeUpstream(r, "") {
-		return "upstream", true
+		return callerResult{Name: "upstream", Allowed: true}
 	}
-	return "", false
+	return callerResult{}
 }
 
 func upstreamPresented(svc Service, r *http.Request) []string {

@@ -22,6 +22,13 @@ export function auditHeadline(ev) {
         before: ev.paused ? `Paused the ${ev.token || 'caller'} token for ` : `Resumed the ${ev.token || 'caller'} token for `,
         name,
       };
+    case 'token_expiry':
+      return {
+        before: ev.expires
+          ? `Set the ${ev.token || 'caller'} token to expire ${new Date(ev.expires).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} for `
+          : `Removed the expiry on the ${ev.token || 'caller'} token for `,
+        name,
+      };
     case 'create':
       return { before: 'Created ', name };
     case 'delete':
@@ -60,6 +67,8 @@ export function auditIcon(action) {
       return 'trash';
     case 'token_pause':
       return 'pause';
+    case 'token_expiry':
+      return 'clock';
     case 'create':
     case 'token_add':
       return 'plus';
@@ -86,7 +95,7 @@ export function auditWhen(iso, now = new Date()) {
   return { day, meta: `${agoLabel(now - t)} · ${clock}` };
 }
 
-function agoLabel(ms) {
+export function agoLabel(ms) {
   const min = Math.round(Math.max(0, ms) / 60000);
   if (min < 1) return 'just now';
   if (min < 60) return `${min} min ago`;

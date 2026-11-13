@@ -430,3 +430,9 @@ func TestPausedTokenRefusesUntilResumed(t *testing.T) {
 		t.Fatalf("real secret who %q ok %v", who, ok)
 	}
 }
+
+// identifyCaller keeps the older (name, allowed) shape for these tests.
+func identifyCaller(svc Service, r *http.Request) (string, bool) {
+	c := resolveCaller(svc, r, time.Now())
+	return c.Name, c.Allowed
+}
