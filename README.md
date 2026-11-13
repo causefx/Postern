@@ -48,6 +48,15 @@ go run ./cmd/postern
 # UI: http://127.0.0.1:8080/admin/
 ```
 
+Development, one terminal:
+
+```bash
+npm install
+npm run dev
+```
+
+This rebuilds the stylesheet on change, serves the UI from `web/` so HTML and JS edits only need a refresh, and rebuilds and restarts the server when you save a `.go` file. Ctrl+C stops everything. Open `http://127.0.0.1:8080/admin/` and sign in with the password `dev`. The dev script defaults to that password and to listening on loopback only, so a restart keeps you signed in and the known password is not reachable from the network. Set `ADMIN_PASSWORD` or `LISTEN` yourself to change either; `POSTERN_DEV=0` embeds the UI instead.
+
 Docker:
 
 ```bash
@@ -164,5 +173,5 @@ Problems go to stderr and the command exits 1. A valid file prints `ok` and exit
 | `ADMIN_PASSWORD` | _(generated)_ | Admin sign-in password |
 | `POSTERN_DATA` | `data/postern-data.json` | JSON store path |
 | `POSTERN_SECURE` | _(auto)_ | Cookie / origin HTTPS mode (see above) |
-| `POSTERN_DEV` | _(off)_ | Serve UI from `./web` on disk (no rebuild for JS/HTML/CSS). Run from repo root; use `npm run dev:css` in another terminal for Tailwind. |
+| `POSTERN_DEV` | _(off)_ | Serve UI from `./web` on disk (no rebuild for JS/HTML/CSS). Run from repo root. `npm run dev` sets it for you. |
 | `POSTERN_OIDC_ISSUER` | _(off)_ | OpenID Connect issuer. Also set `POSTERN_OIDC_CLIENT_ID`. See above |

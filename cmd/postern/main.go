@@ -98,7 +98,7 @@ func main() {
 			log.Fatalf("POSTERN_DEV: web dir not found at %s (run from repo root)", dir)
 		}
 		app.staticDir = dir
-		log.Printf("POSTERN_DEV: serving UI from %s (hard-refresh; run npm run dev:css for Tailwind)", dir)
+		log.Printf("POSTERN_DEV: serving UI from %s (hard-refresh; run npm run dev to rebuild the stylesheet too)", dir)
 	}
 	log.Printf("postern %s", Version)
 
