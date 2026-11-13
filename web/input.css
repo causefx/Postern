@@ -498,6 +498,9 @@
 }
 
 /* —— Dashboard shell —— */
+/* The canvas behind the page is what shows in the status bar area and when overscrolling on iOS;
+   give it the header colour so the header runs edge to edge. */
+html[data-chrome="sunken"] { background-color: var(--bg-sunken); }
 .dash-inner {
   max-width: 1400px;
   margin: 0 auto;
