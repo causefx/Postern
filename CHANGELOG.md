@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.11.0](https://github.com/causefx/Postern/compare/v0.10.0...v0.11.0) (2026-11-13)
+
+
+### Features
+
+* add update check functionality and UI components ([0dab392](https://github.com/causefx/Postern/commit/0dab3925d506652f297381e42acd07db587b3ab2))
+
+
+### Bug Fixes
+
+* command palette clicking ([b1a71fa](https://github.com/causefx/Postern/commit/b1a71faf311019e824bea5b00d875f0ea6d271b8))
+
 ## [0.10.0](https://github.com/causefx/Postern/compare/v0.9.0...v0.10.0) (2026-11-13)
 
 
