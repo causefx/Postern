@@ -2681,6 +2681,15 @@ button.acct-item:focus-visible { background: var(--bg-surface-2); }
   border-color: var(--primary);
   color: var(--on-primary);
 }
+/* The embedding box is a list, not a single-line input. */
+.embed-origins {
+  width: 100%;
+  height: auto;
+  min-height: 5rem;
+  padding: 0.6rem 0.75rem;
+  line-height: 1.45;
+  resize: vertical;
+}
 .settings-note {
   margin: 0;
   font: 500 13px/1.4 Inter, system-ui, sans-serif;

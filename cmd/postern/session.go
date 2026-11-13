@@ -163,13 +163,13 @@ func (s *sessionStore) read(raw string) (sessionInfo, bool) {
 
 func (s *sessionStore) revoke(string) {}
 
-func setSessionCookie(w http.ResponseWriter, r *http.Request, value string, remember bool) {
+func setSessionCookie(w http.ResponseWriter, r *http.Request, value string, remember bool, sameSite http.SameSite) {
 	c := &http.Cookie{
 		Name:     sessionCookie,
 		Value:    value,
 		Path:     "/admin",
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: sameSite,
 		Secure:   isHTTPS(r),
 	}
 	if remember {
@@ -178,13 +178,13 @@ func setSessionCookie(w http.ResponseWriter, r *http.Request, value string, reme
 	http.SetCookie(w, c)
 }
 
-func clearSessionCookie(w http.ResponseWriter, r *http.Request) {
+func clearSessionCookie(w http.ResponseWriter, r *http.Request, sameSite http.SameSite) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookie,
 		Value:    "",
 		Path:     "/admin",
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: sameSite,
 		Secure:   isHTTPS(r),
 		MaxAge:   -1,
 	})

@@ -53,6 +53,14 @@ export const SETTING_DEFS = [
     keywords: 'settings.auditLimit entries history audit changes admin',
   },
   {
+    id: 'embed',
+    group: 'security',
+    groupLabel: 'Security',
+    title: 'Embedding',
+    hint: 'Let a dashboard show the admin UI in a frame',
+    keywords: 'settings.embedOrigins iframe frame embed dashboard organizr homepage heimdall frame-ancestors clickjacking',
+  },
+  {
     id: 'password',
     group: 'signin',
     groupLabel: 'Sign-in',
@@ -106,4 +114,42 @@ export function settingVisible(query, def) {
   const q = query.trim().toLowerCase();
   if (!q) return true;
   return `${def.title} ${def.hint} ${def.keywords}`.toLowerCase().includes(q);
+}
+
+const MAX_EMBED_ORIGINS = 10;
+
+// The same rules as the server (frame.go): a scheme, a host with an optional "*." wildcard, an
+// optional port, nothing else. The server checks again; this only gives an answer while typing.
+const EMBED_SITE = /^https?:\/\/(?:(?:\*\.)?[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?|\[[0-9a-f:.]+\])(?::\d{1,5})?$/i;
+
+/** Splits the text on newlines, commas and spaces into a clean, de-duplicated list. */
+export function parseEmbedOrigins(text) {
+  const origins = [];
+  for (const raw of String(text || '').split(/[\s,]+/)) {
+    const entry = raw.replace(/\/+$/, '');
+    if (!entry) continue;
+    if (entry !== '*' && !EMBED_SITE.test(entry)) {
+      return {
+        origins: [],
+        error: `${JSON.stringify(raw)} is not a site like https://dash.example.com (scheme, host, optional port, no path)`,
+      };
+    }
+    const clean = entry === '*' ? '*' : entry.toLowerCase();
+    if (!origins.includes(clean)) origins.push(clean);
+  }
+  if (origins.length > MAX_EMBED_ORIGINS) return { origins: [], error: `At most ${MAX_EMBED_ORIGINS} sites` };
+  return { origins, error: '' };
+}
+
+export function embedSummary(origins) {
+  const list = origins || [];
+  if (!list.length) return 'Off';
+  if (list.includes('*')) return 'Any site';
+  return list.length === 1 ? '1 site' : `${list.length} sites`;
+}
+
+export function sameList(a, b) {
+  const x = a || [];
+  const y = b || [];
+  return x.length === y.length && x.every((v, i) => v === y[i]);
 }

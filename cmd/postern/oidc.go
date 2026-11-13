@@ -268,7 +268,7 @@ func (a *App) oidcCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.logins.success(clientIP(r))
-	setSessionCookie(w, r, id, pending.Remember)
+	setSessionCookie(w, r, id, pending.Remember, a.sessionSameSite(r))
 	dest := "/admin/"
 	if pending.Popup {
 		dest = "/admin/oidc/done"

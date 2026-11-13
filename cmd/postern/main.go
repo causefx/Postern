@@ -212,15 +212,15 @@ func main() {
 
 	var servers []*http.Server
 	if adminAddr == "" {
-		proxyMux.Handle("/admin/", app.adminAuth(adminMux))
-		proxyMux.Handle("/{$}", adminMux)
+		proxyMux.Handle("/admin/", app.securityHeaders(app.adminAuth(adminMux)))
+		proxyMux.Handle("/{$}", app.securityHeaders(adminMux))
 		log.Printf("listening on %s (proxy at /p/<name>/..., UI at /admin/)", proxyAddr)
 		servers = []*http.Server{newServer(proxyAddr, withHealth(proxyMux))}
 	} else {
 		log.Printf("admin UI on %s/admin/", adminAddr)
 		log.Printf("proxy on %s (/p/<name>/...)", proxyAddr)
 		servers = []*http.Server{
-			newServer(adminAddr, withHealth(app.adminAuth(adminMux))),
+			newServer(adminAddr, withHealth(app.securityHeaders(app.adminAuth(adminMux)))),
 			newServer(proxyAddr, withHealth(proxyMux)),
 		}
 	}

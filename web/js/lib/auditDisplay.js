@@ -78,6 +78,7 @@ export function auditChips(ev) {
     if (ev.activity != null) bits.push(`activity ${ev.activity}`);
     if (ev.audit != null) bits.push(`audit ${ev.audit}`);
     if (ev.passwordLogin != null) bits.push(ev.passwordLogin ? 'password on' : 'password off');
+    if (ev.embed != null) bits.push(`embedding ${ev.embed}`);
     return bits;
   }
   if (!KNOWN_ACTIONS.has(ev.action)) {

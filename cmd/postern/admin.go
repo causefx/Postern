@@ -91,7 +91,7 @@ func (a *App) adminAuth(next http.Handler) http.Handler {
 		}
 		raw := sessionID(r)
 		if refreshed, err := a.sessions.refresh(raw); err == nil {
-			setSessionCookie(w, r, refreshed, a.sessions.remember(raw))
+			setSessionCookie(w, r, refreshed, a.sessions.remember(raw), a.sessionSameSite(r))
 		}
 		if r.Method != http.MethodGet && r.Header.Get("X-Postern-Admin") != "1" {
 			http.Error(w, "missing X-Postern-Admin header", http.StatusForbidden)
@@ -170,13 +170,13 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.logins.success(ip)
-	setSessionCookie(w, r, id, in.Remember)
+	setSessionCookie(w, r, id, in.Remember, a.sessionSameSite(r))
 	writeJSON(w, 200, map[string]any{"ok": true})
 }
 
 func (a *App) logout(w http.ResponseWriter, r *http.Request) {
 	a.sessions.revoke(sessionID(r))
-	clearSessionCookie(w, r)
+	clearSessionCookie(w, r, a.sessionSameSite(r))
 	writeJSON(w, 200, map[string]any{"ok": true})
 }
 
@@ -243,12 +243,14 @@ func (a *App) settingsPayload(s Settings, r *http.Request) map[string]any {
 		"oidc":          a.oidc != nil,
 		"oidcLabel":     label,
 		"oidcSession":   a.sessions != nil && a.sessions.viaOIDC(sessionID(r)),
+		"embedOrigins":  nonNil(s.EmbedOrigins),
 		"encrypted":     a.store.Encrypted(),
 		"defaults": map[string]any{
 			"activityLimit": defaultActivityLimit,
 			"rateLimit":     defaultRateLimit,
 			"auditLimit":    defaultAuditLimit,
 			"passwordLogin": true,
+			"embedOrigins":  []string{},
 		},
 		"maxActivity": maxActivityLimit,
 		"maxRate":     maxRateLimit,
@@ -262,6 +264,7 @@ func (a *App) getSettings(w http.ResponseWriter, r *http.Request) {
 		RateLimit:     a.store.RateLimit(),
 		AuditLimit:    a.store.AuditLimit(),
 		PasswordLogin: a.store.PasswordLogin(),
+		EmbedOrigins:  a.store.EmbedOrigins(),
 	}, r))
 }
 
@@ -271,6 +274,9 @@ func (a *App) putSettings(w http.ResponseWriter, r *http.Request) {
 		RateLimit     int   `json:"rateLimit"`
 		AuditLimit    int   `json:"auditLimit"`
 		PasswordLogin *bool `json:"passwordLogin"`
+		// EmbedOrigins is optional: leaving it out keeps the current list. An empty list turns
+		// embedding off.
+		EmbedOrigins *[]string `json:"embedOrigins"`
 	}
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
 	if err := dec.Decode(&in); err != nil {
@@ -288,6 +294,14 @@ func (a *App) putSettings(w http.ResponseWriter, r *http.Request) {
 	if in.AuditLimit < 1 || in.AuditLimit > maxAuditLimit {
 		writeErr(w, 400, fmt.Sprintf("auditLimit must be from 1 to %d", maxAuditLimit))
 		return
+	}
+	embed := a.store.EmbedOrigins()
+	if in.EmbedOrigins != nil {
+		var err error
+		if embed, err = normalizeEmbedOrigins(*in.EmbedOrigins); err != nil {
+			writeFieldErr(w, err)
+			return
+		}
 	}
 	passwordLogin := true
 	if a.store != nil {
@@ -309,12 +323,14 @@ func (a *App) putSettings(w http.ResponseWriter, r *http.Request) {
 		RateLimit:     a.store.RateLimit(),
 		AuditLimit:    a.store.AuditLimit(),
 		PasswordLogin: a.store.PasswordLogin(),
+		EmbedOrigins:  a.store.EmbedOrigins(),
 	}
 	saved, err := a.store.UpdateSettings(Settings{
 		ActivityLimit: in.ActivityLimit,
 		RateLimit:     in.RateLimit,
 		AuditLimit:    in.AuditLimit,
 		PasswordLogin: passwordLogin,
+		EmbedOrigins:  embed,
 	})
 	if err != nil {
 		writeErr(w, 500, "could not save settings")
@@ -354,7 +370,11 @@ func settingsChanges(prev, saved Settings) auditEvent {
 		on := saved.PasswordLogin
 		ev.PasswordLogin = &on
 	}
-	if ev.Rate == nil && ev.Activity == nil && ev.Audit == nil && ev.PasswordLogin == nil {
+	if !sameStrings(saved.EmbedOrigins, prev.EmbedOrigins) {
+		s := embedSummary(saved.EmbedOrigins)
+		ev.Embed = &s
+	}
+	if ev.Rate == nil && ev.Activity == nil && ev.Audit == nil && ev.PasswordLogin == nil && ev.Embed == nil {
 		return auditEvent{}
 	}
 	return ev

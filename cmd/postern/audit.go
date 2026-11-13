@@ -43,7 +43,9 @@ type auditEvent struct {
 	Activity      *int      `json:"activity,omitempty"`
 	Audit         *int      `json:"audit,omitempty"`
 	PasswordLogin *bool     `json:"passwordLogin,omitempty"`
-	Paused        *bool     `json:"paused,omitempty"`
+	// Embed summarises the embedding setting after a change: "off", "any site" or "2 sites".
+	Embed  *string `json:"embed,omitempty"`
+	Paused *bool   `json:"paused,omitempty"`
 	// Expires is the token expiry set by token_expiry. Empty means cleared.
 	Expires string `json:"expires,omitempty"`
 	// Scope summarises the limit set by token_scope, such as "GET, HEAD · 2 paths". Empty means

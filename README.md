@@ -121,6 +121,23 @@ Session cookies are `HttpOnly` + `SameSite=Lax`. The `Secure` flag follows `POST
 export POSTERN_SECURE=1
 ```
 
+### Browser protections and embedding
+
+Every admin response (`/admin/...`, never the `/p/...` proxy) carries browser protections: a `Content-Security-Policy` that allows only scripts, styles, fonts and images from Postern itself, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin` and a `Permissions-Policy` that turns off camera, microphone and location. Postern does not send `Strict-Transport-Security`; set it on your reverse proxy, which is the one that knows the site is HTTPS.
+
+By default the admin UI also refuses to be shown inside another page (`frame-ancestors 'none'` and `X-Frame-Options: DENY`). That stops clickjacking, where a hostile page overlays an invisible copy of the admin UI under its own buttons. To use the UI inside a dashboard such as Organizr, Homepage or Heimdall, open **Settings, Embedding** and list the dashboard's address, one per line:
+
+```
+https://dash.example.com
+http://192.168.1.10:3000
+https://*.example.org
+```
+
+- Each entry is a scheme, a host and an optional port, with no path. `*.example.org` matches subdomains. `*` on its own allows any site; Settings warns about it, because any website could then overlay the admin UI.
+- The setting applies immediately. Empty means nothing may embed Postern. It is stored as `embedOrigins` in the settings file, and a bad entry in a hand-edited file turns embedding off and is named by `postern check`.
+- While any site is listed, `X-Frame-Options` is not sent, because it cannot name sites and would block the ones you listed. Only `frame-ancestors` changes.
+- Signing in inside a frame needs the session cookie to travel with a cross-site request. When embedding is on and Postern is served over HTTPS, the cookie is `SameSite=None; Secure` for that reason. A dashboard on the same registrable domain as Postern (`dash.example.com` and `postern.example.com`) works over plain HTTP too. Browsers that block third-party cookies (Safari, Firefox with strict tracking protection) will not keep the session in a frame from another domain; embed from the same domain, or open the UI in its own tab.
+
 ### Behind a reverse proxy: client addresses
 
 The rate limit, the admin sign-in lockout and the log lines all key on the caller's address. By default that is the address of the connection, and `X-Forwarded-For` and `X-Real-IP` are ignored, because any caller can send them. Behind Caddy, Traefik, nginx or Cloudflare the connection comes from the proxy, so **every caller looks like one client**: they share one rate limit bucket per service, and five failed sign-ins lock everyone out.

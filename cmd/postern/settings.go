@@ -26,6 +26,9 @@ type Settings struct {
 	AuditLimit int `json:"auditLimit"`
 	// PasswordLogin allows the admin password. It stays on unless OIDC is configured.
 	PasswordLogin bool `json:"passwordLogin"`
+	// EmbedOrigins are the sites allowed to show the admin UI in a frame: origins such as
+	// https://dash.example.com, or "*" for any site. Empty blocks embedding. See frame.go.
+	EmbedOrigins []string `json:"embedOrigins"`
 }
 
 func defaultSettings() Settings {
@@ -34,16 +37,18 @@ func defaultSettings() Settings {
 		RateLimit:     defaultRateLimit,
 		AuditLimit:    defaultAuditLimit,
 		PasswordLogin: true,
+		EmbedOrigins:  []string{},
 	}
 }
 
 // settingsFile is a settings document as written by hand or by an older
 // version, where any key may be missing.
 type settingsFile struct {
-	ActivityLimit *int  `json:"activityLimit"`
-	RateLimit     *int  `json:"rateLimit"`
-	AuditLimit    *int  `json:"auditLimit"`
-	PasswordLogin *bool `json:"passwordLogin"`
+	ActivityLimit *int      `json:"activityLimit"`
+	RateLimit     *int      `json:"rateLimit"`
+	AuditLimit    *int      `json:"auditLimit"`
+	PasswordLogin *bool     `json:"passwordLogin"`
+	EmbedOrigins  *[]string `json:"embedOrigins"`
 }
 
 // resolve fills missing keys with defaults and pulls out-of-range numbers
@@ -70,7 +75,39 @@ func (f settingsFile) resolve() (s Settings, changed bool) {
 	} else {
 		s.PasswordLogin = *f.PasswordLogin
 	}
+	if f.EmbedOrigins == nil {
+		// A file from before this setting existed is complete as it is; the key appears on the
+		// next save from the UI.
+	} else if origins, err := normalizeEmbedOrigins(*f.EmbedOrigins); err != nil {
+		// A bad entry in a hand-edited file turns embedding off rather than guessing. `postern check`
+		// names the entry.
+		changed = true
+	} else {
+		s.EmbedOrigins = nonNil(origins)
+		if len(origins) != len(*f.EmbedOrigins) || !sameStrings(origins, *f.EmbedOrigins) {
+			changed = true
+		}
+	}
 	return s, changed
+}
+
+func nonNil(in []string) []string {
+	if in == nil {
+		return []string{}
+	}
+	return in
+}
+
+func sameStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // problems lists values that are present but out of range. Missing keys are
@@ -85,6 +122,11 @@ func (f settingsFile) problems() []string {
 	}
 	if f.AuditLimit != nil && (*f.AuditLimit < 1 || *f.AuditLimit > maxAuditLimit) {
 		out = append(out, fmt.Sprintf("settings.auditLimit must be from 1 to %d", maxAuditLimit))
+	}
+	if f.EmbedOrigins != nil {
+		if _, err := normalizeEmbedOrigins(*f.EmbedOrigins); err != nil {
+			out = append(out, "settings."+err.Error())
+		}
 	}
 	return out
 }
@@ -129,6 +171,7 @@ func writeSettingsFile(path string, s Settings) error {
 		RateLimit:     normalizeRateLimit(s.RateLimit),
 		AuditLimit:    normalizeAuditLimit(s.AuditLimit),
 		PasswordLogin: s.PasswordLogin,
+		EmbedOrigins:  nonNil(s.EmbedOrigins),
 	}, "", "  ")
 	if err != nil {
 		return err
@@ -188,6 +231,16 @@ func (s *Store) PasswordLogin() bool {
 	return s.settings.PasswordLogin
 }
 
+// EmbedOrigins are the sites allowed to show the admin UI in a frame. Empty means none.
+func (s *Store) EmbedOrigins() []string {
+	if s == nil {
+		return nil
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return append([]string(nil), s.settings.EmbedOrigins...)
+}
+
 // UpdateSettings writes the settings file and leaves the previous values in
 // place if the save fails. It never touches the data file.
 func (s *Store) UpdateSettings(next Settings) (Settings, error) {
@@ -199,6 +252,7 @@ func (s *Store) UpdateSettings(next Settings) (Settings, error) {
 		RateLimit:     normalizeRateLimit(next.RateLimit),
 		AuditLimit:    normalizeAuditLimit(next.AuditLimit),
 		PasswordLogin: next.PasswordLogin,
+		EmbedOrigins:  nonNil(append([]string(nil), next.EmbedOrigins...)),
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()

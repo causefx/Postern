@@ -12,6 +12,7 @@ import { SettingsTabs } from './SettingsTabs.js';
 import { AuditPanel } from './AuditPanel.js';
 import { RequestsPanel } from './RequestsPanel.js';
 import { PasswordLoginSetting } from './PasswordLoginSetting.js';
+import { EmbedSetting } from './EmbedSetting.js';
 import {
   ACTIVITY_PRESETS,
   AUDIT_PRESETS,
@@ -27,9 +28,12 @@ import {
   clampActivity,
   clampAudit,
   clampRate,
+  embedSummary,
+  parseEmbedOrigins,
   perSecondLabel,
   passwordSummary,
   rateSummary,
+  sameList,
   settingVisible,
 } from '../../lib/settings.js';
 
@@ -94,7 +98,11 @@ function createController({ onReady, initialTab = 'settings' }) {
     activityLimit: DEFAULT_ACTIVITY_LIMIT,
     auditLimit: DEFAULT_AUDIT_LIMIT,
     passwordLogin: true,
+    embedOrigins: [],
   };
+  /** What is typed in the embedding box, and what is wrong with it. The draft keeps the parsed list. */
+  let embedText = '';
+  let embedError = '';
   let oidcConfigured = false;
   let oidcSession = false;
   let poll = 0;
@@ -121,7 +129,13 @@ function createController({ onReady, initialTab = 'settings' }) {
 
   function isDirty() {
     if (!saved) return false;
-    return draft.rateLimit !== saved.rateLimit || draft.activityLimit !== saved.activityLimit || draft.auditLimit !== saved.auditLimit || draft.passwordLogin !== saved.passwordLogin;
+    return (
+      draft.rateLimit !== saved.rateLimit ||
+      draft.activityLimit !== saved.activityLimit ||
+      draft.auditLimit !== saved.auditLimit ||
+      draft.passwordLogin !== saved.passwordLogin ||
+      !sameList(draft.embedOrigins, saved.embedOrigins)
+    );
   }
 
   function setRate(n) {
@@ -139,18 +153,34 @@ function createController({ onReady, initialTab = 'settings' }) {
     sync();
   }
 
+  function setEmbedText(text) {
+    embedText = text;
+    const parsed = parseEmbedOrigins(text);
+    embedError = parsed.error;
+    if (!parsed.error) draft.embedOrigins = parsed.origins;
+    sync();
+  }
+
+  function showEmbed() {
+    embedText = (draft.embedOrigins || []).join('\n');
+    embedError = '';
+  }
+
   function resetAll() {
     draft.rateLimit = DEFAULT_RATE_LIMIT;
     draft.activityLimit = DEFAULT_ACTIVITY_LIMIT;
     draft.auditLimit = DEFAULT_AUDIT_LIMIT;
     draft.passwordLogin = true;
+    draft.embedOrigins = [];
+    showEmbed();
     sync();
     paintList();
   }
 
   function discard() {
     if (!saved) return;
-    draft = { ...saved };
+    draft = { ...saved, embedOrigins: [...saved.embedOrigins] };
+    showEmbed();
     paintList();
   }
 
@@ -188,7 +218,7 @@ function createController({ onReady, initialTab = 'settings' }) {
   }
 
   async function save() {
-    if (!loaded || !isDirty() || saving || passwordBlocked()) return;
+    if (!loaded || !isDirty() || saving || passwordBlocked() || embedError) return;
     saving = true;
     sync();
     try {
@@ -196,6 +226,7 @@ function createController({ onReady, initialTab = 'settings' }) {
         rateLimit: draft.rateLimit,
         activityLimit: draft.activityLimit,
         auditLimit: draft.auditLimit,
+        embedOrigins: draft.embedOrigins,
       };
       if (oidcConfigured) payload.passwordLogin = draft.passwordLogin;
       const next = await api.saveSettings(payload);
@@ -204,10 +235,12 @@ function createController({ onReady, initialTab = 'settings' }) {
         activityLimit: clampActivity(next.activityLimit),
         auditLimit: clampAudit(next.auditLimit),
         passwordLogin: next.passwordLogin !== false,
+        embedOrigins: Array.isArray(next.embedOrigins) ? next.embedOrigins : [],
       };
       oidcConfigured = !!next.oidc;
       oidcSession = !!next.oidcSession;
-      draft = { ...saved };
+      draft = { ...saved, embedOrigins: [...saved.embedOrigins] };
+      showEmbed();
       showToast('Settings saved');
       const log = await api.audit().catch(() => null);
       if (log) auditEntries = log.entries || [];
@@ -257,9 +290,13 @@ function createController({ onReady, initialTab = 'settings' }) {
     if (actDefault) actDefault.disabled = draft.activityLimit === DEFAULT_ACTIVITY_LIMIT;
     const auditDefault = listHost.querySelector('[data-default="audit"]');
     if (auditDefault) auditDefault.disabled = draft.auditLimit === DEFAULT_AUDIT_LIMIT;
-    const dirty = isDirty();
+    const embedSum = listHost.querySelector('[data-summary="embed"]');
+    if (embedSum) embedSum.textContent = embedSummary(draft.embedOrigins);
+    listHost.querySelector('[data-embed]')?._set?.({ error: embedError, origins: draft.embedOrigins });
+    // A half-typed list is not a change yet, but it must not look saved either.
+    const dirty = isDirty() || !!embedError;
     discardBtn.disabled = !dirty || saving;
-    saveBtn.disabled = !dirty || saving || !loaded || passwordBlocked();
+    saveBtn.disabled = !dirty || saving || !loaded || passwordBlocked() || !!embedError;
     resetBtn.disabled = saving || !loaded;
   }
 
@@ -279,7 +316,16 @@ function createController({ onReady, initialTab = 'settings' }) {
         lastGroup = def.group;
       }
       const isOpen = open.has(def.id);
-      const body = def.id === 'rate' ? rateBody() : def.id === 'audit' ? auditBody() : def.id === 'password' ? passwordBody() : activityBody();
+      const body =
+        def.id === 'rate'
+          ? rateBody()
+          : def.id === 'audit'
+            ? auditBody()
+            : def.id === 'password'
+              ? passwordBody()
+              : def.id === 'embed'
+                ? embedBody()
+                : activityBody();
       listHost.append(
         SettingsAccordion(
           {
@@ -291,7 +337,9 @@ function createController({ onReady, initialTab = 'settings' }) {
                 ? rateSummary(draft.rateLimit)
                 : def.id === 'password'
                   ? passwordSummary(oidcConfigured ? draft.passwordLogin : true)
-                  : activitySummary(def.id === 'audit' ? draft.auditLimit : draft.activityLimit),
+                  : def.id === 'embed'
+                    ? embedSummary(draft.embedOrigins)
+                    : activitySummary(def.id === 'audit' ? draft.auditLimit : draft.activityLimit),
             open: isOpen,
             onToggle: () => {
               if (open.has(def.id)) open.delete(def.id);
@@ -394,6 +442,10 @@ function createController({ onReady, initialTab = 'settings' }) {
     });
   }
 
+  function embedBody() {
+    return EmbedSetting({ text: embedText, error: embedError, origins: draft.embedOrigins, onInput: setEmbedText });
+  }
+
   function passwordBody() {
     return PasswordLoginSetting({
       allowed: draft.passwordLogin,
@@ -485,6 +537,7 @@ function createController({ onReady, initialTab = 'settings' }) {
       ['traffic', 'Traffic'],
       ['activity', 'Logs'],
       ['signin', 'Sign-in'],
+      ['security', 'Security'],
     ].map(([id, label]) =>
       h(
         'button',
@@ -576,8 +629,10 @@ function createController({ onReady, initialTab = 'settings' }) {
         activityLimit: clampActivity(data.activityLimit),
         auditLimit: clampAudit(data.auditLimit),
         passwordLogin: data.passwordLogin !== false,
+        embedOrigins: Array.isArray(data.embedOrigins) ? data.embedOrigins : [],
       };
-      draft = { ...saved };
+      draft = { ...saved, embedOrigins: [...saved.embedOrigins] };
+      showEmbed();
       oidcConfigured = !!data.oidc;
       oidcSession = !!data.oidcSession;
       encrypted = data.encrypted === true;

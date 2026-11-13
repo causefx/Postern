@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 )
@@ -60,7 +61,7 @@ func TestSetSessionCookieRespectsSecureMode(t *testing.T) {
 	secureMode = 1
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "http://x/admin/", nil)
-	setSessionCookie(rec, req, "abc", true)
+	setSessionCookie(rec, req, "abc", true, http.SameSiteLaxMode)
 	cookies := rec.Result().Cookies()
 	if len(cookies) != 1 || !cookies[0].Secure {
 		t.Fatalf("expected Secure cookie, got %+v", cookies)
