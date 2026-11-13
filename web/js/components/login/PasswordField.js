@@ -8,6 +8,7 @@ export function PasswordField() {
     name: 'password',
     type: 'password',
     autocomplete: 'current-password',
+    allowAutofill: true,
     required: true,
     'aria-describedby': 'password-hint',
     className:

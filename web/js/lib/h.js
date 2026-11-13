@@ -1,15 +1,24 @@
+import { IGNORE_ATTRS } from './noAutofill.js';
+
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const SVG_TAGS = new Set([
   'svg', 'path', 'circle', 'rect', 'line', 'polyline', 'polygon',
   'g', 'defs', 'use', 'text', 'tspan', 'clipPath', 'mask',
 ]);
 
-/** Tiny DOM helper: h(tag, props, ...children) */
+/**
+ * Tiny DOM helper: h(tag, props, ...children)
+ *
+ * Every text-like field opts out of password managers and browser autofill, because nothing in
+ * this UI except the admin sign-in is a login. The sign-in password field passes
+ * `allowAutofill: true` to keep normal behaviour.
+ */
 export function h(tag, props = {}, ...children) {
   const el = SVG_TAGS.has(tag)
     ? document.createElementNS(SVG_NS, tag)
     : document.createElement(tag);
   for (const [k, v] of Object.entries(props || {})) {
+    if (k === 'allowAutofill') continue;
     if (v == null || v === false) continue;
     if (k === 'className') {
       if (el.namespaceURI === SVG_NS) el.setAttribute('class', v);
@@ -23,6 +32,7 @@ export function h(tag, props = {}, ...children) {
     else if (k === 'value') el.value = v;
     else el.setAttribute(k, v === true ? '' : String(v));
   }
+  if ((tag === 'input' || tag === 'textarea') && !props?.allowAutofill) blockAutofill(el);
   for (const c of children.flat()) {
     if (c == null || c === false) continue;
     el.append(c instanceof Node ? c : document.createTextNode(String(c)));
@@ -33,4 +43,11 @@ export function h(tag, props = {}, ...children) {
 export function clear(el) {
   el.replaceChildren();
   return el;
+}
+
+function blockAutofill(el) {
+  for (const [name, value] of Object.entries(IGNORE_ATTRS)) el.setAttribute(name, value);
+  // A password-type field is "new-password" so browsers never offer saved ones; anything else is off.
+  if (el.type === 'password') el.setAttribute('autocomplete', 'new-password');
+  else if (!el.hasAttribute('autocomplete')) el.setAttribute('autocomplete', 'off');
 }

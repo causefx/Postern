@@ -239,7 +239,6 @@ export function AuthRowsEditor({ auth, editing, onChange, serviceLabel = 'servic
     const secret = h('input', {
       type: 'password',
       className: 'input font-mono',
-      autocomplete: 'off',
       placeholder: missing ? 'Required' : stored ? '••••••••' : 'value',
       value: row.secret || '',
       'aria-invalid': missing ? 'true' : null,
