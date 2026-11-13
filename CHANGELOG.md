@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0](https://github.com/causefx/Postern/compare/v0.12.0...v0.13.0) (2026-11-13)
+
+
+### Features
+
+* update login illustration with key-swap diagram and theme support ([a8f133e](https://github.com/causefx/Postern/commit/a8f133e14b9b1c53cb4b97cd88cefdd85011d3eb))
+
 ## [0.12.0](https://github.com/causefx/Postern/compare/v0.11.0...v0.12.0) (2026-11-13)
 
 
