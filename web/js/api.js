@@ -74,4 +74,5 @@ export const api = {
   settings: () => request('settings'),
   saveSettings: (body) => request('settings', { method: 'PUT', body: JSON.stringify(body) }),
   audit: () => request('audit'),
+  allActivity: (limit) => request('activity' + (limit ? '?limit=' + encodeURIComponent(limit) : '')),
 };

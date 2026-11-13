@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 )
@@ -139,6 +140,40 @@ func (l *activityLog) list(name string) []activityEvent {
 	src := l.by[name]
 	out := make([]activityEvent, len(src))
 	copy(out, src)
+	return out
+}
+
+// serviceEvent is one request tagged with the service it went to.
+type serviceEvent struct {
+	Service string `json:"service"`
+	activityEvent
+}
+
+// listAll merges every service's events, newest first, and keeps the newest
+// limit of them. A limit of zero or less returns everything. The cap is kept per
+// service, so the result is the recent tail of each service interleaved by
+// time, not a complete global history.
+func (l *activityLog) listAll(limit int) []serviceEvent {
+	out := []serviceEvent{}
+	if l == nil {
+		return out
+	}
+	l.mu.Lock()
+	for name, list := range l.by {
+		for _, ev := range list {
+			out = append(out, serviceEvent{Service: name, activityEvent: ev})
+		}
+	}
+	l.mu.Unlock()
+	sort.SliceStable(out, func(i, j int) bool {
+		if !out[i].Time.Equal(out[j].Time) {
+			return out[i].Time.After(out[j].Time)
+		}
+		return out[i].Service < out[j].Service
+	})
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
 	return out
 }
 

@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -709,6 +710,44 @@ func (a *App) serviceActivity(w http.ResponseWriter, r *http.Request) {
 		events = a.activity.list(name)
 	}
 	writeJSON(w, 200, events)
+}
+
+const (
+	defaultAllActivity = 300
+	maxAllActivity     = 2000
+)
+
+// allActivity is the combined request log across services, newest first.
+// ?limit=N caps it (default 300, max 2000); ?service=name narrows it.
+func (a *App) allActivity(w http.ResponseWriter, r *http.Request) {
+	limit := defaultAllActivity
+	if v := r.URL.Query().Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 {
+			writeErr(w, 400, "bad limit")
+			return
+		}
+		limit = min(n, maxAllActivity)
+	}
+	events := a.activity.listAll(0)
+	if name := r.URL.Query().Get("service"); name != "" {
+		kept := events[:0]
+		for _, ev := range events {
+			if ev.Service == name {
+				kept = append(kept, ev)
+			}
+		}
+		events = kept
+	}
+	total := len(events)
+	if len(events) > limit {
+		events = events[:limit]
+	}
+	writeJSON(w, 200, map[string]any{
+		"limit":   a.store.ActivityLimit(),
+		"total":   total,
+		"entries": events,
+	})
 }
 
 func (a *App) clearActivity(w http.ResponseWriter, r *http.Request) {

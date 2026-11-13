@@ -35,6 +35,7 @@ import {
   closeSettings,
   isSettingsOpen,
   requestSettingsSave,
+  showSettingsTab,
 } from './components/settings/SettingsDrawer.js';
 
 const root = document.getElementById('app');
@@ -63,14 +64,21 @@ const drawerHandlers = {
   },
 };
 
-async function openSettingsDrawer() {
+// With a tab (from the command palette) an open drawer switches to it; without one the header
+// button toggles the drawer.
+async function openSettingsDrawer(tab) {
   if (isSettingsOpen()) {
-    closeSettings();
+    if (tab) {
+      setState({ commandOpen: false });
+      showSettingsTab(tab);
+    } else {
+      closeSettings();
+    }
     return;
   }
   if (isDrawerOpen() && !(await closeServiceDrawer())) return;
   setState({ commandOpen: false });
-  openSettings();
+  openSettings({ tab });
 }
 
 function openCreate() {
@@ -225,7 +233,7 @@ function render() {
     onAdd: () => openCreate(),
     onReload: () => reload(),
     onEdit: openEdit,
-    onSettings: () => openSettingsDrawer(),
+    onSettings: (tab) => openSettingsDrawer(tab),
   });
   if (palette) root.append(palette);
 }

@@ -108,6 +108,15 @@ export function commandSections({ query = '', onAdd, onReload, onEdit, onSetting
   if (matches(query, 'settings')) {
     actions.push({ id: 'settings', section: 'actions', label: 'Settings', icon: 'gear', run: () => onSettings?.() });
   }
+  if (matches(query, 'request log requests all services activity')) {
+    actions.push({
+      id: 'requests',
+      section: 'actions',
+      label: 'Request log (all services)',
+      icon: 'search',
+      run: () => onSettings?.('requests'),
+    });
+  }
   for (const f of [
     { id: 'all', label: 'Filter: All services' },
     { id: 'live', label: 'Filter: Live only' },

@@ -9,6 +9,7 @@ import { SettingsAccordion } from './SettingsAccordion.js';
 import { SettingControls } from './SettingControls.js';
 import { SettingsTabs } from './SettingsTabs.js';
 import { AuditPanel } from './AuditPanel.js';
+import { RequestsPanel } from './RequestsPanel.js';
 import { PasswordLoginSetting } from './PasswordLoginSetting.js';
 import {
   ACTIVITY_PRESETS,
@@ -55,10 +56,16 @@ export function closeSettings({ skipConfirm = false } = {}) {
   return true;
 }
 
-export function openSettings() {
+/** Switch the open drawer to 'settings', 'requests' or 'activity'. */
+export function showSettingsTab(tab) {
+  ctrl?.showTab?.(tab);
+}
+
+export function openSettings({ tab = 'settings' } = {}) {
   if (root) return;
   const gen = ++generation;
   ctrl = createController({
+    initialTab: tab,
     onReady: (el) => {
       if (gen !== generation) return;
       root = el;
@@ -77,7 +84,9 @@ export function requestSettingsSave() {
   return ctrl?.save?.();
 }
 
-function createController({ onReady }) {
+const TABS = ['settings', 'requests', 'activity'];
+
+function createController({ onReady, initialTab = 'settings' }) {
   let saved = null;
   let draft = {
     rateLimit: DEFAULT_RATE_LIMIT,
@@ -90,7 +99,7 @@ function createController({ onReady }) {
   let poll = 0;
   let query = '';
   let group = 'all';
-  let tab = 'settings';
+  let tab = TABS.includes(initialTab) ? initialTab : 'settings';
   let auditEntries = [];
   let auditService = 'all';
   const open = new Set(['rate']);
@@ -331,13 +340,13 @@ function createController({ onReady }) {
   function activityBody() {
     return SettingControls({
       field: 'activity',
-      label: 'Activity history',
+      label: 'Request log',
       value: draft.activityLimit,
       min: 1,
       max: MAX_ACTIVITY_LIMIT,
       presets: ACTIVITY_PRESETS,
-      note: 'Kept per service. Lowering this trims older requests on save.',
-      detail: 'The Recent column and the Usage list read this log. Query secrets are already redacted.',
+      note: 'Kept separately for each service. Lowering this drops the oldest requests on save.',
+      detail: 'Requests that went through the proxy. Shown in the Recent column, in each service’s Requests tab and in the Requests tab here. Query secrets are redacted.',
       fieldName: `settings.activityLimit · default ${DEFAULT_ACTIVITY_LIMIT}`,
       isDefault: draft.activityLimit === DEFAULT_ACTIVITY_LIMIT,
       onChange: setActivity,
@@ -348,13 +357,13 @@ function createController({ onReady }) {
   function auditBody() {
     return SettingControls({
       field: 'audit',
-      label: 'Audit log',
+      label: 'Admin log',
       value: draft.auditLimit,
       min: 1,
       max: MAX_AUDIT_LIMIT,
       presets: AUDIT_PRESETS,
-      note: 'Newest admin changes stay. Older lines are dropped on save.',
-      detail: 'The Activity tab reads this log. It does not include secrets.',
+      note: 'One list for all services. Lowering this drops the oldest entries on save.',
+      detail: 'Changes made in this admin UI to services, tokens and settings. Shown in the Admin log tab. It does not include secrets.',
       fieldName: `settings.auditLimit · default ${DEFAULT_AUDIT_LIMIT}`,
       isDefault: draft.auditLimit === DEFAULT_AUDIT_LIMIT,
       onChange: setAudit,
@@ -393,6 +402,13 @@ function createController({ onReady }) {
     queueMicrotask(() => document.getElementById('audit-panel')?.scrollIntoView({ block: 'nearest' }));
   }
 
+  function showActivitySetting() {
+    tab = 'settings';
+    open.add('activity');
+    setGroup('activity');
+    paintChrome();
+  }
+
   function paintAudit() {
     auditHost.replaceChildren(
       AuditPanel({
@@ -414,6 +430,18 @@ function createController({ onReady }) {
     settingsTools.classList.toggle('settings-pane-hidden', tab !== 'settings');
     listHost.classList.toggle('settings-pane-hidden', tab !== 'settings');
     auditHost.classList.toggle('settings-pane-hidden', tab !== 'activity');
+    requestsHost.classList.toggle('settings-pane-hidden', tab !== 'requests');
+    // Only poll while the Requests tab is showing.
+    if (tab === 'requests') requests.start();
+    else requests.stop();
+    if (tab === 'requests') {
+      footer.replaceChildren(
+        h('span', { className: 'audit-keep' }, 'Proxy requests across all services · updates live'),
+        h('span', { className: 'drawer-footer-spacer' }),
+        Button({ size: 'sm', className: 'btn-outline', onClick: showActivitySetting }, 'Change in Settings'),
+      );
+      return;
+    }
     if (tab === 'activity') {
       footer.replaceChildren(
         h('span', { className: 'audit-keep' }, 'Keeping the last ', h('strong', {}, String(saved?.auditLimit ?? DEFAULT_AUDIT_LIMIT)), ' entries'),
@@ -432,7 +460,7 @@ function createController({ onReady }) {
     ...[
       ['all', 'All'],
       ['traffic', 'Traffic'],
-      ['activity', 'Activity'],
+      ['activity', 'Logs'],
       ['signin', 'Sign-in'],
     ].map(([id, label]) =>
       h(
@@ -470,6 +498,8 @@ function createController({ onReady }) {
     chipRow,
   );
   const auditHost = h('div', { className: 'audit-host settings-pane-hidden' });
+  const requests = RequestsPanel();
+  const requestsHost = h('div', { className: 'audit-host requests-host settings-pane-hidden' }, requests.el);
   const footer = h('div', { className: 'drawer-footer' });
 
   const panel = h(
@@ -496,7 +526,7 @@ function createController({ onReady }) {
       ),
     ),
     tabsHost,
-    h('div', { className: 'drawer-body' }, settingsTools, listHost, auditHost),
+    h('div', { className: 'drawer-body' }, settingsTools, listHost, requestsHost, auditHost),
     footer,
   );
 
@@ -563,7 +593,20 @@ function createController({ onReady }) {
       paintChrome();
     });
 
-  return { isDirty, save, stop: stopPoll, markOIDC };
+  return {
+    isDirty,
+    save,
+    stop: () => {
+      stopPoll();
+      requests.stop();
+    },
+    showTab: (next) => {
+      if (!TABS.includes(next) || next === tab) return;
+      tab = next;
+      paintChrome();
+    },
+    markOIDC,
+  };
 }
 
 window.addEventListener('message', (e) => {
