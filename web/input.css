@@ -1200,14 +1200,34 @@ button.acct-item:focus-visible { background: var(--bg-surface-2); }
   overflow: visible;
   display: block;
 }
+/* Colours of the login key-swap diagram: dark first, light under [data-theme="light"]. */
+.pk-art {
+  --pk-ink: #DEE2E6;
+  --pk-soft: #ADB5BD;
+  --pk-mute: #6C757D;
+  --pk-line: #495057;
+  --pk-door: #F8F9FA;
+  --pk-ok: #a3c9b1;
+  --pk-ok-bg: rgba(163, 201, 177, 0.14);
+  --pk-warn: #d6c38e;
+  --pk-warn-bg: rgba(214, 195, 142, 0.14);
+}
+[data-theme="light"] .pk-art {
+  --pk-ink: #343A40;
+  --pk-soft: #6C757D;
+  --pk-mute: #868E96;
+  --pk-line: #CED4DA;
+  --pk-door: #212529;
+  --pk-ok: #2b8a57;
+  --pk-ok-bg: rgba(43, 138, 87, 0.12);
+  --pk-warn: #8a6400;
+  --pk-warn-bg: rgba(138, 100, 0, 0.12);
+}
 .input[aria-invalid='true'] {
   border-color: var(--danger);
 }
 .input[aria-invalid='true']:focus {
   border-color: var(--danger);
-}
-@media (prefers-reduced-motion: reduce) {
-  .pkt { display: none; }
 }
 /* Mobile: form only — hide brand illustration + tagline for now */
 @media (max-width: 1000px) {

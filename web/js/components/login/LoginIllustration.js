@@ -1,92 +1,117 @@
-/** Inline animated postern diagram (SMIL). Source: data/postern-login/login-illustration.svg,
- *  with its colours swapped for theme tokens so it follows light and dark. */
+/**
+ * Key-swap diagram for the login screen: each request arrives with a Postern token and the service
+ * receives its real key, masked. Refused requests are never forwarded. The list scrolls on its own
+ * (SMIL), one row at a time.
+ *
+ * Inline so it can follow the app theme: the colours are --pk-* variables defined in input.css
+ * (dark by default, light under [data-theme="light"]).
+ */
 
-const MARKUP = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Requests from the internet pass through a single door in a wall to private services; requests without a valid token are stopped." class="postern-illustration">
-<defs><pattern id="lg-dots" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="var(--bg-surface-2)"></circle></pattern></defs>
-<rect x="0" y="0" width="640" height="480" fill="url(#lg-dots)"></rect>
-<text x="40" y="44" fill="var(--text-muted)" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="600" letter-spacing="1.5">INTERNET</text>
-<rect x="384" y="86" width="240" height="330" rx="18" fill="var(--bg-page)" fill-opacity="0.55" stroke="var(--line)" stroke-dasharray="4 5"></rect>
-<text x="402" y="110" fill="var(--text-muted)" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="600" letter-spacing="1.5">PRIVATE NETWORK</text>
-<rect x="306" y="18" width="48" height="16" rx="3" fill="var(--bg-surface-2)" stroke="var(--line)"></rect>
-<rect x="306" y="38" width="22" height="16" rx="3" fill="var(--bg-surface-2)" stroke="var(--line)"></rect>
-<rect x="332" y="38" width="22" height="16" rx="3" fill="var(--bg-surface-2)" stroke="var(--line)"></rect>
-<rect x="306" y="58" width="48" height="16" rx="3" fill="var(--bg-surface-2)" stroke="var(--line)"></rect>
-<rect x="306" y="78" width="22" height="16" rx="3" fill="var(--bg-surface-2)" stroke="var(--line)"></rect>
-<rect x="332" y="78" width="22" height="16" rx="3" fill="var(--bg-surface-2)" stroke="var(--line)"></rect>
-<rect x="306" y="98" width="48" height="16" rx="3" fill="var(--bg-surface-2)" stroke="var(--line)"></rect>
-<rect x="306" y="118" width="22" height="16" rx="3" fill="var(--bg-surface-2)" stroke="var(--line)"></rect>
-<rect x="332" y="118" width="22" height="16" rx="3" fill="var(--bg-surface-2)" stroke="var(--line)"></rect>
-<rect x="306" y="138" width="48" height="16" rx="3" fill="var(--bg-surface-2)" stroke="var(--line)"></rect>
-<rect x="306" y="158" width="22" height="16" rx="3" fill="var(--bg-surface-2)" stroke="var(--line)"></rect>
-<rect x="332" y="158" width="22" height="16" rx="3" fill="var(--bg-surface-2)" stroke="var(--line)"></rect>
-<rect x="306" y="318" width="22" height="16" rx="3" fill="var(--bg-surface-2)" stroke="var(--line)"></rect>
-<rect x="332" y="318" width="22" height="16" rx="3" fill="var(--bg-surface-2)" stroke="var(--line)"></rect>
-<rect x="306" y="338" width="48" height="16" rx="3" fill="var(--bg-surface-2)" stroke="var(--line)"></rect>
-<rect x="306" y="358" width="22" height="16" rx="3" fill="var(--bg-surface-2)" stroke="var(--line)"></rect>
-<rect x="332" y="358" width="22" height="16" rx="3" fill="var(--bg-surface-2)" stroke="var(--line)"></rect>
-<rect x="306" y="378" width="48" height="16" rx="3" fill="var(--bg-surface-2)" stroke="var(--line)"></rect>
-<rect x="306" y="398" width="22" height="16" rx="3" fill="var(--bg-surface-2)" stroke="var(--line)"></rect>
-<rect x="332" y="398" width="22" height="16" rx="3" fill="var(--bg-surface-2)" stroke="var(--line)"></rect>
-<rect x="306" y="418" width="48" height="16" rx="3" fill="var(--bg-surface-2)" stroke="var(--line)"></rect>
-<rect x="306" y="438" width="22" height="16" rx="3" fill="var(--bg-surface-2)" stroke="var(--line)"></rect>
-<rect x="332" y="438" width="22" height="16" rx="3" fill="var(--bg-surface-2)" stroke="var(--line)"></rect>
-<rect x="306" y="458" width="48" height="16" rx="3" fill="var(--bg-surface-2)" stroke="var(--line)"></rect>
-<path d="M306 300 V218 A24 24 0 0 1 354 218 V300 Z" fill="var(--text)" fill-opacity="0.07"></path>
-<path d="M306 300 V218 A24 24 0 0 1 354 218 V300" fill="none" stroke="var(--text)" stroke-width="1.75"></path>
-<path d="M298 300 H362" stroke="var(--text)" stroke-width="1.75" stroke-linecap="round"></path>
-<circle cx="330" cy="236" r="4" fill="none" stroke="var(--text-muted)" stroke-width="1.5"></circle>
-<path d="M330 240 V248" stroke="var(--text-muted)" stroke-width="1.5" stroke-linecap="round"></path>
-<path d="M354 268 C 410 268 420 146 470 146" fill="none" stroke="var(--line-strong)" stroke-width="1.25"></path>
-<path d="M354 268 C 410 268 420 218 470 218" fill="none" stroke="var(--line-strong)" stroke-width="1.25"></path>
-<path d="M354 268 C 410 268 420 290 470 290" fill="none" stroke="var(--line-strong)" stroke-width="1.25"></path>
-<path d="M354 268 C 410 268 420 362 470 362" fill="none" stroke="var(--line-strong)" stroke-width="1.25"></path>
-<rect x="470" y="126" width="138" height="40" rx="10" fill="var(--bg-surface-2)" stroke="var(--line-strong)"></rect>
-<circle cx="489" cy="146" r="4" fill="var(--success)"></circle>
-<text x="502" y="150.5" fill="var(--text-soft)" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12.5">sonarr</text>
-<rect x="470" y="198" width="138" height="40" rx="10" fill="var(--bg-surface-2)" stroke="var(--line-strong)"></rect>
-<circle cx="489" cy="218" r="4" fill="var(--success)"></circle>
-<text x="502" y="222.5" fill="var(--text-soft)" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12.5">sabnzbd</text>
-<rect x="470" y="270" width="138" height="40" rx="10" fill="var(--bg-surface-2)" stroke="var(--line-strong)"></rect>
-<circle cx="489" cy="290" r="4" fill="var(--success)"></circle>
-<text x="502" y="294.5" fill="var(--text-soft)" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12.5">jellyfin</text>
-<rect x="470" y="342" width="138" height="40" rx="10" fill="var(--bg-surface-2)" stroke="var(--line-strong)"></rect>
-<circle cx="489" cy="362" r="4" fill="var(--success)"></circle>
-<text x="502" y="366.5" fill="var(--text-soft)" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12.5">homeassistant</text>
-<path d="M70 78 C 200 78 230 268 306 268" fill="none" stroke="var(--text-muted)" stroke-opacity="0.7" stroke-width="1.25"></path>
-<path d="M128 150 C 258 150 230 268 306 268" fill="none" stroke="var(--text-muted)" stroke-opacity="0.7" stroke-width="1.25"></path>
-<path d="M60 236 C 190 236 230 268 306 268" fill="none" stroke="var(--text-muted)" stroke-opacity="0.7" stroke-width="1.25"></path>
-<path d="M118 330 C 248 330 230 268 306 268" fill="none" stroke="var(--text-muted)" stroke-opacity="0.7" stroke-width="1.25"></path>
-<path d="M74 410 C 204 410 230 268 306 268" fill="none" stroke="var(--text-muted)" stroke-opacity="0.7" stroke-width="1.25"></path>
-<path d="M150 104 C 240 104 210 178 262 178" fill="none" stroke="var(--line-strong)" stroke-width="1.25" stroke-dasharray="3 4"></path>
-<path d="M266 174 l8 8 M274 174 l-8 8" stroke="var(--text-muted)" stroke-width="1.5" stroke-linecap="round"></path>
-<path d="M40 172 C 130 172 210 215 262 215" fill="none" stroke="var(--line-strong)" stroke-width="1.25" stroke-dasharray="3 4"></path>
-<path d="M266 211 l8 8 M274 211 l-8 8" stroke="var(--text-muted)" stroke-width="1.5" stroke-linecap="round"></path>
-<path d="M156 280 C 246 280 210 275 262 275" fill="none" stroke="var(--line-strong)" stroke-width="1.25" stroke-dasharray="3 4"></path>
-<path d="M266 271 l8 8 M274 271 l-8 8" stroke="var(--text-muted)" stroke-width="1.5" stroke-linecap="round"></path>
-<path d="M46 380 C 136 380 210 330 262 330" fill="none" stroke="var(--line-strong)" stroke-width="1.25" stroke-dasharray="3 4"></path>
-<path d="M266 326 l8 8 M274 326 l-8 8" stroke="var(--text-muted)" stroke-width="1.5" stroke-linecap="round"></path>
-<circle cx="70" cy="78" r="5" fill="var(--bg-page)" stroke="var(--text-soft)" stroke-width="1.5"></circle>
-<circle cx="128" cy="150" r="5" fill="var(--bg-page)" stroke="var(--text-soft)" stroke-width="1.5"></circle>
-<circle cx="60" cy="236" r="5" fill="var(--bg-page)" stroke="var(--text-soft)" stroke-width="1.5"></circle>
-<circle cx="118" cy="330" r="5" fill="var(--bg-page)" stroke="var(--text-soft)" stroke-width="1.5"></circle>
-<circle cx="74" cy="410" r="5" fill="var(--bg-page)" stroke="var(--text-soft)" stroke-width="1.5"></circle>
-<circle cx="150" cy="104" r="5" fill="var(--bg-page)" stroke="var(--line-strong)" stroke-width="1.5"></circle>
-<circle cx="40" cy="172" r="5" fill="var(--bg-page)" stroke="var(--line-strong)" stroke-width="1.5"></circle>
-<circle cx="156" cy="280" r="5" fill="var(--bg-page)" stroke="var(--line-strong)" stroke-width="1.5"></circle>
-<circle cx="46" cy="380" r="5" fill="var(--bg-page)" stroke="var(--line-strong)" stroke-width="1.5"></circle>
-<circle class="pkt" r="3.5" fill="var(--text)"><animateMotion dur="4.5s" repeatCount="indefinite" begin="-0.0s" path="M70 78 C 200 78 230 268 306 268 L 354 268 C 410 268 420 146 470 146"></animateMotion></circle>
-<circle class="pkt" r="3.5" fill="var(--text)"><animateMotion dur="4.5s" repeatCount="indefinite" begin="-0.9s" path="M128 150 C 258 150 230 268 306 268 L 354 268 C 410 268 420 218 470 218"></animateMotion></circle>
-<circle class="pkt" r="3.5" fill="var(--text)"><animateMotion dur="4.5s" repeatCount="indefinite" begin="-1.8s" path="M60 236 C 190 236 230 268 306 268 L 354 268 C 410 268 420 290 470 290"></animateMotion></circle>
-<circle class="pkt" r="3.5" fill="var(--text)"><animateMotion dur="4.5s" repeatCount="indefinite" begin="-2.7s" path="M118 330 C 248 330 230 268 306 268 L 354 268 C 410 268 420 362 470 362"></animateMotion></circle>
-<circle class="pkt" r="3.5" fill="var(--text)"><animateMotion dur="4.5s" repeatCount="indefinite" begin="-3.6s" path="M74 410 C 204 410 230 268 306 268 L 354 268 C 410 268 420 146 470 146"></animateMotion></circle>
-<circle class="pkt" r="3" fill="var(--text-muted)"><animateMotion dur="2.6s" repeatCount="indefinite" begin="-0.5s" path="M150 104 C 240 104 210 178 262 178"></animateMotion><animate attributeName="opacity" values="1;1;0" keyTimes="0;0.85;1" dur="2.6s" repeatCount="indefinite" begin="-0.5s"></animate></circle>
-<circle class="pkt" r="3" fill="var(--text-muted)"><animateMotion dur="2.6s" repeatCount="indefinite" begin="-1.6s" path="M40 172 C 130 172 210 215 262 215"></animateMotion><animate attributeName="opacity" values="1;1;0" keyTimes="0;0.85;1" dur="2.6s" repeatCount="indefinite" begin="-1.6s"></animate></circle>
-<circle class="pkt" r="3" fill="var(--text-muted)"><animateMotion dur="2.6s" repeatCount="indefinite" begin="-2.7s" path="M156 280 C 246 280 210 275 262 275"></animateMotion><animate attributeName="opacity" values="1;1;0" keyTimes="0;0.85;1" dur="2.6s" repeatCount="indefinite" begin="-2.7s"></animate></circle>
-<circle class="pkt" r="3" fill="var(--text-muted)"><animateMotion dur="2.6s" repeatCount="indefinite" begin="-3.8s" path="M46 380 C 136 380 210 330 262 330"></animateMotion><animate attributeName="opacity" values="1;1;0" keyTimes="0;0.85;1" dur="2.6s" repeatCount="indefinite" begin="-3.8s"></animate></circle>
+const MONO = 'JetBrains Mono, monospace';
+const ROW_H = 56;
+const FIRST_Y = 84;
+
+/** One request per row. `via` is how the caller sends the token; `key` is what the service gets. */
+const REQUESTS = [
+  { method: 'GET', path: '/p/sonarr/api/v3/series', via: '?token=pst_8f2a…', to: 'sonarr/api/v3/series', key: 'X-Api-Key: ••••••3c1a', status: 200 },
+  { method: 'GET', path: '/p/plex/library/sections', via: 'X-Postern: pst_19bd…', to: 'plex/library/sections', key: '?X-Plex-Token=••••w7Qe', status: 200 },
+  { method: 'GET', path: '/p/radarr/api/v3/movie', via: 'no token', status: 401 },
+  { method: 'GET', path: '/p/jellyfin/Items', via: 'Bearer pst_c04e…', to: 'jellyfin/Items', key: 'Authorization: ••••••e91f', status: 200 },
+  { method: 'POST', path: '/p/sabnzbd/api', via: '?token=pst_77aa…', to: 'sabnzbd/api', key: '?apikey=••••••0b2d', status: 200 },
+  { method: 'GET', path: '/p/prowlarr/api/v1/search', via: '?token=pst_d3… (paused)', status: 403 },
+  { method: 'GET', path: '/p/qbit/api/v2/torrents', via: 'Bearer pst_5e10…', to: 'qbit/api/v2/torrents', key: 'Basic ••••:••••', status: 200 },
+];
+
+function text(x, y, size, fill, body, extra = '') {
+  return `<text x="${x}" y="${y}" font-family="${MONO}" font-size="${size}" fill="${fill}"${extra}>${body}</text>`;
+}
+
+function row(req, i) {
+  const y = FIRST_Y + ROW_H * i;
+  const ok = !!req.to;
+  const tone = ok ? 'var(--pk-ok)' : 'var(--pk-warn)';
+  const badge = ok ? 'var(--pk-ok-bg)' : 'var(--pk-warn-bg)';
+  const out = [
+    text(24, y, 11.5, 'var(--pk-mute)', req.method),
+    text(req.method === 'POST' ? 59 : 52, y, 11.5, 'var(--pk-ink)', req.path),
+    text(24, y + 18, 11, ok ? 'var(--pk-soft)' : 'var(--pk-warn)', req.via),
+  ];
+  if (ok) {
+    out.push(
+      `<path d="M308 ${y + 6} H330" stroke="var(--pk-soft)" stroke-opacity=".5" stroke-width="1.25"/>`,
+      `<path d="M326 ${y + 2} l4 4 -4 4" fill="none" stroke="var(--pk-soft)" stroke-opacity=".5" stroke-width="1.25"/>`,
+      text(344, y, 11.5, 'var(--pk-ink)', req.to),
+      text(344, y + 18, 11, tone, req.key),
+    );
+  } else {
+    out.push(
+      `<path d="M320 ${y + 2} l8 8 M328 ${y + 2} l-8 8" stroke="${tone}" stroke-width="1.75" stroke-linecap="round"/>`,
+      text(344, y + 9, 11, 'var(--pk-mute)', 'never forwarded', ' font-style="italic"'),
+    );
+  }
+  out.push(
+    `<rect x="580" y="${y - 5}" width="36" height="19" rx="5" fill="${badge}"/>`,
+    text(598, y + 9, 11, tone, String(req.status), ' text-anchor="middle" font-weight="700"'),
+  );
+  return out.join('');
+}
+
+/** Two passes over the list so the scroll can wrap without a jump. */
+function rows() {
+  const all = [...REQUESTS, ...REQUESTS];
+  return all.map(row).join('');
+}
+
+/** Hold each row for a beat, then move up by one row; the last step lands on the second pass. */
+function scroll() {
+  const steps = REQUESTS.length;
+  // Seconds per row. 50% faster than the original 2.2s.
+  const dur = (2.2 / 1.5) * steps;
+  const values = [];
+  const keyTimes = [];
+  const move = 0.22;
+  for (let s = 0; s < steps; s++) {
+    const t0 = s / steps;
+    const t1 = (s + 1) / steps;
+    const y = -ROW_H * s;
+    const next = -ROW_H * (s + 1);
+    values.push(`0 ${y}`, `0 ${y}`);
+    keyTimes.push(t0, t1 - (t1 - t0) * move);
+    if (s === steps - 1) {
+      values.push(`0 ${next}`);
+      keyTimes.push(1);
+    }
+  }
+  return `<animateTransform attributeName="transform" type="translate" values="${values.join(';')}" keyTimes="${keyTimes
+    .map((k) => k.toFixed(4))
+    .join(';')}" dur="${dur}s" repeatCount="indefinite"/>`;
+}
+
+function markup(animate) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Each request arrives with a Postern token; Postern swaps it for the service's real key, shown masked. Refused requests are never forwarded." class="postern-illustration pk-art" fill="none">
+<defs>
+<clipPath id="pk-clip"><rect x="0" y="50" width="640" height="410"/></clipPath>
+<linearGradient id="pk-fade-top" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--bg-surface)"/><stop offset="1" stop-color="var(--bg-surface)" stop-opacity="0"/></linearGradient>
+<linearGradient id="pk-fade-bottom" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--bg-surface)" stop-opacity="0"/><stop offset="1" stop-color="var(--bg-surface)"/></linearGradient>
+</defs>
+<text x="24" y="28" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="600" letter-spacing="1.5" fill="var(--pk-mute)">CALLER SENDS</text>
+<text x="344" y="28" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="600" letter-spacing="1.5" fill="var(--pk-mute)">SERVICE RECEIVES</text>
+<g clip-path="url(#pk-clip)"><g>${rows()}${animate ? scroll() : ''}</g></g>
+<rect x="0" y="50" width="640" height="56" fill="url(#pk-fade-top)"/>
+<rect x="0" y="404" width="640" height="56" fill="url(#pk-fade-bottom)"/>
+<path d="M322 46 V460" stroke="var(--pk-line)" stroke-width="2" stroke-dasharray="1 5" stroke-linecap="round"/>
+<g transform="translate(306 230)">
+<rect x="-6" y="-6" width="44" height="48" rx="10" fill="var(--bg-surface)"/>
+<path d="M4 34 V16 A12 12 0 0 1 28 16 V34" fill="var(--bg-page)" stroke="var(--pk-door)" stroke-width="2"/>
+<path d="M0 34 H32" stroke="var(--pk-door)" stroke-width="2" stroke-linecap="round"/>
+<circle cx="16" cy="20" r="2.5" fill="none" stroke="var(--pk-soft)" stroke-width="1.5"/>
+</g>
 </svg>`;
+}
 
 export function LoginIllustration() {
+  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const wrap = document.createElement('div');
-  wrap.innerHTML = MARKUP.trim();
+  wrap.innerHTML = markup(!reduce).trim();
   return wrap.firstElementChild;
 }
