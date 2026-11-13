@@ -30,12 +30,10 @@ export function CommandPalette({ onAdd, onReload, onEdit, onSettings, onUpdate }
       const items = currentItems();
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        active = items.length ? (active + 1) % items.length : 0;
-        paint();
+        setActive(items.length ? (active + 1) % items.length : 0, { scroll: true });
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        active = items.length ? (active - 1 + items.length) % items.length : 0;
-        paint();
+        setActive(items.length ? (active - 1 + items.length) % items.length : 0, { scroll: true });
       } else if (e.key === 'Enter') {
         e.preventDefault();
         const item = items[active];
@@ -61,33 +59,51 @@ export function CommandPalette({ onAdd, onReload, onEdit, onSettings, onUpdate }
     return flat;
   }
 
+  /** Rows by index, so moving the highlight never rebuilds them. */
+  let rows = [];
+
+  /**
+   * Move the highlight in place. Rebuilding the list here would replace the button under the
+   * pointer on hover, so the mousedown and mouseup of a click land on different elements and the
+   * click never fires.
+   */
+  function setActive(next, { scroll = false } = {}) {
+    active = next;
+    rows.forEach((row, i) => {
+      const on = i === active;
+      row.classList.toggle('cmd-item-active', on);
+      row.setAttribute('aria-selected', on ? 'true' : 'false');
+      if (on && scroll) row.scrollIntoView({ block: 'nearest' });
+    });
+  }
+
   function paint() {
     const sections = build();
     flat = sections.flatMap((s) => s.items);
     if (active >= flat.length) active = Math.max(0, flat.length - 1);
+    rows = [];
     listEl.replaceChildren();
     for (const sec of sections) {
       listEl.append(h('div', { className: 'cmd-section-title' }, sec.title));
       for (const item of sec.items) {
         const idx = flat.indexOf(item);
-        listEl.append(
-          h(
-            'button',
-            {
-              type: 'button',
-              role: 'option',
-              'aria-selected': idx === active,
-              className: `cmd-item${idx === active ? ' cmd-item-active' : ''}${item.danger ? ' cmd-item-danger' : ''}`,
-              onMouseEnter: () => {
-                active = idx;
-                paint();
-              },
-              onClick: () => run(item),
+        const row = h(
+          'button',
+          {
+            type: 'button',
+            role: 'option',
+            'aria-selected': idx === active ? 'true' : 'false',
+            className: `cmd-item${idx === active ? ' cmd-item-active' : ''}${item.danger ? ' cmd-item-danger' : ''}`,
+            onMouseEnter: () => {
+              if (idx !== active) setActive(idx);
             },
-            Icon(item.icon || 'search', { size: 16, className: 'shrink-0 text-muted' }),
-            h('span', { className: 'flex-1 text-left truncate' }, item.label),
-          ),
+            onClick: () => run(item),
+          },
+          Icon(item.icon || 'search', { size: 16, className: 'shrink-0 text-muted' }),
+          h('span', { className: 'flex-1 text-left truncate' }, item.label),
         );
+        rows[idx] = row;
+        listEl.append(row);
       }
     }
     if (!flat.length) {
