@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -169,23 +170,50 @@ type Store struct {
 	settingsPath string
 	settings     Settings
 	data         map[string]Service
+	// codec seals the data file. Nil means it is stored as plain JSON.
+	codec *fileCodec
 }
 
+// Encrypted reports whether the data file is stored encrypted: a key was
+// given at start-up, so every save is sealed.
+func (s *Store) Encrypted() bool {
+	return s != nil && s.codec != nil
+}
+
+// OpenStore opens the data file, encrypted when POSTERN_KEY or POSTERN_KEY_FILE
+// is set. See openStore for what happens to each combination.
 func OpenStore(path string) (*Store, error) {
+	codec, err := codecFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	return openStore(path, codec)
+}
+
+// openStore opens the data file with an optional key.
+//
+//	plain file,     no key: used as is
+//	plain file,     key:    loaded, then encrypted in place right now
+//	encrypted file, key:    decrypted in memory only
+//	encrypted file, no key, or the wrong key: an error, and nothing is
+//	                written, so the file can never be replaced by an empty store
+func openStore(path string, codec *fileCodec) (*Store, error) {
 	s := &Store{
 		path:         path,
 		settingsPath: settingsPathFor(path),
 		data:         map[string]Service{},
 		settings:     defaultSettings(),
+		codec:        codec,
 	}
 	file, hadSettings, err := readSettingsFile(s.settingsPath)
 	if err != nil {
 		return nil, err
 	}
 	var (
-		inline *settingsFile
-		raw    []legacyService
-		dirty  bool
+		inline     *settingsFile
+		raw        []legacyService
+		dirty      bool
+		encryptNow bool
 	)
 	b, err := os.ReadFile(path)
 	switch {
@@ -193,9 +221,17 @@ func OpenStore(path string) (*Store, error) {
 	case err != nil:
 		return nil, err
 	default:
-		inline, raw, dirty, err = decodeStore(b)
+		plain, wasEncrypted, derr := codec.Decode(b)
+		if derr != nil {
+			return nil, fmt.Errorf("%s: %w", path, derr)
+		}
+		inline, raw, dirty, err = decodeStore(plain)
 		if err != nil {
 			return nil, err
+		}
+		if codec != nil && !wasEncrypted && len(bytes.TrimSpace(b)) > 0 {
+			dirty = true
+			encryptNow = true
 		}
 	}
 
@@ -242,6 +278,9 @@ func OpenStore(path string) (*Store, error) {
 		s.mu.Unlock()
 		if err != nil {
 			return nil, err
+		}
+		if encryptNow {
+			log.Printf("encrypted the data file in place: %s", path)
 		}
 	}
 	return s, nil
@@ -297,11 +336,41 @@ func (s *Store) saveLocked() error {
 			return errors.New("refusing to persist service with empty token")
 		}
 	}
+	out := b
+	if s.codec != nil {
+		if out, err = s.codec.Encode(b); err != nil {
+			return err
+		}
+	}
 	tmp := s.path + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o600); err != nil {
+	if err := os.WriteFile(tmp, out, 0o600); err != nil {
 		return err
 	}
+	// An encrypted file is read back and compared before it replaces the
+	// current one, so a bad write can never destroy the only good copy.
+	if s.codec != nil {
+		if err := verifySaved(tmp, s.codec, b); err != nil {
+			os.Remove(tmp)
+			return err
+		}
+	}
 	return os.Rename(tmp, s.path)
+}
+
+// verifySaved opens the encrypted file at path and checks it holds want.
+func verifySaved(path string, codec *fileCodec, want []byte) error {
+	got, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("verifying the saved file: %w", err)
+	}
+	plain, encrypted, err := codec.Decode(got)
+	if err != nil {
+		return fmt.Errorf("verifying the saved file: %w", err)
+	}
+	if !encrypted || !bytes.Equal(plain, want) {
+		return errors.New("verifying the saved file: the contents do not match")
+	}
+	return nil
 }
 
 func (s *Store) Get(name string) (Service, bool) {
@@ -397,7 +466,26 @@ func CheckFile(path string) ([]string, error) {
 	if len(strings.TrimSpace(string(b))) == 0 {
 		return []string{"file is empty"}, nil
 	}
-	inline, raw, _, err := decodeStore(b)
+	codec, err := codecFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	plain, _, err := codec.Decode(b)
+	switch {
+	case errors.Is(err, errKeyRequired):
+		// Without a key only the envelope can be checked.
+		if env, _ := parseEnvelope(b); env.Postern != "" {
+			if _, _, _, derr := env.open(); derr != nil {
+				return []string{"the encrypted data file is damaged: " + derr.Error()}, nil
+			}
+		}
+		return nil, errContentsNotChecked
+	case errors.Is(err, errWrongKey):
+		return nil, err
+	case err != nil:
+		return []string{err.Error()}, nil
+	}
+	inline, raw, _, err := decodeStore(plain)
 	if err != nil {
 		return nil, fmt.Errorf("invalid json: %s", err)
 	}

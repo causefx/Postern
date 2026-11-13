@@ -96,6 +96,8 @@ function createController({ onReady }) {
   const open = new Set(['rate']);
   let saving = false;
   let loaded = false;
+  /** Whether the data file is encrypted at rest. Read-only: it is set by an environment variable. */
+  let encrypted = false;
   let loadError = '';
 
   const listHost = h('div', { className: 'settings-list' });
@@ -293,7 +295,20 @@ function createController({ onReady }) {
       shown += 1;
     }
     if (!shown) listHost.append(h('p', { className: 'settings-empty' }, 'No matching settings.'));
+    else if (group === 'all' && !query.trim()) listHost.append(storageNote());
     sync();
+  }
+
+  /** Read-only: whether the file holding upstream keys and tokens is encrypted. */
+  function storageNote() {
+    return h(
+      'p',
+      { className: `settings-storage${encrypted ? ' is-encrypted' : ''}` },
+      h('strong', {}, 'Stored data: '),
+      encrypted
+        ? 'encrypted at rest.'
+        : 'not encrypted. Set POSTERN_KEY or POSTERN_KEY_FILE and restart to encrypt the file that holds your upstream keys and tokens.',
+    );
   }
 
   function rateBody() {
@@ -512,6 +527,7 @@ function createController({ onReady }) {
       draft = { ...saved };
       oidcConfigured = !!data.oidc;
       oidcSession = !!data.oidcSession;
+      encrypted = data.encrypted === true;
       loaded = true;
       loadError = '';
       if (sessionStorage.getItem('postern-password-off') === '1' && oidcConfigured) {

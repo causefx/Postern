@@ -150,7 +150,7 @@ Postern keeps its state in a few files in one directory (`data/` by default, `/d
 
 | File | Holds | Secrets |
 |---|---|---|
-| `postern-data.json` (`POSTERN_DATA`) | services: upstream credentials and caller tokens | **yes** |
+| `postern-data.json` (`POSTERN_DATA`) | services: upstream credentials and caller tokens | **yes** (encrypted when a key is set) |
 | `postern-settings.json` (`POSTERN_SETTINGS`) | `activityLimit`, `rateLimit`, `auditLimit`, `passwordLogin` | no |
 | `postern-data.json.audit` | admin changes | no |
 | `postern-data.json.activity` | recent requests | no |
@@ -184,6 +184,66 @@ POSTERN_DATA=data/postern-data.json go run ./cmd/postern check
 
 Problems go to stderr and the command exits 1. Valid files print `ok` and exit 0. It never creates or changes a file.
 
+### Encryption at rest
+
+The data file holds your upstream credentials and caller tokens. Give Postern a key and it stores that file encrypted: AES-256-GCM, with the key derived from your passphrase by PBKDF2-HMAC-SHA256 (600,000 iterations, random salt). Settings and the audit, activity and usage files hold no secrets and stay plain.
+
+```bash
+openssl rand -base64 32 > postern.key        # a random key is best; any passphrase works
+export POSTERN_KEY_FILE=$PWD/postern.key     # or POSTERN_KEY='...'
+go run ./cmd/postern
+```
+
+Prefer `POSTERN_KEY_FILE`: environment variables show up in `docker inspect` and `/proc`. Set only one of the two. Docker or Compose with a secret:
+
+```yaml
+services:
+  postern:
+    image: ghcr.io/causefx/postern:latest
+    environment:
+      ADMIN_PASSWORD: choose-a-strong-password
+      POSTERN_KEY_FILE: /run/secrets/postern_key
+    secrets: [postern_key]
+    volumes: [postern-data:/data]
+secrets:
+  postern_key:
+    file: ./postern.key
+volumes:
+  postern-data:
+```
+
+What happens at start-up:
+
+| Data file | Key | Result |
+|---|---|---|
+| none | none | plain file on the first save, as before. The log says it is not encrypted |
+| none | set | encrypted from the first save |
+| plain | none | used as is |
+| plain | set | read, then **encrypted in place immediately**. No plaintext backup is kept |
+| encrypted | right key | decrypted in memory only. Every save is sealed again |
+| encrypted | wrong key | refuses to start. Nothing is written |
+| encrypted | none | refuses to start. Nothing is written |
+
+An encrypted file is never replaced by an empty one. Each save is read back and checked before it replaces the old file. The Settings drawer shows whether the data file is encrypted, and `/admin/api/meta` reports `encrypted`.
+
+**Back up first, and keep the key somewhere else.** If you lose the key, the secrets cannot be recovered. Restore a backup or add the services again. A backup of the data file is useless without the key, and a copy of the key is useless without the file.
+
+These commands rewrite the data file, so **stop the server first**:
+
+```bash
+# Change the key
+POSTERN_KEY_FILE=old.key POSTERN_NEW_KEY_FILE=new.key postern rekey
+# then start with POSTERN_KEY_FILE=new.key
+
+# Turn encryption off
+POSTERN_KEY_FILE=old.key postern decrypt
+# then unset POSTERN_KEY and POSTERN_KEY_FILE, or the next start encrypts it again
+```
+
+`postern check` also reads an encrypted file: with the key it checks the contents, without it only that the envelope is intact.
+
+This protects the file at rest: copies, backups, disk images, a leaked volume. It does not protect a running server, where secrets and the key are in memory, and it does not help against someone who has both the file and the key. A signed-in admin can still see caller tokens in the UI, as before. Versions from before encryption cannot read an encrypted file; run `decrypt` before going back.
+
 ## Environment
 
 | Variable | Default | Meaning |
@@ -193,6 +253,9 @@ Problems go to stderr and the command exits 1. Valid files print `ok` and exit 0
 | `ADMIN_PASSWORD` | _(generated)_ | Admin sign-in password |
 | `POSTERN_DATA` | `data/postern-data.json` | JSON store path (services) |
 | `POSTERN_SETTINGS` | `postern-settings.json` beside the data file | Settings file path |
+| `POSTERN_KEY` | _(off)_ | Passphrase that encrypts the data file. Prefer `POSTERN_KEY_FILE` |
+| `POSTERN_KEY_FILE` | _(off)_ | Path to a file holding that passphrase. Not with `POSTERN_KEY` |
+| `POSTERN_NEW_KEY`, `POSTERN_NEW_KEY_FILE` | _(off)_ | The new key, for `postern rekey` only |
 | `POSTERN_SECURE` | _(auto)_ | Cookie / origin HTTPS mode (see above) |
 | `POSTERN_DEV` | _(off)_ | Serve UI from `./web` on disk (no rebuild for JS/HTML/CSS). Run from repo root. `npm run dev` sets it for you. |
 | `POSTERN_OIDC_ISSUER` | _(off)_ | OpenID Connect issuer. Also set `POSTERN_OIDC_CLIENT_ID`. See above |

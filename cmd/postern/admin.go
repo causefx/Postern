@@ -242,6 +242,7 @@ func (a *App) settingsPayload(s Settings, r *http.Request) map[string]any {
 		"oidc":          a.oidc != nil,
 		"oidcLabel":     label,
 		"oidcSession":   a.sessions != nil && a.sessions.viaOIDC(sessionID(r)),
+		"encrypted":     a.store.Encrypted(),
 		"defaults": map[string]any{
 			"activityLimit": defaultActivityLimit,
 			"rateLimit":     defaultRateLimit,
@@ -377,6 +378,7 @@ func (a *App) meta(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, 200, map[string]any{
 		"version":      Version,
+		"encrypted":    a.store.Encrypted(),
 		"secure":       secure,
 		"listen":       r.Host,
 		"publicOrigin": scheme + "://" + r.Host,

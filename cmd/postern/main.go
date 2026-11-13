@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"log"
@@ -65,12 +66,24 @@ func env(k, def string) string {
 
 func main() {
 	dataPath := env("POSTERN_DATA", "data/postern-data.json")
-	if len(os.Args) > 1 && os.Args[1] == "check" {
-		os.Exit(checkMain(dataPath))
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "check":
+			os.Exit(checkMain(dataPath))
+		case "decrypt":
+			os.Exit(decryptMain(dataPath))
+		case "rekey":
+			os.Exit(rekeyMain(dataPath))
+		}
 	}
 	store, err := OpenStore(dataPath)
 	if err != nil {
 		log.Fatal(err)
+	}
+	if store.Encrypted() {
+		log.Printf("data file is encrypted at rest")
+	} else {
+		log.Printf("data file is not encrypted (set POSTERN_KEY or POSTERN_KEY_FILE to encrypt it)")
 	}
 	app := &App{
 		store:     store,
@@ -195,6 +208,10 @@ func withHealth(next http.Handler) http.Handler {
 
 func checkMain(path string) int {
 	problems, err := CheckFile(path)
+	if errors.Is(err, errContentsNotChecked) {
+		fmt.Println(err)
+		return 0
+	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		return 1

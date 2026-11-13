@@ -2329,6 +2329,22 @@
   font: 400 12px/1.4 var(--font-mono);
   color: var(--text-muted);
 }
+.settings-storage {
+  margin: 1.15rem 0 0;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg-sunken);
+  color: var(--text-muted);
+  font: 500 12px/1.5 Inter, system-ui, sans-serif;
+}
+.settings-storage strong {
+  color: var(--text);
+  font-weight: 700;
+}
+.settings-storage.is-encrypted strong {
+  color: var(--success);
+}
 .settings-empty {
   margin: 0.4rem 0 0.8rem;
   color: var(--text-muted);
