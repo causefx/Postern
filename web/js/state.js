@@ -4,6 +4,8 @@ const listeners = new Set();
 
 export const state = {
   meta: { secure: true, listen: '', publicOrigin: location.origin },
+  /** Result of the server's update check; null until first loaded. See GET /admin/api/update. */
+  update: null,
   services: [],
   filter: 'all', // all | live | off
   selected: [], // service names

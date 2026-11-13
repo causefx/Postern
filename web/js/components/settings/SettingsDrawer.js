@@ -2,7 +2,8 @@ import { h } from '../../lib/h.js';
 import { Button } from '../common/Button.js';
 import { Icon } from '../common/Icon.js';
 import { api } from '../../api.js';
-import { setState } from '../../state.js';
+import { setState, state } from '../../state.js';
+import { openUpdateDialog } from '../dialogs/UpdateDialog.js';
 import { showToast } from '../common/Toast.js';
 import { isMac } from '../../lib/serviceDisplay.js';
 import { SettingsAccordion } from './SettingsAccordion.js';
@@ -304,8 +305,30 @@ function createController({ onReady, initialTab = 'settings' }) {
       shown += 1;
     }
     if (!shown) listHost.append(h('p', { className: 'settings-empty' }, 'No matching settings.'));
-    else if (group === 'all' && !query.trim()) listHost.append(storageNote());
+    else if (group === 'all' && !query.trim()) listHost.append(storageNote(), versionNote());
     sync();
+  }
+
+  /** Read-only: the running version and whether the server has seen a newer release. */
+  function versionNote() {
+    const u = state.update;
+    const current = u?.current || state.meta?.version || '';
+    let status = '';
+    let action = 'Check for updates';
+    if (u?.enabled === false) status = u.reason === 'dev' ? 'development build, update checks skipped' : 'update checks are off';
+    else if (u?.available) {
+      status = `v${u.latest} is available`;
+      action = 'What’s new';
+    } else if (u?.latest) status = 'up to date';
+    return h(
+      'p',
+      { className: `settings-storage${u?.available ? ' is-update' : ''}` },
+      h('strong', {}, 'Version: '),
+      `${current ? `v${current}` : 'unknown'}${status ? ` · ${status}` : ''}. `,
+      u?.enabled === false
+        ? null
+        : h('button', { type: 'button', className: 'settings-inline-link', onClick: (e) => openUpdateDialog({ trigger: e.currentTarget }) }, action),
+    );
   }
 
   /** Read-only: whether the file holding upstream keys and tokens is encrypted. */

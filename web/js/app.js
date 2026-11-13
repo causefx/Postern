@@ -21,6 +21,7 @@ import { BulkActionBar } from './components/services/BulkActionBar.js';
 import { EmptyState } from './components/services/EmptyState.js';
 import { CommandPalette } from './components/command/CommandPalette.js';
 import { mountToast, showToast } from './components/common/Toast.js';
+import { openUpdateDialog } from './components/dialogs/UpdateDialog.js';
 import {
   openServiceDrawer,
   closeServiceDrawer,
@@ -79,6 +80,25 @@ async function openSettingsDrawer(tab) {
   if (isDrawerOpen() && !(await closeServiceDrawer())) return;
   setState({ commandOpen: false });
   openSettings({ tab });
+}
+
+function openUpdates() {
+  setState({ commandOpen: false });
+  openUpdateDialog();
+}
+
+/** Pull the server's cached update status. It never makes the server call GitHub. */
+async function loadUpdate() {
+  try {
+    const update = await api.update();
+    // Only repaint when something the UI shows has changed.
+    const prev = state.update;
+    if (!prev || prev.available !== update.available || prev.latest !== update.latest || prev.enabled !== update.enabled) {
+      setState({ update });
+    }
+  } catch {
+    /* the pill just stays as it was */
+  }
 }
 
 function openCreate() {
@@ -207,6 +227,7 @@ function render() {
       onAdd: () => openCreate(),
       onOpenCommand: () => setState({ commandOpen: true }),
       onSettings: () => openSettingsDrawer(),
+      onUpdate: () => openUpdates(),
     }),
   );
 
@@ -234,6 +255,7 @@ function render() {
     onReload: () => reload(),
     onEdit: openEdit,
     onSettings: (tab) => openSettingsDrawer(tab),
+    onUpdate: () => openUpdates(),
   });
   if (palette) root.append(palette);
 }
@@ -268,6 +290,9 @@ async function boot() {
   document.addEventListener('keydown', onKeydown);
   subscribe(render);
   await reload();
+  loadUpdate();
+  // The server checks GitHub about once a day; this only picks up its latest answer.
+  window.setInterval(loadUpdate, 30 * 60 * 1000);
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) refreshLive();
   });

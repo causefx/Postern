@@ -8,7 +8,7 @@ import { isMac } from '../../lib/serviceDisplay.js';
 import { isDrawerOpen, getDrawerName } from '../drawer/ServiceDrawer.js';
 import { isSettingsOpen } from '../settings/SettingsDrawer.js';
 
-export function DashboardHeader({ onAdd, onOpenCommand, onSettings }) {
+export function DashboardHeader({ onAdd, onOpenCommand, onSettings, onUpdate }) {
   const c = counts();
   const secure = state.meta.secure;
   const mod = isMac() ? '⌘' : 'Ctrl';
@@ -81,6 +81,21 @@ export function DashboardHeader({ onAdd, onOpenCommand, onSettings }) {
                 role: 'img',
               },
               Icon('warn', { size: 20 }),
+            )
+          : null,
+        state.update?.available
+          ? h(
+              'button',
+              {
+                type: 'button',
+                className: 'update-pill',
+                title: `Update available: v${state.update.latest} (you have v${state.update.current}). See what changed.`,
+                'aria-label': `Update available, version ${state.update.latest}`,
+                onClick: onUpdate,
+              },
+              h('span', { className: 'update-pill-dot', 'aria-hidden': 'true' }),
+              h('span', { className: 'desktop-only' }, `v${state.update.latest} available`),
+              h('span', { className: 'mobile-only' }, 'Update'),
             )
           : null,
         Button(

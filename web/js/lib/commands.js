@@ -30,7 +30,7 @@ function matches(query, text) {
 /**
  * Palette sections. Each item is { id, section, label, icon, danger?, run }.
  */
-export function commandSections({ query = '', onAdd, onReload, onEdit, onSettings } = {}) {
+export function commandSections({ query = '', onAdd, onReload, onEdit, onSettings, onUpdate } = {}) {
   const sections = [];
   const selected = state.services.filter((s) => state.selected.includes(s.name));
   const names = selected.map((s) => s.name);
@@ -115,6 +115,15 @@ export function commandSections({ query = '', onAdd, onReload, onEdit, onSetting
       label: 'Request log (all services)',
       icon: 'search',
       run: () => onSettings?.('requests'),
+    });
+  }
+  if (matches(query, 'check for updates new version changelog what\'s new release notes')) {
+    actions.push({
+      id: 'updates',
+      section: 'actions',
+      label: state.update?.available ? `Update available: v${state.update.latest}` : 'Check for updates',
+      icon: 'arrow',
+      run: () => onUpdate?.(),
     });
   }
   for (const f of [

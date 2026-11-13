@@ -244,6 +244,16 @@ POSTERN_KEY_FILE=old.key postern decrypt
 
 This protects the file at rest: copies, backups, disk images, a leaked volume. It does not protect a running server, where secrets and the key are in memory, and it does not help against someone who has both the file and the key. A signed-in admin can still see caller tokens in the UI, as before. Versions from before encryption cannot read an encrypted file; run `decrypt` before going back.
 
+## Update checks
+
+Postern tells you when a newer release exists. About a minute after start, and then once a day, the server asks the public GitHub Releases API for the latest releases and compares them with its own version. The only thing it sends is a plain `GET` with the user agent `postern-update-check`: no instance data, no telemetry.
+
+When you are behind, a **vX.Y.Z available** pill appears in the header. It opens an Updates dialog with the release notes for **every** version between yours and the latest (the newest 20, with a link to the rest). The Settings drawer and the command palette ("Check for updates") open the same dialog, and **Check now** runs a check on demand (at most one every 30 seconds).
+
+Postern only reports. It never downloads or replaces itself. The dialog says what to run: in a container, `docker compose pull && docker compose up -d`; otherwise, download the new binary and restart. Development builds (`dev` or any non-release version) skip the check. A failed check, for example with no internet access, shows a message in the dialog and never affects the proxy.
+
+Set `POSTERN_UPDATE_CHECK=off` to turn it off: no request is ever made, and the UI says checks are off.
+
 ## Environment
 
 | Variable | Default | Meaning |
@@ -256,6 +266,8 @@ This protects the file at rest: copies, backups, disk images, a leaked volume. I
 | `POSTERN_KEY` | _(off)_ | Passphrase that encrypts the data file. Prefer `POSTERN_KEY_FILE` |
 | `POSTERN_KEY_FILE` | _(off)_ | Path to a file holding that passphrase. Not with `POSTERN_KEY` |
 | `POSTERN_NEW_KEY`, `POSTERN_NEW_KEY_FILE` | _(off)_ | The new key, for `postern rekey` only |
+| `POSTERN_UPDATE_CHECK` | _(on)_ | `off` stops the daily GitHub release check. See Update checks |
+| `POSTERN_CONTAINER` | _(auto)_ | Set by the image. Tells the update dialog to suggest `docker pull` |
 | `POSTERN_SECURE` | _(auto)_ | Cookie / origin HTTPS mode (see above) |
 | `POSTERN_DEV` | _(off)_ | Serve UI from `./web` on disk (no rebuild for JS/HTML/CSS). Run from repo root. `npm run dev` sets it for you. |
 | `POSTERN_OIDC_ISSUER` | _(off)_ | OpenID Connect issuer. Also set `POSTERN_OIDC_CLIENT_ID`. See above |

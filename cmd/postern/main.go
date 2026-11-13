@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -39,6 +40,7 @@ type App struct {
 	usage     *tokenUsage
 	hits      *proxyLimiter
 	audit     *auditLog
+	updates   *updateChecker
 	adminPass string
 	oidc      *oidcClient
 	// staticDir, when set (POSTERN_DEV), serves UI assets from disk instead of embed.
@@ -93,7 +95,17 @@ func main() {
 		usage:     openTokenUsage(dataPath + ".usage"),
 		hits:      configuredProxyLimiter(store.RateLimit()),
 		audit:     newAuditLog(dataPath + ".audit"),
+		updates:   newUpdateChecker(Version, updateCheckOff()),
 		adminPass: os.Getenv("ADMIN_PASSWORD"),
+	}
+	switch app.updates.disabled {
+	case "off":
+		log.Printf("update check is off (POSTERN_UPDATE_CHECK=off)")
+	case "dev":
+		log.Printf("update check skipped: %q is not a release version", Version)
+	default:
+		log.Printf("update check is on: asks GitHub for new releases daily (set POSTERN_UPDATE_CHECK=off to disable)")
+		go app.updates.run(context.Background())
 	}
 	app.audit.setLimit(store.AuditLimit())
 	if app.adminPass == "" {
@@ -154,6 +166,8 @@ func main() {
 	adminMux.HandleFunc("GET /admin/api/settings", app.getSettings)
 	adminMux.HandleFunc("PUT /admin/api/settings", app.putSettings)
 	adminMux.HandleFunc("GET /admin/api/audit", app.listAudit)
+	adminMux.HandleFunc("GET /admin/api/update", app.getUpdate)
+	adminMux.HandleFunc("POST /admin/api/update/check", app.checkUpdate)
 	adminMux.HandleFunc("GET /admin/api/activity", app.allActivity)
 	adminMux.HandleFunc("GET /admin/api/services", app.listServices)
 	adminMux.HandleFunc("POST /admin/api/services", app.createService)
