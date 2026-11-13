@@ -168,25 +168,34 @@ export function DocsPanel({ draft }) {
               ),
             ),
           ),
-          h('span', { className: 'text-xs text-muted' }, 'Send the token as'),
-          h(
-            'div',
-            { className: 'access-seg flex-wrap' },
-            ...opts.map((o) =>
-              h(
-                'button',
-                {
-                  type: 'button',
-                  className: `access-seg-btn${sendAs === o.id ? ' access-seg-active' : ''}`,
-                  onClick: () => {
-                    sendAs = o.id;
-                    paint();
-                  },
-                },
-                o.label,
-              ),
-            ),
-          ),
+          opts.length === 1
+            ? h(
+                'p',
+                { className: 'm-0 text-xs text-muted' },
+                'Send the token as ',
+                h('span', { className: 'font-mono text-base-content' }, opts[0].label),
+              )
+            : [
+                h('span', { className: 'text-xs text-muted' }, 'Send the token as'),
+                h(
+                  'div',
+                  { className: 'access-seg flex-wrap' },
+                  ...opts.map((o) =>
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        className: `access-seg-btn${sendAs === o.id ? ' access-seg-active' : ''}`,
+                        onClick: () => {
+                          sendAs = o.id;
+                          paint();
+                        },
+                      },
+                      o.label,
+                    ),
+                  ),
+                ),
+              ],
           codeBlockWithCopy(snippet),
           h(
             'p',
