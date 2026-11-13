@@ -286,7 +286,7 @@ func TestSessionHMACSurvivesRestart(t *testing.T) {
 	}
 }
 
-func TestActivityLimitStoredInDataFile(t *testing.T) {
+func TestActivityLimitStoredInSettingsFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "d.json")
 	raw := `[{"name":"one","url":"http://127.0.0.1:9","token":"abc","enabled":true,"auth":{}}]`
@@ -300,15 +300,24 @@ func TestActivityLimitStoredInDataFile(t *testing.T) {
 	if store.ActivityLimit() != defaultActivityLimit {
 		t.Fatalf("default limit %d", store.ActivityLimit())
 	}
-	saved, err := os.ReadFile(path)
+	saved, err := os.ReadFile(filepath.Join(dir, "postern-settings.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(string(saved), `"activityLimit": 20`) || !strings.Contains(string(saved), `"rateLimit": 120`) || !strings.Contains(string(saved), `"auditLimit": 100`) || !strings.HasPrefix(strings.TrimSpace(string(saved)), "{") {
-		t.Fatalf("migrated file %s", saved)
+		t.Fatalf("settings file %s", saved)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil || strings.Contains(string(data), "activityLimit") || !strings.Contains(string(data), `"services"`) {
+		t.Fatalf("data file must hold services only: %s %v", data, err)
 	}
 
-	custom := filepath.Join(dir, "custom.json")
+	// Each data file gets its own directory, because settings sit beside it.
+	customDir := filepath.Join(dir, "custom")
+	if err := os.MkdirAll(customDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	custom := filepath.Join(customDir, "custom.json")
 	body := `{
 	  "settings": {"activityLimit": 4},
 	  "services": [{"name":"one","url":"http://127.0.0.1:9","token":"abc","tokens":[{"id":"id1","name":"default","secret":"abc"}],"enabled":true,"auth":{}}]
@@ -342,7 +351,11 @@ func TestActivityLimitStoredInDataFile(t *testing.T) {
 		t.Fatalf("reloaded ring %d", got)
 	}
 
-	bad := filepath.Join(dir, "bad.json")
+	badDir := filepath.Join(dir, "bad")
+	if err := os.MkdirAll(badDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	bad := filepath.Join(badDir, "bad.json")
 	if err := os.WriteFile(bad, []byte(`{"settings":{"activityLimit":5000},"services":[]}`), 0o600); err != nil {
 		t.Fatal(err)
 	}

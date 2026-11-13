@@ -164,39 +164,65 @@ func newToken() string {
 }
 
 type Store struct {
-	mu       sync.RWMutex
-	path     string
-	settings Settings
-	data     map[string]Service
-}
-
-// Settings is the non-secret configuration stored with the services.
-type Settings struct {
-	// ActivityLimit is how many recent requests each service keeps.
-	ActivityLimit int `json:"activityLimit"`
-	// RateLimit is how many proxy requests one client IP may make to one service per minute.
-	// Zero turns the limit off.
-	RateLimit int `json:"rateLimit"`
-	// AuditLimit is how many admin changes the activity list keeps.
-	AuditLimit int `json:"auditLimit"`
-	// PasswordLogin allows the admin password. It stays on unless OIDC is configured.
-	PasswordLogin bool `json:"passwordLogin"`
+	mu           sync.RWMutex
+	path         string
+	settingsPath string
+	settings     Settings
+	data         map[string]Service
 }
 
 func OpenStore(path string) (*Store, error) {
-	s := &Store{path: path, data: map[string]Service{}, settings: defaultSettings()}
+	s := &Store{
+		path:         path,
+		settingsPath: settingsPathFor(path),
+		data:         map[string]Service{},
+		settings:     defaultSettings(),
+	}
+	file, hadSettings, err := readSettingsFile(s.settingsPath)
+	if err != nil {
+		return nil, err
+	}
+	var (
+		inline *settingsFile
+		raw    []legacyService
+		dirty  bool
+	)
 	b, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return s, nil
-	}
-	if err != nil {
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+	case err != nil:
 		return nil, err
+	default:
+		inline, raw, dirty, err = decodeStore(b)
+		if err != nil {
+			return nil, err
+		}
 	}
-	settings, raw, dirty, err := decodeStore(b)
-	if err != nil {
-		return nil, err
+
+	// The settings file wins. A "settings" block inside the data file comes
+	// from before the split: it only seeds a missing settings file, and is
+	// dropped from the data file either way.
+	var settingsDirty bool
+	switch {
+	case hadSettings:
+		s.settings, settingsDirty = file.resolve()
+	case inline != nil:
+		s.settings, _ = inline.resolve()
+		settingsDirty = true
+	default:
+		settingsDirty = true
 	}
-	s.settings = settings
+	if inline != nil {
+		dirty = true
+	}
+	// Settings first: if we stop between the two writes, the next start finds
+	// the settings file and only has the old block left to drop.
+	if settingsDirty {
+		if err := writeSettingsFile(s.settingsPath, s.settings); err != nil {
+			return nil, err
+		}
+	}
+
 	for _, leg := range raw {
 		svc, migrated, err := serviceFromLegacy(leg)
 		if err != nil {
@@ -221,135 +247,30 @@ func OpenStore(path string) (*Store, error) {
 	return s, nil
 }
 
-// ActivityLimit is how many recent requests each service keeps.
-func (s *Store) ActivityLimit() int {
-	if s == nil {
-		return defaultActivityLimit
-	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return normalizeActivityLimit(s.settings.ActivityLimit)
-}
-
-// UpdateSettings stores both limits and leaves the previous values in place if the save fails.
-func (s *Store) UpdateSettings(next Settings) (Settings, error) {
-	if s == nil {
-		return Settings{}, errors.New("no store")
-	}
-	next = Settings{
-		ActivityLimit: normalizeActivityLimit(next.ActivityLimit),
-		RateLimit:     normalizeRateLimit(next.RateLimit),
-		AuditLimit:    normalizeAuditLimit(next.AuditLimit),
-		PasswordLogin: next.PasswordLogin,
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	prev := s.settings
-	s.settings = next
-	if err := s.saveLocked(); err != nil {
-		s.settings = prev
-		return Settings{}, err
-	}
-	return s.settings, nil
-}
-
-// RateLimit is how many proxy requests one client IP may make to one service per minute.
-// Zero means the limit is off.
-func (s *Store) RateLimit() int {
-	if s == nil {
-		return defaultRateLimit
-	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return normalizeRateLimit(s.settings.RateLimit)
-}
-
-// AuditLimit is how many admin changes the activity list keeps.
-func (s *Store) AuditLimit() int {
-	if s == nil {
-		return defaultAuditLimit
-	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return normalizeAuditLimit(s.settings.AuditLimit)
-}
-
-// PasswordLogin reports whether the stored setting allows the admin password.
-// OIDC must also be configured before a false value takes effect.
-func (s *Store) PasswordLogin() bool {
-	if s == nil {
-		return true
-	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.settings.PasswordLogin
-}
-
-func defaultSettings() Settings {
-	return Settings{
-		ActivityLimit: defaultActivityLimit,
-		RateLimit:     defaultRateLimit,
-		AuditLimit:    defaultAuditLimit,
-		PasswordLogin: true,
-	}
-}
-
-// decodeStore reads either a bare service array or {"settings","services"}.
-// dirty means the next save should rewrite the file so the setting is stored.
-func decodeStore(b []byte) (Settings, []legacyService, bool, error) {
+// decodeStore reads a bare service array or {"services": [...]}. inline is
+// the "settings" block that data files kept before settings had their own
+// file, or nil when there is none. dirty means the next save should rewrite
+// the file in the current format.
+func decodeStore(b []byte) (inline *settingsFile, services []legacyService, dirty bool, err error) {
 	trimmed := bytes.TrimSpace(b)
 	if len(trimmed) == 0 {
-		return defaultSettings(), nil, false, nil
+		return nil, nil, false, nil
 	}
 	if trimmed[0] == '[' {
 		var raw []legacyService
 		if err := json.Unmarshal(trimmed, &raw); err != nil {
-			return Settings{}, nil, false, err
+			return nil, nil, false, err
 		}
-		return defaultSettings(), raw, true, nil
+		return nil, raw, true, nil
 	}
 	var doc struct {
-		Settings struct {
-			ActivityLimit *int  `json:"activityLimit"`
-			RateLimit     *int  `json:"rateLimit"`
-			AuditLimit    *int  `json:"auditLimit"`
-			PasswordLogin *bool `json:"passwordLogin"`
-		} `json:"settings"`
+		Settings *settingsFile   `json:"settings"`
 		Services []legacyService `json:"services"`
 	}
 	if err := json.Unmarshal(trimmed, &doc); err != nil {
-		return Settings{}, nil, false, err
+		return nil, nil, false, err
 	}
-	settings := defaultSettings()
-	dirty := false
-	if doc.Settings.ActivityLimit == nil {
-		dirty = true
-	} else if n := normalizeActivityLimit(*doc.Settings.ActivityLimit); n != *doc.Settings.ActivityLimit {
-		settings.ActivityLimit = n
-		dirty = true
-	} else {
-		settings.ActivityLimit = n
-	}
-	if doc.Settings.RateLimit == nil {
-		dirty = true
-	} else if n := normalizeRateLimit(*doc.Settings.RateLimit); n != *doc.Settings.RateLimit {
-		settings.RateLimit = n
-		dirty = true
-	} else {
-		settings.RateLimit = n
-	}
-	if doc.Settings.AuditLimit == nil {
-		dirty = true
-	} else if n := normalizeAuditLimit(*doc.Settings.AuditLimit); n != *doc.Settings.AuditLimit {
-		settings.AuditLimit = n
-		dirty = true
-	} else {
-		settings.AuditLimit = n
-	}
-	if doc.Settings.PasswordLogin != nil {
-		settings.PasswordLogin = *doc.Settings.PasswordLogin
-	}
-	return settings, doc.Services, dirty, nil
+	return doc.Settings, doc.Services, false, nil
 }
 
 // saveLocked must be called with s.mu held. Writes atomically, owner-only.
@@ -360,17 +281,8 @@ func (s *Store) saveLocked() error {
 	}
 	sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
 	doc := struct {
-		Settings Settings  `json:"settings"`
 		Services []Service `json:"services"`
-	}{
-		Settings: Settings{
-			ActivityLimit: normalizeActivityLimit(s.settings.ActivityLimit),
-			RateLimit:     normalizeRateLimit(s.settings.RateLimit),
-			AuditLimit:    normalizeAuditLimit(s.settings.AuditLimit),
-			PasswordLogin: s.settings.PasswordLogin,
-		},
-		Services: list,
-	}
+	}{Services: list}
 	b, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
 		return err
@@ -485,19 +397,21 @@ func CheckFile(path string) ([]string, error) {
 	if len(strings.TrimSpace(string(b))) == 0 {
 		return []string{"file is empty"}, nil
 	}
-	_, raw, _, err := decodeStore(b)
+	inline, raw, _, err := decodeStore(b)
 	if err != nil {
 		return nil, fmt.Errorf("invalid json: %s", err)
 	}
 	var problems []string
-	if msg := activityLimitProblem(b); msg != "" {
-		problems = append(problems, msg)
-	}
-	if msg := rateLimitProblem(b); msg != "" {
-		problems = append(problems, msg)
-	}
-	if msg := auditLimitProblem(b); msg != "" {
-		problems = append(problems, msg)
+	// The settings file is what the server reads. An inline block only
+	// matters while no settings file exists yet.
+	file, hadSettings, err := readSettingsFile(settingsPathFor(path))
+	switch {
+	case err != nil:
+		problems = append(problems, err.Error())
+	case hadSettings:
+		problems = append(problems, file.problems()...)
+	case inline != nil:
+		problems = append(problems, inline.problems()...)
 	}
 	seen := map[string]bool{}
 	for i, leg := range raw {
@@ -522,62 +436,6 @@ func CheckFile(path string) ([]string, error) {
 		}
 	}
 	return problems, nil
-}
-
-func activityLimitProblem(b []byte) string {
-	trimmed := bytes.TrimSpace(b)
-	if len(trimmed) == 0 || trimmed[0] != '{' {
-		return ""
-	}
-	var doc struct {
-		Settings struct {
-			ActivityLimit *int `json:"activityLimit"`
-		} `json:"settings"`
-	}
-	if err := json.Unmarshal(trimmed, &doc); err != nil || doc.Settings.ActivityLimit == nil {
-		return ""
-	}
-	n := *doc.Settings.ActivityLimit
-	if n < 1 || n > maxActivityLimit {
-		return fmt.Sprintf("settings.activityLimit must be from 1 to %d", maxActivityLimit)
-	}
-	return ""
-}
-
-func rateLimitProblem(b []byte) string {
-	n, ok := settingsInt(b, "rateLimit")
-	if !ok {
-		return ""
-	}
-	if n < 0 || n > maxRateLimit {
-		return fmt.Sprintf("settings.rateLimit must be 0 or from 1 to %d", maxRateLimit)
-	}
-	return ""
-}
-
-func auditLimitProblem(b []byte) string {
-	n, ok := settingsInt(b, "auditLimit")
-	if !ok {
-		return ""
-	}
-	if n < 1 || n > maxAuditLimit {
-		return fmt.Sprintf("settings.auditLimit must be from 1 to %d", maxAuditLimit)
-	}
-	return ""
-}
-
-func settingsInt(b []byte, field string) (int, bool) {
-	trimmed := bytes.TrimSpace(b)
-	if len(trimmed) == 0 || trimmed[0] != '{' {
-		return 0, false
-	}
-	var doc struct {
-		Settings map[string]*int `json:"settings"`
-	}
-	if err := json.Unmarshal(trimmed, &doc); err != nil || doc.Settings[field] == nil {
-		return 0, false
-	}
-	return *doc.Settings[field], true
 }
 
 // serviceFromLegacy converts one stored record. Invalid open paths are dropped

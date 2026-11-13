@@ -128,7 +128,7 @@ export POSTERN_SECURE=1
 - A token can have an **expiry**. Set it from the token's menu in the Access tab (a date, with 7, 30 and 90 day shortcuts), or with `PATCH /admin/api/services/{name}/tokens/{id}` and `{"expiresAt": "2030-01-31T23:59:59Z"}`. An empty string removes it. Once the time passes the token is refused with `401` and `token expired`, in both access modes, and the Recent column and Usage list show `expired`. Rotating a token keeps its expiry. An expiry in the past is refused; pause or delete a token to cut it off now. Tokens with no expiry never expire.
 - Each token also shows when it last authenticated, or `Never used`. Refused calls (paused, expired, unknown) do not count.
 - A switched-off service answers `403` with `service disabled`. An unknown name is `404`.
-- Each service and client IP can make `settings.rateLimit` proxy requests per minute (default 120, at most 10000), including open paths. Set it to 0 to turn the limit off. The next request over the limit is `429` with an empty body. Admin routes are not counted. The limit uses the connection address, not a forwarded header. The Settings drawer saves it immediately. A hand edit applies on restart.
+- Each service and client IP can make `rateLimit` (a setting) proxy requests per minute (default 120, at most 10000), including open paths. Set it to 0 to turn the limit off. The next request over the limit is `429` with an empty body. Admin routes are not counted. The limit uses the connection address, not a forwarded header. The Settings drawer saves it immediately. A hand edit of the settings file applies on restart.
 - Caller `Cookie` headers are removed before the upstream credential is added.
 - Dial and TLS handshake wait 10s, response headers 60s, and idle connections 90s. Streams keep flushing after the headers arrive. An upstream that never sends headers returns `502`.
 - Prefer **Bearer** or a dedicated header. Query-string tokens can leak via access logs, `Referer`, and browser history.
@@ -146,23 +146,43 @@ Open paths are reachable by anyone who can hit the proxy port. Keep the list sho
 
 ### Data file
 
-Service config (including upstream secrets and Postern tokens) lives in `POSTERN_DATA` (default `data/postern-data.json`, or `/data/postern-data.json` in Docker). Treat it like a secrets store; back it up privately.
+Postern keeps its state in a few files in one directory (`data/` by default, `/data` in Docker):
 
-Admin changes are appended beside that file as `POSTERN_DATA.audit` (create, update, enable, rotate, token add, token revoke, duplicate, delete, settings). Lines do not include secrets or query strings. The Settings activity list keeps the newest `settings.auditLimit` lines (default 100, at most 5000). At about 1 MB the current file is renamed to `.audit.1` and a new one starts.
+| File | Holds | Secrets |
+|---|---|---|
+| `postern-data.json` (`POSTERN_DATA`) | services: upstream credentials and caller tokens | **yes** |
+| `postern-settings.json` (`POSTERN_SETTINGS`) | `activityLimit`, `rateLimit`, `auditLimit`, `passwordLogin` | no |
+| `postern-data.json.audit` | admin changes | no |
+| `postern-data.json.activity` | recent requests | no |
+| `postern-data.json.usage` | when each token last authenticated | no |
+
+Treat the data file like a secrets store; back it up privately.
+
+Service config (including upstream secrets and Postern tokens) lives in `POSTERN_DATA` (default `data/postern-data.json`, or `/data/postern-data.json` in Docker). It holds services only.
+
+Settings live in their own plain JSON file, `postern-settings.json`, beside the data file (set `POSTERN_SETTINGS` to put it elsewhere). It is created with the defaults on first start and is safe to edit by hand; edits apply on restart. Missing keys take their defaults, and a number outside its range is pulled back into range and the file rewritten. A settings file that is not valid JSON stops startup with an error that names it, and is left as written.
+
+```json
+{ "activityLimit": 20, "rateLimit": 120, "auditLimit": 100, "passwordLogin": true }
+```
+
+Earlier versions kept these settings inside the data file. On first start the new version copies that block into `postern-settings.json`, then rewrites the data file without it. Nothing needs doing. If a settings file already exists it wins and the old block is dropped. To go back to an older version, copy the values from `postern-settings.json` into a `settings` block in the data file, or accept the defaults.
+
+Admin changes are appended beside that file as `POSTERN_DATA.audit` (create, update, enable, rotate, token add, token revoke, duplicate, delete, settings). Lines do not include secrets or query strings. The Settings activity list keeps the newest `auditLimit` lines (a setting) (default 100, at most 5000). At about 1 MB the current file is renamed to `.audit.1` and a new one starts.
 
 When each token last authenticated is kept beside the data file as `POSTERN_DATA.usage`, so the data file is not rewritten on every request. It is flushed at most every 30 seconds, so a crash can lose the last half minute of "last used". It holds token IDs and times only, no secrets. Deleting that file just resets every token to `Never used`.
 
-Recent proxy requests (the Recent column and the Usage list) are kept beside the data file as `POSTERN_DATA.activity`. The Recent column names the caller token on the latest request (`open`, `rejected`, `off`, `limited`, or `upstream` when it was not a token). A paused token keeps its name and is marked paused. How many each service keeps is `settings.activityLimit` in the data file (default 20, at most 1000). Paths are stored with query secrets redacted. Deleting a service removes its entries. The Settings drawer saves the limit immediately and trims the log. A hand edit applies on restart.
+Recent proxy requests (the Recent column and the Usage list) are kept beside the data file as `POSTERN_DATA.activity`. The Recent column names the caller token on the latest request (`open`, `rejected`, `off`, `limited`, or `upstream` when it was not a token). A paused token keeps its name and is marked paused. How many each service keeps is `activityLimit` in the settings file (default 20, at most 1000). Paths are stored with query secrets redacted. Deleting a service removes its entries. The Settings drawer saves the limit immediately and trims the log.
 
 `GET /healthz` on the proxy listener and the admin listener returns `ok` with no authentication and does not call an upstream.
 
-Check a data file without starting the server:
+Check the data file and the settings file without starting the server:
 
 ```bash
 POSTERN_DATA=data/postern-data.json go run ./cmd/postern check
 ```
 
-Problems go to stderr and the command exits 1. A valid file prints `ok` and exits 0.
+Problems go to stderr and the command exits 1. Valid files print `ok` and exit 0. It never creates or changes a file.
 
 ## Environment
 
@@ -171,7 +191,8 @@ Problems go to stderr and the command exits 1. A valid file prints `ok` and exit
 | `LISTEN` | `:8080` | Proxy listen address (`/p/...`) |
 | `ADMIN_LISTEN` | _(empty)_ | If set, admin UI/API bind here only |
 | `ADMIN_PASSWORD` | _(generated)_ | Admin sign-in password |
-| `POSTERN_DATA` | `data/postern-data.json` | JSON store path |
+| `POSTERN_DATA` | `data/postern-data.json` | JSON store path (services) |
+| `POSTERN_SETTINGS` | `postern-settings.json` beside the data file | Settings file path |
 | `POSTERN_SECURE` | _(auto)_ | Cookie / origin HTTPS mode (see above) |
 | `POSTERN_DEV` | _(off)_ | Serve UI from `./web` on disk (no rebuild for JS/HTML/CSS). Run from repo root. `npm run dev` sets it for you. |
 | `POSTERN_OIDC_ISSUER` | _(off)_ | OpenID Connect issuer. Also set `POSTERN_OIDC_CLIENT_ID`. See above |

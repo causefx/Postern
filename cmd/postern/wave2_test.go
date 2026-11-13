@@ -299,7 +299,14 @@ func TestSettingsSaveAppliesLive(t *testing.T) {
 		t.Fatalf("reject %d", bad.Code)
 	}
 
-	off := filepath.Join(dir, "off.json")
+	// Check reads the settings file beside each data file, so each fixture gets its own directory.
+	offDir, hugeDir := filepath.Join(dir, "off"), filepath.Join(dir, "huge")
+	for _, d := range []string{offDir, hugeDir} {
+		if err := os.MkdirAll(d, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	off := filepath.Join(offDir, "off.json")
 	if err := os.WriteFile(off, []byte(`{"settings":{"activityLimit":20,"rateLimit":0},"services":[]}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -307,7 +314,7 @@ func TestSettingsSaveAppliesLive(t *testing.T) {
 	if err != nil || len(problems) != 0 {
 		t.Fatalf("check off %v %v", problems, err)
 	}
-	huge := filepath.Join(dir, "huge.json")
+	huge := filepath.Join(hugeDir, "huge.json")
 	if err := os.WriteFile(huge, []byte(`{"settings":{"rateLimit":10001},"services":[]}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
