@@ -6,93 +6,153 @@ export function auditServices(entries) {
   return [...names].sort((a, b) => a.localeCompare(b));
 }
 
-export function auditHeadline(ev) {
-  const name = ev.service || '';
+const text = (s) => ({ text: s });
+const name = (s) => ({ text: s, strong: true });
+
+/**
+ * The row title as parts: plain verb text, and entity names (service, token) marked strong.
+ * Returns [{ text, strong? }].
+ */
+export function auditTitle(ev) {
+  const svc = ev.service ? [name(ev.service)] : [];
+  const token = name(ev.token || 'caller');
   switch (ev.action) {
     case 'update':
-      return ev.from ? { before: `Renamed ${ev.from} to `, name } : { before: 'Updated ', name };
+      return ev.from ? [text('Renamed '), name(ev.from), text(' to '), ...svc] : [text('Updated '), ...svc];
     case 'rotate':
-      return { before: `Rotated the ${ev.token || 'caller'} token for `, name };
+      return [text('Rotated the '), token, text(' token for '), ...svc];
     case 'token_add':
-      return { before: `Added the ${ev.token || 'caller'} token for `, name };
+      return [text('Added the '), token, text(' token for '), ...svc];
     case 'token_revoke':
-      return { before: `Revoked the ${ev.token || 'caller'} token for `, name };
+      return [text('Revoked the '), token, text(' token for '), ...svc];
     case 'token_pause':
-      return {
-        before: ev.paused ? `Paused the ${ev.token || 'caller'} token for ` : `Resumed the ${ev.token || 'caller'} token for `,
-        name,
-      };
+      return [text(ev.paused ? 'Paused the ' : 'Resumed the '), token, text(' token for '), ...svc];
     case 'token_expiry':
-      return {
-        before: ev.expires
-          ? `Set the ${ev.token || 'caller'} token to expire ${new Date(ev.expires).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} for `
-          : `Removed the expiry on the ${ev.token || 'caller'} token for `,
-        name,
-      };
+      if (!ev.expires) return [text('Removed the expiry on the '), token, text(' token for '), ...svc];
+      return [
+        text('Set the '),
+        token,
+        text(` token to expire ${new Date(ev.expires).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} for `),
+        ...svc,
+      ];
     case 'create':
-      return { before: 'Created ', name };
+      return [text('Created '), ...svc];
     case 'delete':
-      return { before: 'Deleted ', name };
+      return [text('Deleted '), ...svc];
     case 'enable':
-      return { before: ev.enabled ? 'Turned on ' : 'Turned off ', name };
+      return [text(ev.enabled ? 'Turned on ' : 'Turned off '), ...svc];
     case 'duplicate':
-      return ev.from ? { before: `Duplicated ${ev.from} as `, name } : { before: 'Duplicated ', name };
+      return ev.from ? [text('Duplicated '), name(ev.from), text(' as '), ...svc] : [text('Duplicated '), ...svc];
     case 'settings':
-      return { before: 'Changed settings', name: '' };
+      return [text('Changed settings')];
     default:
-      return { before: ev.action ? `${ev.action} ` : 'Changed ', name };
+      return [text(ev.action ? `${ev.action} ` : 'Changed '), ...svc];
   }
 }
 
-export function auditDetail(ev) {
+const KNOWN_ACTIONS = new Set([
+  'update',
+  'rotate',
+  'token_add',
+  'token_revoke',
+  'token_pause',
+  'token_expiry',
+  'create',
+  'delete',
+  'enable',
+  'duplicate',
+  'settings',
+]);
+
+const BASE_FIELDS = new Set(['time', 'action', 'service']);
+
+/** The extra fields of an entry, one short string each, shown as chips. Empty when there are none. */
+export function auditChips(ev) {
   if (ev.action === 'settings') {
     const bits = [];
     if (ev.rate != null) bits.push(ev.rate === 0 ? 'rate off' : `rate ${ev.rate}`);
     if (ev.activity != null) bits.push(`activity ${ev.activity}`);
     if (ev.audit != null) bits.push(`audit ${ev.audit}`);
     if (ev.passwordLogin != null) bits.push(ev.passwordLogin ? 'password on' : 'password off');
-    return bits.join(' · ');
+    return bits;
   }
-  return ev.url ? `url → ${ev.url}` : '';
+  if (!KNOWN_ACTIONS.has(ev.action)) {
+    return Object.entries(ev)
+      .filter(([key, value]) => !BASE_FIELDS.has(key) && value != null && value !== '')
+      .map(([key, value]) => `${key} ${value}`);
+  }
+  return ev.url ? [`url → ${ev.url}`] : [];
 }
 
-export function auditIcon(action) {
-  switch (action) {
+/** Icon name and tint for an entry. tone: 'success' | 'warning' | 'off' | 'neutral'. */
+export function auditIcon(ev) {
+  switch (ev.action) {
+    case 'enable':
+      return { icon: 'power', tone: ev.enabled ? 'success' : 'off' };
+    case 'token_pause':
+      return ev.paused ? { icon: 'pause', tone: 'warning' } : { icon: 'play', tone: 'success' };
     case 'update':
-      return 'pencil';
+      return { icon: 'pencil', tone: 'neutral' };
     case 'rotate':
-      return 'rotate';
+      return { icon: 'rotate', tone: 'neutral' };
     case 'delete':
     case 'token_revoke':
-      return 'trash';
-    case 'token_pause':
-      return 'pause';
+      return { icon: 'trash', tone: 'neutral' };
     case 'token_expiry':
-      return 'clock';
+      return { icon: 'clock', tone: 'neutral' };
     case 'create':
     case 'token_add':
-      return 'plus';
+      return { icon: 'plus', tone: 'neutral' };
     case 'duplicate':
-      return 'copy';
-    case 'enable':
-      return 'power';
+      return { icon: 'copy', tone: 'neutral' };
     case 'settings':
-      return 'gear';
+      return { icon: 'gear', tone: 'neutral' };
     default:
-      return 'chevron';
+      return { icon: 'dot', tone: 'neutral' };
   }
 }
 
-export function auditWhen(iso, now = new Date()) {
+const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+/** Whole calendar days between t and now (0 = today). */
+function daysAgo(t, now) {
+  return Math.round((startOfDay(now) - startOfDay(t)) / 86400000);
+}
+
+/** Local calendar date of an entry, used to group rows into one card per day. */
+export function auditDayKey(iso) {
   const t = new Date(iso);
-  if (Number.isNaN(t.getTime())) return { day: 'Earlier', meta: '' };
-  const start = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  const dayDiff = Math.round((start(now) - start(t)) / 86400000);
-  let day = t.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  if (dayDiff === 0) day = 'Today';
-  else if (dayDiff === 1) day = 'Yesterday';
-  const clock = t.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  return { day, meta: `${agoLabel(now - t)} · ${clock}` };
+  if (Number.isNaN(t.getTime())) return 'unknown';
+  return `${t.getFullYear()}-${t.getMonth()}-${t.getDate()}`;
+}
+
+/** Day heading: "Today", "Yesterday", or "Nov 10 · 2 days ago". The stylesheet upper-cases it. */
+export function auditDayLabel(iso, now = new Date()) {
+  const t = new Date(iso);
+  if (Number.isNaN(t.getTime())) return 'Earlier';
+  const diff = daysAgo(t, now);
+  if (diff <= 0) return 'Today';
+  if (diff === 1) return 'Yesterday';
+  const date = t.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    ...(t.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
+  });
+  return `${date} · ${diff} days ago`;
+}
+
+/** Time of day for a row, e.g. "4:43 PM". */
+export function auditClock(iso) {
+  const t = new Date(iso);
+  if (Number.isNaN(t.getTime())) return '';
+  return t.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
+/** Full local timestamp for the row tooltip. */
+export function auditFullTime(iso) {
+  const t = new Date(iso);
+  if (Number.isNaN(t.getTime())) return '';
+  return t.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'medium' });
 }
 
 export function agoLabel(ms) {
@@ -102,5 +162,5 @@ export function agoLabel(ms) {
   const hr = Math.round(min / 60);
   if (hr < 24) return `${hr} hr ago`;
   const day = Math.round(hr / 24);
-  return `${day} day ago`;
+  return `${day} ${day === 1 ? 'day' : 'days'} ago`;
 }

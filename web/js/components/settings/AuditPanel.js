@@ -1,6 +1,15 @@
 import { h } from '../../lib/h.js';
 import { Icon } from '../common/Icon.js';
-import { auditDetail, auditHeadline, auditIcon, auditServices, auditWhen } from '../../lib/auditDisplay.js';
+import {
+  auditChips,
+  auditClock,
+  auditDayKey,
+  auditDayLabel,
+  auditFullTime,
+  auditIcon,
+  auditServices,
+  auditTitle,
+} from '../../lib/auditDisplay.js';
 
 /** Parsed admin audit log, filtered by service name. */
 export function AuditPanel({ entries, service, onService }) {
@@ -39,42 +48,51 @@ export function AuditPanel({ entries, service, onService }) {
   );
 }
 
+/** One card per local day, newest first: a heading, then one row per change. */
 function entryList(entries) {
-  const blocks = [];
-  let day = '';
+  const days = [];
   for (const ev of entries) {
-    const when = auditWhen(ev.time);
-    if (when.day !== day) {
-      day = when.day;
-      blocks.push(h('h3', { className: 'audit-day' }, day));
-    }
-    blocks.push(entryCard(ev, when));
+    const key = auditDayKey(ev.time);
+    const last = days[days.length - 1];
+    if (last && last.key === key) last.events.push(ev);
+    else days.push({ key, label: auditDayLabel(ev.time), events: [ev] });
   }
-  return h('div', { className: 'audit-list' }, ...blocks);
+  return h(
+    'div',
+    { className: 'audit-list' },
+    ...days.map((day) =>
+      h(
+        'section',
+        { className: 'audit-day-group', 'aria-label': day.label },
+        h('h3', { className: 'audit-day' }, day.label),
+        h('div', { className: 'audit-day-card' }, ...day.events.map(entryRow)),
+      ),
+    ),
+  );
 }
 
-function entryCard(ev, when) {
-  const head = auditHeadline(ev);
-  const detail = auditDetail(ev);
+function entryRow(ev) {
+  const chips = auditChips(ev);
+  const { icon, tone } = auditIcon(ev);
   return h(
     'article',
-    { className: 'audit-item' },
-    h('span', { className: 'audit-icon', 'aria-hidden': 'true' }, Icon(auditIcon(ev.action), { size: 15 })),
+    { className: 'audit-ev' },
+    h('span', { className: `audit-ev-icon is-${tone}`, 'aria-hidden': 'true' }, Icon(icon, { size: 15 })),
     h(
       'div',
-      { className: 'audit-copy' },
+      { className: 'audit-ev-main' },
       h(
         'div',
-        { className: 'audit-title' },
-        head.before,
-        head.name ? h('span', { className: 'audit-name' }, head.name) : null,
+        { className: 'audit-ev-top' },
+        h(
+          'div',
+          { className: 'audit-ev-title' },
+          ...auditTitle(ev).map((part) => (part.strong ? h('b', {}, part.text) : part.text)),
+        ),
+        h('time', { className: 'audit-ev-time', datetime: ev.time, title: auditFullTime(ev.time) }, auditClock(ev.time)),
       ),
-      h(
-        'div',
-        { className: 'audit-sub' },
-        detail ? h('div', { className: 'audit-detail' }, detail) : null,
-        h('div', { className: 'audit-meta' }, when.meta),
-      ),
+      // Only rendered when there is something to show, so single-line rows stay single-line.
+      chips.length ? h('div', { className: 'audit-ev-meta' }, ...chips.map((c) => h('span', { className: 'audit-chip' }, c))) : null,
     ),
   );
 }

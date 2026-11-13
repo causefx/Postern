@@ -2,6 +2,7 @@ import { h } from '../../lib/h.js';
 
 const PATHS = {
   plus: '<path d="M12 5v14M5 12h14"/>',
+  dot: '<circle cx="12" cy="12" r="2.5"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
   check: '<path d="M5 12l5 5L20 7"/>',
