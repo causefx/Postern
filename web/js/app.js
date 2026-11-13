@@ -268,9 +268,6 @@ async function boot() {
     history.replaceState(null, '', location.pathname);
     openSettings();
   }
-  if (filteredServices().length && state.focusIndex < 0) {
-    setState({ focusIndex: 0 });
-  }
 }
 
 boot().catch((err) => {

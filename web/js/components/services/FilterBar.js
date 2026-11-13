@@ -27,7 +27,7 @@ export function FilterBar() {
             role: 'tab',
             'aria-selected': state.filter === t.id,
             className: `filter-tab${state.filter === t.id ? ' filter-tab-active' : ''}`,
-            onClick: () => setState({ filter: t.id, focusIndex: 0 }),
+            onClick: () => setState({ filter: t.id, focusIndex: -1 }),
           },
           t.label,
           h('span', { className: 'filter-tab-n' }, String(t.n)),

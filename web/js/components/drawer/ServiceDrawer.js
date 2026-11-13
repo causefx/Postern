@@ -53,7 +53,7 @@ export function getDrawerName() {
  * handlers: { onSaved, onDeleted, onClose, onNavigate(delta) }
  */
 export function openServiceDrawer({ mode = 'edit', service = null, handlers = {} }) {
-  closeServiceDrawer({ skipConfirm: true });
+  closeServiceDrawer({ skipConfirm: true, keepFocus: true });
   ctrl = createController({ mode, service, handlers });
   root = ctrl.el;
   document.body.append(root);
@@ -74,7 +74,11 @@ async function resolveUnsaved() {
   return choice;
 }
 
-export async function closeServiceDrawer({ skipConfirm = false } = {}) {
+/**
+ * Close the drawer. The highlighted row is cleared with it, except when the
+ * drawer is only being remounted for another row (`keepFocus`).
+ */
+export async function closeServiceDrawer({ skipConfirm = false, keepFocus = false } = {}) {
   if (!root) return true;
   if (!skipConfirm) {
     const choice = await resolveUnsaved();
@@ -84,7 +88,7 @@ export async function closeServiceDrawer({ skipConfirm = false } = {}) {
   const el = root;
   root = null;
   ctrl = null;
-  setState({ drawer: null, drawerDirty: false });
+  setState({ drawer: null, drawerDirty: false, ...(keepFocus ? {} : { focusIndex: -1 }) });
   setTimeout(() => el.remove(), 180);
   return true;
 }

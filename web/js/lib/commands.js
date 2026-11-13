@@ -118,7 +118,7 @@ export function commandSections({ query = '', onAdd, onReload, onEdit, onSetting
         section: 'actions',
         label: f.label,
         icon: 'search',
-        run: () => setState({ filter: f.id, focusIndex: 0 }),
+        run: () => setState({ filter: f.id, focusIndex: -1 }),
       });
     }
   }

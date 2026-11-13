@@ -82,8 +82,7 @@ export function clampFocus() {
     if (state.focusIndex !== -1) setState({ focusIndex: -1 });
     return;
   }
-  if (state.focusIndex < 0) setState({ focusIndex: 0 });
-  else if (state.focusIndex >= n) setState({ focusIndex: n - 1 });
+  if (state.focusIndex >= n) setState({ focusIndex: n - 1 });
 }
 
 /** Drop selection entries that no longer exist. */
@@ -99,6 +98,5 @@ export function syncListState() {
   state.selected = state.selected.filter((n) => names.has(n));
   const n = filteredServices().length;
   if (n === 0) state.focusIndex = -1;
-  else if (state.focusIndex < 0) state.focusIndex = 0;
   else if (state.focusIndex >= n) state.focusIndex = n - 1;
 }
