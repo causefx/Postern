@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/causefx/Postern/compare/v0.6.0...v0.7.0) (2026-11-13)
+
+
+### Features
+
+* add CI and Dependabot workflows, update Dockerfile and README for multi-platform support ([518cd41](https://github.com/causefx/Postern/commit/518cd413645f4ed14675ac7e728ef15ce81d569d))
+
 ## [0.6.0](https://github.com/causefx/Postern/compare/v0.5.0...v0.6.0) (2026-11-12)
 
 
