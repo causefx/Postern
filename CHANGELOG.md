@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/causefx/Postern/compare/v0.7.0...v0.8.0) (2026-11-13)
+
+
+### Features
+
+* add token expiry management and UI updates ([98d6815](https://github.com/causefx/Postern/commit/98d681529b5022d5668786783580e6e9ed3ca642))
+
 ## [0.7.0](https://github.com/causefx/Postern/compare/v0.6.0...v0.7.0) (2026-11-13)
 
 
