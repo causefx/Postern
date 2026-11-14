@@ -8,6 +8,7 @@ import { isAuthNone } from '../../lib/authPresets.js';
 import { copyValue } from '../../lib/clipboard.js';
 import { toast } from '../common/Toast.js';
 import { api } from '../../api.js';
+import { pop } from '../../lib/motion.js';
 import {
   dateInputValue,
   endOfDayISO,
@@ -21,6 +22,9 @@ import {
   scopeLabel,
   tokenState,
 } from '../../lib/tokenDisplay.js';
+
+/** Service name -> the token ids last shown, so only a token that just appeared animates in. */
+const knownTokens = new Map();
 
 /**
  * Access tab: mode cards, then shared Tokens list below.
@@ -80,6 +84,17 @@ export function AccessPanel({ draft, token, tokens = [], savedName, serviceLabel
       ),
       tokensSection(label),
     );
+    popNewTokens();
+  }
+
+  /** A token that was not on screen the last time this service's list was drawn pops in. */
+  function popNewTokens() {
+    const cards = [...wrap.querySelectorAll('.tok-card[data-tid]')];
+    const known = knownTokens.get(savedName);
+    knownTokens.set(savedName, new Set(cards.map((el) => el.dataset.tid)));
+    if (!known) return;
+    const fresh = cards.filter((el) => !known.has(el.dataset.tid));
+    if (fresh.length) requestAnimationFrame(() => fresh.forEach((el) => pop(el)));
   }
 
   function tokenRows() {
@@ -527,7 +542,7 @@ export function AccessPanel({ draft, token, tokens = [], savedName, serviceLabel
     const editing = editingScope?.id === t.id || editingExpiry === t.id;
     return h(
       'div',
-      { className: `tok-card is-${state}${editing ? ' is-open' : ''}` },
+      { className: `tok-card is-${state}${editing ? ' is-open' : ''}`, dataset: t.id ? { tid: t.id } : undefined },
       h(
         'div',
         { className: 'tok-row' },

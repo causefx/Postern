@@ -30,6 +30,7 @@ import {
   getDrawerName,
 } from './components/drawer/ServiceDrawer.js';
 import { copyServiceToken, toggleServiceEnabled } from './lib/serviceActions.js';
+import { reveal } from './lib/motion.js';
 import {
   openSettings,
   closeSettings,
@@ -260,6 +261,27 @@ function render() {
     onUpdate: () => openUpdates(),
   });
   if (palette) root.append(palette);
+  playEntrances(main);
+}
+
+let booted = false;
+
+/**
+ * The page is rebuilt on every state change, so entrances are remembered by name (see reveal):
+ * the header and filter bar come in once, a service row comes in the first time it is on screen.
+ */
+function playEntrances(main) {
+  const lead = booted ? 0 : 0.06;
+  reveal([{ key: 'shell:header', el: root.querySelector('.dash-header') }], { y: -8, duration: 0.3 });
+  if (main.firstElementChild) {
+    reveal([{ key: state.services.length ? 'shell:filter' : 'shell:empty', el: main.firstElementChild }], { delay: lead, y: 8 });
+  }
+  const rows = [...root.querySelectorAll('tr.svc-tr[data-name], .mobile-row[data-name]')].map((el) => ({
+    key: `row:${el.dataset.name}`,
+    el,
+  }));
+  reveal(rows, { delay: booted ? 0 : 0.12, step: 0.03, y: 8 });
+  booted = true;
 }
 
 async function reload() {

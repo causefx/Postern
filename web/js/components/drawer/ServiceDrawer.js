@@ -9,6 +9,7 @@ import { OpenPathsEditor } from './OpenPathsEditor.js';
 import { ServiceDrawerHeader } from './ServiceDrawerHeader.js';
 import { ServiceDrawerTabs } from './ServiceDrawerTabs.js';
 import { api } from '../../api.js';
+import { rise } from '../../lib/motion.js';
 import { slugify } from '../../lib/slug.js';
 import { authFromView, authToPayload, emptyAuth, isAuthNone } from '../../lib/authPresets.js';
 import { defaultGate, gateFromView } from '../../lib/callerGate.js';
@@ -237,6 +238,7 @@ function createController({ mode, service, handlers }) {
       if (activeTab === id) return;
       activeTab = id;
       renderActiveTab();
+      rise(panelHost.firstElementChild, { y: 6, duration: 0.26, max: 1 });
     },
   });
 

@@ -47,6 +47,7 @@ Some conventions:
 - Admin API writes need the header `X-Postern-Admin: 1` (the CSRF guard). Use it in `curl` tests.
 - Never put a secret in the audit log, the request log, the usage file, a log line or an error body.
 - The admin UI is plain JavaScript modules with no framework and no inline scripts or styles, because of its Content-Security-Policy. Use the theme variables in `web/input.css`, not fixed colours, so light and dark both work.
+- Animation goes through `web/js/lib/motion.js` (`rise`, `reveal`, `expand`, `slideIn`, `pop`), which builds on a vendored copy of [Motion](https://motion.dev)'s mini build in `web/js/vendor/`. It does nothing for people who prefer reduced motion. The dashboard repaints itself on every state change, so play an entrance once per item with `reveal` and a stable key, never from a render function directly. To upgrade Motion, bump `motion` in `package.json` and run `npm run vendor:motion`.
 - Keep user-facing text plain and short.
 
 ## Pull requests

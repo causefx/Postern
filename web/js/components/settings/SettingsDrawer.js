@@ -6,6 +6,7 @@ import { setState, state } from '../../state.js';
 import { openUpdateDialog } from '../dialogs/UpdateDialog.js';
 import { toast } from '../common/Toast.js';
 import { isMac } from '../../lib/serviceDisplay.js';
+import { expand, rise, slideIn } from '../../lib/motion.js';
 import { SettingsRow, setSummary } from './SettingsRow.js';
 import { SettingControls } from './SettingControls.js';
 import { SettingsTabs } from './SettingsTabs.js';
@@ -131,6 +132,8 @@ function createController({ onReady, initialTab = 'settings' }) {
   const open = new Set();
   let saving = false;
   let loaded = false;
+  /** The list has come in once; later repaints (typing in search, toggling a row) stay still. */
+  let listShown = false;
   /** Whether the data file is encrypted at rest. Read-only: it is set by an environment variable. */
   let encrypted = false;
   let loadError = '';
@@ -386,15 +389,21 @@ function createController({ onReady, initialTab = 'settings' }) {
     }
     if (!groups.length) listHost.append(h('p', { className: 'settings-empty' }, 'No matching settings.'));
     sync();
+    if (!listShown) {
+      listShown = true;
+      rise([...listHost.children], { delay: 0.1, step: 0.04, y: 8, max: 12 });
+    }
   }
 
   function rowFor(def) {
     const common = { id: def.id, icon: def.icon, title: def.title, hint: hintFor(def), summary: summaryFor(def.id) };
     if (def.kind === 'action') return SettingsRow({ ...common, onClick: () => showView(def.id) });
     const toggle = () => {
-      if (open.has(def.id)) open.delete(def.id);
-      else open.add(def.id);
+      const opening = !open.has(def.id);
+      if (opening) open.add(def.id);
+      else open.delete(def.id);
       paintList();
+      if (opening) expand(listHost.querySelector(`#${def.id}-panel`));
     };
     // The version row opens the update dialog, unless update checks are off and there is only a reason to read.
     if (def.id === 'version' && state.update?.enabled !== false) {
@@ -557,6 +566,12 @@ function createController({ onReady, initialTab = 'settings' }) {
     paintChrome();
     if (!sub) listHost.querySelector('[data-summary="export"]')?.closest('.settings-row')?.scrollIntoView?.({ block: 'nearest' });
     else drawerBody.scrollTop = 0;
+    slideIn(sub ? subHost : visiblePane(), sub ? 1 : -1, { distance: 24 });
+  }
+
+  /** Whichever of the three panes the tab shows. */
+  function visiblePane() {
+    return tab === 'requests' ? requestsHost : tab === 'activity' ? auditHost : listHost;
   }
 
   async function refreshAudit() {
@@ -598,6 +613,7 @@ function createController({ onReady, initialTab = 'settings' }) {
     tabsHost.replaceChildren(SettingsTabs({ tab, count: auditEntries.length, onChange: (next) => {
       tab = next;
       paintChrome();
+      rise(visiblePane(), { y: 6, duration: 0.26, max: 1 });
     } }));
     settingsTools.classList.toggle('settings-pane-hidden', tab !== 'settings');
     listHost.classList.toggle('settings-pane-hidden', tab !== 'settings');
