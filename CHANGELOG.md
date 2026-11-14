@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.0](https://github.com/causefx/Postern/compare/v0.16.0...v0.17.0) (2026-11-14)
+
+
+### Features
+
+* add example configurations for Docker Compose, Caddy, Traefik, and nginx with detailed setup instructions ([fbf9c8f](https://github.com/causefx/Postern/commit/fbf9c8f4c839067bb6ea7c9a44bc992f1f769589))
+* add screenshot functionality for admin UI and enhance screenshot publishing process ([e9776e3](https://github.com/causefx/Postern/commit/e9776e3eaf9274d5b8ed81959c9be00c99f03032))
+
 ## [0.16.0](https://github.com/causefx/Postern/compare/v0.15.0...v0.16.0) (2026-11-14)
 
 
