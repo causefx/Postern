@@ -33,6 +33,7 @@ import { copyServiceToken, toggleServiceEnabled } from './lib/serviceActions.js'
 import {
   openSettings,
   closeSettings,
+  backOrCloseSettings,
   isSettingsOpen,
   requestSettingsSave,
   showSettingsTab,
@@ -142,7 +143,7 @@ function onKeydown(e) {
     }
     if (e.key === 'Escape') {
       e.preventDefault();
-      closeSettings();
+      backOrCloseSettings();
       return;
     }
     return;

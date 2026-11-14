@@ -68,6 +68,27 @@ export const SETTING_DEFS = [
     hint: 'Allow signing in with the admin password',
     keywords: 'settings.passwordLogin oidc sso',
   },
+  // Actions, not values: they open a screen of their own and are never saved with the rest.
+  {
+    id: 'export',
+    kind: 'action',
+    icon: 'download',
+    group: 'backup',
+    groupLabel: 'Backup',
+    title: 'Export config',
+    hint: 'Download services as JSON',
+    keywords: 'backup export download save copy json redacted full secrets keys git',
+  },
+  {
+    id: 'import',
+    kind: 'action',
+    icon: 'upload',
+    group: 'backup',
+    groupLabel: 'Backup',
+    title: 'Import config',
+    hint: 'Validate and add services from a file',
+    keywords: 'backup import restore upload load json dry run overwrite migrate',
+  },
 ];
 
 export function clampRate(n) {

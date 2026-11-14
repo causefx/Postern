@@ -51,6 +51,10 @@ type auditEvent struct {
 	// Scope summarises the limit set by token_scope, such as "GET, HEAD · 2 paths". Empty means
 	// the limit was removed. It never carries a secret.
 	Scope string `json:"scope,omitempty"`
+	// Mode is "full" or "redacted" for export and import, and Detail a short count such as
+	// "8 services, 14 secrets". Neither carries a secret.
+	Mode   string `json:"mode,omitempty"`
+	Detail string `json:"detail,omitempty"`
 }
 
 type auditLog struct {

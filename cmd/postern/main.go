@@ -184,6 +184,8 @@ func main() {
 	adminMux.HandleFunc("GET /admin/api/settings", app.getSettings)
 	adminMux.HandleFunc("PUT /admin/api/settings", app.putSettings)
 	adminMux.HandleFunc("GET /admin/api/audit", app.listAudit)
+	adminMux.HandleFunc("POST /admin/api/export", app.exportConfig)
+	adminMux.HandleFunc("POST /admin/api/import", app.importConfig)
 	adminMux.HandleFunc("GET /admin/api/update", app.getUpdate)
 	adminMux.HandleFunc("POST /admin/api/update/check", app.checkUpdate)
 	adminMux.HandleFunc("GET /admin/api/activity", app.allActivity)

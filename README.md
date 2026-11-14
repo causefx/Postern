@@ -287,6 +287,45 @@ POSTERN_KEY_FILE=old.key postern decrypt
 
 This protects the file at rest: copies, backups, disk images, a leaked volume. It does not protect a running server, where secrets and the key are in memory, and it does not help against someone who has both the file and the key. A signed-in admin can still see caller tokens in the UI, as before. Versions from before encryption cannot read an encrypted file; run `decrypt` before going back.
 
+### Export and import
+
+**Settings → Backup** copies your services out as one JSON file and reads them back in. Use it to back up, to move to another instance, or to keep the shape of your setup in git.
+
+**Export config** has two modes:
+
+- **Redacted** has no secrets and is safe to commit or share. Upstream keys are written as empty strings (`"secret": ""`) and caller tokens are listed by name only.
+- **Full backup** includes every upstream key and every caller token in plain text, so it is as sensitive as an unencrypted data file. You must tick a box to build it, and each one is written to the admin log. It is not encrypted by Postern. If you want an encrypted backup, copy the data file itself while a `POSTERN_KEY` is set.
+
+The file holds services only: name, URL, upstream auth, caller gate, open paths and caller tokens (with their scope, pause and expiry). Settings and the log files are not included.
+
+```json
+{
+  "version": 1,
+  "exported": "2026-11-13T16:11:00Z",
+  "redacted": true,
+  "services": [
+    {
+      "name": "sonarr",
+      "url": "https://sonarr.example.com",
+      "enabled": true,
+      "access": "postern",
+      "auth": { "header": { "name": "X-Api-Key", "secret": "" } },
+      "openPaths": [{ "match": "prefix", "path": "/ping" }],
+      "tokens": [{ "name": "default" }, { "name": "phone", "scope": { "methods": ["GET"] } }]
+    }
+  ]
+}
+```
+
+**Import config** reads a file of either kind. Postern first checks it with a dry run and lists what it would do for each service: **create**, **overwrite**, **skip** (the name is taken) or **error**. Nothing changes until you press Import, and nothing is written unless every service passes. Misspelt field names are errors too, so a typo cannot silently drop a setting.
+
+- A service whose name already exists is skipped unless you turn on **Overwrite services with the same name**.
+- A **redacted** file has no upstream keys, so a new service that needs one is an error until you add the key to the file. When you overwrite an existing service from a redacted file, it keeps the key it has.
+- Caller tokens in a redacted file are matched by name. A token with the same name on the service being overwritten keeps its secret, so callers keep working. Any other token is created with a new secret, and tokens missing from the file are removed. A full backup brings its own secrets and token IDs back.
+- A token secret written in a file must be at least 16 characters. Leave it out and Postern makes one.
+
+The API is `POST /admin/api/export` (`{"mode":"redacted"}` or `{"mode":"full","confirm":true}`) and `POST /admin/api/import` (`{"config": <file>, "overwrite": false, "dryRun": true}`). Both need an admin session and the `X-Postern-Admin` header.
+
 ## Update checks
 
 Postern tells you when a newer release exists. About a minute after start, and then once a day, the server asks the public GitHub Releases API for the latest releases and compares them with its own version. The only thing it sends is a plain `GET` with the user agent `postern-update-check`: no instance data, no telemetry.

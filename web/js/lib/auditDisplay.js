@@ -48,6 +48,10 @@ export function auditTitle(ev) {
       return ev.from ? [text('Duplicated '), name(ev.from), text(' as '), ...svc] : [text('Duplicated '), ...svc];
     case 'settings':
       return [text('Changed settings')];
+    case 'export':
+      return [text(ev.mode === 'full' ? 'Exported a full backup' : 'Exported the config')];
+    case 'import':
+      return [text(ev.mode === 'redacted' ? 'Imported services from a redacted file' : 'Imported services from a full backup')];
     default:
       return [text(ev.action ? `${ev.action} ` : 'Changed '), ...svc];
   }
@@ -66,6 +70,8 @@ const KNOWN_ACTIONS = new Set([
   'enable',
   'duplicate',
   'settings',
+  'export',
+  'import',
 ]);
 
 const BASE_FIELDS = new Set(['time', 'action', 'service']);
@@ -87,6 +93,7 @@ export function auditChips(ev) {
       .map(([key, value]) => `${key} ${value}`);
   }
   if (ev.action === 'token_scope') return ev.scope ? [ev.scope] : [];
+  if (ev.action === 'export' || ev.action === 'import') return ev.detail ? [ev.detail] : [];
   return ev.url ? [`url → ${ev.url}`] : [];
 }
 
@@ -115,6 +122,10 @@ export function auditIcon(ev) {
       return { icon: 'copy', tone: 'neutral' };
     case 'settings':
       return { icon: 'gear', tone: 'neutral' };
+    case 'export':
+      return { icon: 'download', tone: ev.mode === 'full' ? 'warning' : 'neutral' };
+    case 'import':
+      return { icon: 'upload', tone: 'neutral' };
     default:
       return { icon: 'dot', tone: 'neutral' };
   }

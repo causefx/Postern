@@ -80,6 +80,11 @@ export const api = {
   settings: () => request('settings'),
   saveSettings: (body) => request('settings', { method: 'PUT', body: JSON.stringify(body) }),
   audit: () => request('audit'),
+  /** mode is 'redacted' or 'full'. A full export holds every secret, so it must be confirmed. */
+  exportConfig: (mode, confirm = false) => request('export', { method: 'POST', body: JSON.stringify({ mode, confirm }) }),
+  /** `config` is the parsed file. With dryRun the server only checks it and reports what it would do. */
+  importConfig: (config, { overwrite = false, dryRun = false } = {}) =>
+    request('import', { method: 'POST', body: JSON.stringify({ config, overwrite, dryRun }) }),
   update: () => request('update'),
   checkUpdate: () => request('update/check', { method: 'POST' }),
   allActivity: (limit) => request('activity' + (limit ? '?limit=' + encodeURIComponent(limit) : '')),

@@ -13,6 +13,9 @@ import { AuditPanel } from './AuditPanel.js';
 import { RequestsPanel } from './RequestsPanel.js';
 import { PasswordLoginSetting } from './PasswordLoginSetting.js';
 import { EmbedSetting } from './EmbedSetting.js';
+import { SettingsActionRow } from './SettingsActionRow.js';
+import { ExportConfig } from './ExportConfig.js';
+import { ImportConfig } from './ImportConfig.js';
 import {
   ACTIVITY_PRESETS,
   AUDIT_PRESETS,
@@ -59,6 +62,15 @@ export function closeSettings({ skipConfirm = false } = {}) {
   setState({ settingsOpen: false });
   setTimeout(() => el.remove(), 180);
   return true;
+}
+
+/** Escape and the back gesture: leave Export or Import first, then close the drawer. */
+export function backOrCloseSettings() {
+  if (ctrl?.inSubview?.()) {
+    ctrl.back();
+    return true;
+  }
+  return closeSettings();
 }
 
 /** Switch the open drawer to 'settings', 'requests' or 'activity'. */
@@ -109,6 +121,9 @@ function createController({ onReady, initialTab = 'settings' }) {
   let query = '';
   let group = 'all';
   let tab = TABS.includes(initialTab) ? initialTab : 'settings';
+  /** 'list' is the settings list and its tabs. 'export' and 'import' replace the whole drawer body. */
+  let view = 'list';
+  let sub = null;
   let auditEntries = [];
   let auditService = 'all';
   const open = new Set(['rate']);
@@ -218,6 +233,7 @@ function createController({ onReady, initialTab = 'settings' }) {
   }
 
   async function save() {
+    if (view !== 'list') return;
     if (!loaded || !isDirty() || saving || passwordBlocked() || embedError) return;
     saving = true;
     sync();
@@ -314,6 +330,11 @@ function createController({ onReady, initialTab = 'settings' }) {
       if (def.group !== lastGroup) {
         listHost.append(h('h3', { className: 'settings-group' }, def.groupLabel));
         lastGroup = def.group;
+      }
+      if (def.kind === 'action') {
+        listHost.append(SettingsActionRow({ icon: def.icon, title: def.title, hint: def.hint, onClick: () => showView(def.id) }));
+        shown += 1;
+        continue;
       }
       const isOpen = open.has(def.id);
       const body =
@@ -497,7 +518,57 @@ function createController({ onReady, initialTab = 'settings' }) {
     );
   }
 
+  /** Opens Export or Import, or goes back to the list with 'list'. */
+  function showView(next) {
+    if (next === view) return;
+    sub?.stop?.();
+    sub = null;
+    view = next;
+    if (next === 'export') sub = ExportConfig({ onChanged: refreshAudit });
+    else if (next === 'import') sub = ImportConfig({ onClose: () => showView('list'), onImported: refreshAudit });
+    subHost.replaceChildren(...(sub ? [sub.body] : []));
+    paintHeader();
+    paintChrome();
+    if (!sub) listHost.querySelector('.settings-action')?.scrollIntoView?.({ block: 'nearest' });
+    else drawerBody.scrollTop = 0;
+  }
+
+  async function refreshAudit() {
+    const log = await api.audit().catch(() => null);
+    if (!log || !root || root.querySelector('.drawer-panel') !== panel) return;
+    auditEntries = log.entries || [];
+    paintChrome();
+  }
+
+  function paintHeader() {
+    const titles = { export: 'Export config', import: 'Import config' };
+    const parts = [];
+    if (view !== 'list') {
+      parts.push(
+        Button({ variant: 'ghost', size: 'sm', square: true, 'aria-label': 'Back to settings', onClick: () => showView('list') }, Icon('back', { size: 16 })),
+      );
+    }
+    parts.push(
+      h('h2', { className: 'drawer-title font-display' }, titles[view] || 'Settings'),
+      Button({ variant: 'ghost', size: 'sm', square: true, 'aria-label': 'Close', onClick: () => closeSettings() }, Icon('close', { size: 16 })),
+    );
+    headerHost.replaceChildren(...parts);
+  }
+
   function paintChrome() {
+    const inList = view === 'list';
+    tabsHost.hidden = !inList;
+    subHost.classList.toggle('settings-pane-hidden', inList);
+    if (!inList) {
+      tabsHost.replaceChildren();
+      settingsTools.classList.add('settings-pane-hidden');
+      listHost.classList.add('settings-pane-hidden');
+      auditHost.classList.add('settings-pane-hidden');
+      requestsHost.classList.add('settings-pane-hidden');
+      requests.stop();
+      footer.replaceChildren(sub.footer);
+      return;
+    }
     tabsHost.replaceChildren(SettingsTabs({ tab, count: auditEntries.length, onChange: (next) => {
       tab = next;
       paintChrome();
@@ -538,6 +609,7 @@ function createController({ onReady, initialTab = 'settings' }) {
       ['activity', 'Logs'],
       ['signin', 'Sign-in'],
       ['security', 'Security'],
+      ['backup', 'Backup'],
     ].map(([id, label]) =>
       h(
         'button',
@@ -577,6 +649,10 @@ function createController({ onReady, initialTab = 'settings' }) {
   const requests = RequestsPanel();
   const requestsHost = h('div', { className: 'audit-host requests-host settings-pane-hidden' }, requests.el);
   const footer = h('div', { className: 'drawer-footer' });
+  const headerHost = h('div', { className: 'drawer-header' });
+  /** Export and Import fill this in place of the list. */
+  const subHost = h('div', { className: 'bk-host settings-pane-hidden' });
+  const drawerBody = h('div', { className: 'drawer-body' }, settingsTools, listHost, requestsHost, auditHost, subHost);
 
   const panel = h(
     'aside',
@@ -586,23 +662,9 @@ function createController({ onReady, initialTab = 'settings' }) {
       'aria-modal': 'true',
       'aria-label': 'Settings',
     },
-    h(
-      'div',
-      { className: 'drawer-header' },
-      h('h2', { className: 'drawer-title font-display' }, 'Settings'),
-      Button(
-        {
-          variant: 'ghost',
-          size: 'sm',
-          square: true,
-          'aria-label': 'Close',
-          onClick: () => closeSettings(),
-        },
-        Icon('close', { size: 16 }),
-      ),
-    ),
+    headerHost,
     tabsHost,
-    h('div', { className: 'drawer-body' }, settingsTools, listHost, requestsHost, auditHost),
+    drawerBody,
     footer,
   );
 
@@ -617,6 +679,7 @@ function createController({ onReady, initialTab = 'settings' }) {
     panel,
   );
 
+  paintHeader();
   paintList();
   paintChrome();
   onReady(el);
@@ -677,12 +740,17 @@ function createController({ onReady, initialTab = 'settings' }) {
     stop: () => {
       stopPoll();
       requests.stop();
+      sub?.stop?.();
     },
     showTab: (next) => {
-      if (!TABS.includes(next) || next === tab) return;
+      if (!TABS.includes(next)) return;
+      if (view !== 'list') showView('list');
+      if (next === tab) return;
       tab = next;
       paintChrome();
     },
+    inSubview: () => view !== 'list',
+    back: () => showView('list'),
     markOIDC,
   };
 }
