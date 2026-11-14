@@ -2,6 +2,39 @@
 
 A small reverse proxy that puts a front door on private services: callers get a Postern token (or use the service’s own auth shape), while the real upstream credential never leaves this server.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/desktop/dashboard-dark.webp">
+  <img src="docs/screenshots/desktop/dashboard-light.webp" alt="The Postern dashboard: eight services, each with its route, upstream, how callers get in, and what it last did" width="900">
+</picture>
+
+<table>
+<tr>
+<td width="33%" valign="top">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/desktop/edit-access-scope-dark.webp">
+  <img src="docs/screenshots/desktop/edit-access-scope-light.webp" alt="Limiting a caller token to read-only methods and one path">
+</picture>
+<br><sub>Several tokens per service, each limited to the methods and paths you choose</sub>
+</td>
+<td width="33%" valign="top">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/desktop/edit-requests-dark.webp">
+  <img src="docs/screenshots/desktop/edit-requests-light.webp" alt="A service's request log with refused requests marked">
+</picture>
+<br><sub>A request log per service, with refusals and their reasons</sub>
+</td>
+<td width="33%" valign="top">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/desktop/palette-search-dark.webp">
+  <img src="docs/screenshots/desktop/palette-search-light.webp" alt="The command palette searching for a service">
+</picture>
+<br><sub>A command palette for everything, and a layout that works on a phone</sub>
+</td>
+</tr>
+</table>
+
+More screens, light and dark, desktop and phone: the [gallery](docs/gallery.md).
+
 ## Layout
 
 | Path | What it is |
