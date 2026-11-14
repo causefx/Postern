@@ -39,7 +39,10 @@ Before you push:
 go vet ./...
 go test ./...        # CI also runs it with -race
 npm run build:css    # only if you changed web/input.css or a class name; web/app.css is committed minified
+cd e2e && npm ci && npm test    # browser tests of the admin UI, if you changed web/ (see e2e/README.md)
 ```
+
+`npm run dev` rewrites `web/app.css` unminified while it runs. Run `npm run build:css` before you commit it; CI rebuilds the file and fails if it differs.
 
 Some conventions:
 

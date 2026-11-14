@@ -36,3 +36,14 @@ updates:
     groups:
       css:
         patterns: ["*"]
+
+  # The browser tests have their own package so the Docker build never installs Playwright.
+  - package-ecosystem: npm
+    directory: /e2e
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "build"
+    groups:
+      e2e:
+        patterns: ["*"]

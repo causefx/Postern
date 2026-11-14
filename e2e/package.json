@@ -1,0 +1,14 @@
+{
+  "name": "postern-e2e",
+  "private": true,
+  "type": "module",
+  "description": "Browser smoke tests for the admin UI. Kept apart from the root package so the Docker build never installs Playwright.",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "install:browser": "playwright install --with-deps chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1"
+  }
+}
