@@ -2,7 +2,7 @@ import { h } from '../../lib/h.js';
 import { Button } from '../common/Button.js';
 import { Icon } from '../common/Icon.js';
 import { Modal, openModal, closeModal } from '../common/Modal.js';
-import { showToast } from '../common/Toast.js';
+import { toast } from '../common/Toast.js';
 import { api } from '../../api.js';
 import { setState } from '../../state.js';
 import { releaseNoteNodes } from '../../lib/releaseNotes.js';
@@ -146,10 +146,10 @@ export function openUpdateDialog({ trigger } = {}) {
       st = await api.checkUpdate();
       setState({ update: st });
       paint();
-      if (st.error) showToast(st.error, 'error');
-      else if (!st.available) showToast('You are up to date');
+      if (st.error) toast.error("Couldn't check for updates", { detail: st.error });
+      else if (!st.available) toast.success('You are up to date');
     } catch (err) {
-      showToast(err.message || 'Could not check for updates', 'error');
+      toast.error("Couldn't check for updates", { detail: err.message });
     } finally {
       checkBtn.textContent = 'Check now';
       checkBtn.disabled = !st?.enabled;

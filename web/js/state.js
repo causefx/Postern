@@ -13,7 +13,6 @@ export const state = {
   commandOpen: false,
   drawer: null, // { mode: 'create'|'edit', name?: string }
   drawerDirty: false,
-  toast: null,
 };
 
 export function subscribe(fn) {

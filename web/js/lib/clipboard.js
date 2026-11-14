@@ -1,4 +1,4 @@
-import { showToast } from '../components/common/Toast.js';
+import { toast } from '../components/common/Toast.js';
 
 function legacyCopy(text) {
   const el = document.createElement('textarea');
@@ -28,14 +28,14 @@ export async function copyText(text) {
   legacyCopy(value);
 }
 
-/** Copy to clipboard and show a "Value copied" toast. */
-export async function copyValue(text) {
+/** Copy to clipboard and show a short "copied" toast. `label` names what was copied. */
+export async function copyValue(text, label = 'Value copied') {
   const value = typeof text === 'function' ? text() : text;
   try {
     await copyText(value);
-    showToast('Value copied');
+    toast.quick(label);
   } catch {
-    showToast('Copy failed', 'error');
+    toast.error("Couldn't copy", { detail: 'The browser blocked access to the clipboard.' });
     throw new Error('Copy failed');
   }
 }

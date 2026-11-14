@@ -6,7 +6,7 @@ import { CallerGateEditor } from './CallerGateEditor.js';
 import { OpenPathsEditor } from './OpenPathsEditor.js';
 import { isAuthNone } from '../../lib/authPresets.js';
 import { copyValue } from '../../lib/clipboard.js';
-import { showToast } from '../common/Toast.js';
+import { toast } from '../common/Toast.js';
 import { api } from '../../api.js';
 import {
   dateInputValue,
@@ -88,32 +88,41 @@ export function AccessPanel({ draft, token, tokens = [], savedName, serviceLabel
     return [];
   }
 
-  async function pauseToken(t) {
+  function pauseToken(t) {
+    return setPaused(t, !t.paused, true);
+  }
+
+  /** Pauses or resumes a token. The first change offers Undo; undoing it does not offer another. */
+  async function setPaused(t, paused, undoable) {
     if (!t.id) return;
+    const name = t.name || 'token';
     try {
-      const updated = await api.setTokenPaused(savedName, t.id, !t.paused);
-      showToast(t.paused ? `Resumed ${t.name || 'token'}` : `Paused ${t.name || 'token'}`);
+      const updated = await api.setTokenPaused(savedName, t.id, paused);
+      toast.success(paused ? 'Token paused' : 'Token resumed', {
+        detail: paused ? `Calls with ${name} now get 403` : `Calls with ${name} work again`,
+        undo: undoable ? () => setPaused(t, !paused, false) : undefined,
+      });
       onTokensUpdated?.(updated);
     } catch (err) {
-      showToast(err.message, 'error');
+      toast.error("Couldn't update the token", { detail: err.message });
     }
   }
 
-  async function applyExpiry(t, iso, message) {
+  async function applyExpiry(t, iso, detail) {
     try {
       const updated = await api.setTokenExpiry(savedName, t.id, iso);
       editingExpiry = '';
-      showToast(message);
+      toast.success(iso ? 'Expiry set' : 'Expiry removed', { detail });
       onTokensUpdated?.(updated);
     } catch (err) {
-      showToast(err.message, 'error');
+      toast.error("Couldn't change the expiry", { detail: err.message });
     }
   }
 
   function saveExpiry(t, value) {
     const iso = endOfDayISO(value);
     if (!iso) {
-      showToast('Pick an expiry date', 'error');
+      toast.error('Pick an expiry date', { detail: 'Choose a day, or use 7, 30 or 90 days.' });
       return;
     }
     return applyExpiry(t, iso, `${t.name || 'Token'} expires ${value}`);
@@ -233,11 +242,11 @@ export function AccessPanel({ draft, token, tokens = [], savedName, serviceLabel
     try {
       const updated = await api.setTokenScope(savedName, t.id, open ? null : body);
       editingScope = null;
-      showToast(open ? `${t.name || 'Token'} has full access` : `Limited ${t.name || 'token'}`);
+      toast.success(open ? 'Scope removed' : 'Scope saved', { detail: open ? `${t.name || 'Token'} has full access` : `${t.name || 'Token'} is limited` });
       onTokensUpdated?.(updated);
     } catch (err) {
       draft.errors = err.errors || {};
-      showToast(err.message, 'error');
+      toast.error("Couldn't save the scope", { detail: err.message });
       paint();
     }
   }
@@ -346,10 +355,10 @@ export function AccessPanel({ draft, token, tokens = [], savedName, serviceLabel
   async function rotateToken(t) {
     try {
       const updated = t.id ? await api.rotateTokenId(savedName, t.id) : await api.rotateToken(savedName);
-      showToast(`Rotated ${t.name || 'token'}`);
+      toast.success('Token rotated', { detail: `${t.name || 'Token'} has a new secret. The old one stops working` });
       onTokensUpdated?.(updated);
     } catch (e) {
-      showToast(e.message, 'error');
+      toast.error("Couldn't rotate the token", { detail: e.message });
     }
   }
 
@@ -358,10 +367,10 @@ export function AccessPanel({ draft, token, tokens = [], savedName, serviceLabel
     if (!confirm(`Delete token ${t.name}? Callers using it will get 401.`)) return;
     try {
       const updated = await api.deleteToken(savedName, t.id);
-      showToast(`Deleted ${t.name}`);
+      toast.success('Token deleted', { detail: `Callers using ${t.name} now get 401` });
       onTokensUpdated?.(updated);
     } catch (e) {
-      showToast(e.message, 'error');
+      toast.error("Couldn't delete the token", { detail: e.message });
     }
   }
 
@@ -369,10 +378,10 @@ export function AccessPanel({ draft, token, tokens = [], savedName, serviceLabel
     try {
       const updated = await api.addToken(savedName, name);
       adding = false;
-      showToast('Token added');
+      toast.success('Token added', { detail: name ? `${name} can call this service` : 'It can call this service' });
       onTokensUpdated?.(updated);
     } catch (e) {
-      showToast(e.message, 'error');
+      toast.error("Couldn't add the token", { detail: e.message });
     }
   }
 

@@ -4,7 +4,7 @@ import { Icon } from '../common/Icon.js';
 import { api } from '../../api.js';
 import { copyText } from '../../lib/clipboard.js';
 import { downloadText, exportFilename } from '../../lib/configFile.js';
-import { showToast } from '../common/Toast.js';
+import { toast } from '../common/Toast.js';
 
 /**
  * The Export config screen: a redacted file that is safe to share, or a full backup with every
@@ -95,9 +95,10 @@ export function ExportConfig({ onChanged } = {}) {
     if (!data) return;
     try {
       await copyText(data.text);
-      showToast(mode === 'full' ? 'Backup copied. It holds every secret.' : 'Config copied');
+      if (mode === 'full') toast.warning('Backup copied', { detail: 'It holds every secret in plain text.' });
+      else toast.quick('Config copied');
     } catch {
-      showToast('Copy failed', 'error');
+      toast.error("Couldn't copy", { detail: 'The browser blocked access to the clipboard.' });
     }
   }
 
@@ -105,7 +106,9 @@ export function ExportConfig({ onChanged } = {}) {
     const data = current();
     if (!data) return;
     downloadText(exportFilename(mode), data.text);
-    showToast(mode === 'full' ? 'Backup downloaded. Keep it somewhere safe.' : 'Config downloaded');
+    const name = exportFilename(mode);
+    if (mode === 'full') toast.warning('Backup downloaded', { detail: `${name} holds every secret. Keep it somewhere safe.` });
+    else toast.success('Config downloaded', { detail: name });
   }
 
   function segButton(id, icon, label) {

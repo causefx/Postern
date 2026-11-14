@@ -2,7 +2,7 @@ import { h } from '../../lib/h.js';
 import { Button } from '../common/Button.js';
 import { Modal, openModal, closeModal } from '../common/Modal.js';
 import { api } from '../../api.js';
-import { showToast } from '../common/Toast.js';
+import { toast } from '../common/Toast.js';
 
 function suggestName(name) {
   const suffix = '-2';
@@ -43,7 +43,7 @@ export function openDuplicateDialog({ service, trigger, onDuplicated }) {
           try {
             const created = await api.duplicateService(service.name, input.value.trim());
             closeModal(dlg);
-            showToast(`Duplicated as ${created.name}`);
+            toast.success('Service duplicated', { detail: `${service.name} copied as ${created.name}` });
             onDuplicated?.(created);
           } catch (e) {
             err.textContent = e.errors ? Object.values(e.errors).join(' · ') : e.message;

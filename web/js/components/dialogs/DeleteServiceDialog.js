@@ -2,7 +2,7 @@ import { h } from '../../lib/h.js';
 import { Button } from '../common/Button.js';
 import { Modal, openModal, closeModal } from '../common/Modal.js';
 import { api } from '../../api.js';
-import { showToast } from '../common/Toast.js';
+import { toast } from '../common/Toast.js';
 
 export function openDeleteDialog({ service, trigger, onDeleted }) {
   const err = h('p', { className: 'text-danger text-sm m-0' });
@@ -17,7 +17,7 @@ export function openDeleteDialog({ service, trigger, onDeleted }) {
           onDeleted?.(service);
         } catch (e) {
           err.textContent = e.message;
-          showToast(e.message, 'error');
+          toast.error("Couldn't delete the service", { detail: e.message });
         }
       },
     },

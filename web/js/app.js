@@ -19,7 +19,7 @@ import { MobileServiceList } from './components/services/MobileServiceList.js';
 import { BulkActionBar } from './components/services/BulkActionBar.js';
 import { EmptyState } from './components/services/EmptyState.js';
 import { CommandPalette } from './components/command/CommandPalette.js';
-import { mountToast, showToast } from './components/common/Toast.js';
+import { mountToast, toast } from './components/common/Toast.js';
 import { openUpdateDialog } from './components/dialogs/UpdateDialog.js';
 import {
   openServiceDrawer,
@@ -51,7 +51,7 @@ const drawerHandlers = {
   },
   onDeleted: async () => {
     await reload();
-    showToast('Service deleted');
+    toast.success('Service deleted');
   },
   onClose: () => {},
   onNavigate: async (delta) => {

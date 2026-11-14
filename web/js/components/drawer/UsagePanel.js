@@ -1,5 +1,5 @@
 import { h } from '../../lib/h.js';
-import { showToast } from '../common/Toast.js';
+import { toast } from '../common/Toast.js';
 import { api } from '../../api.js';
 import { blankServiceRecent } from '../../lib/liveList.js';
 import {
@@ -191,7 +191,7 @@ export function UsagePanel({ savedName }) {
       renderLog();
       blankServiceRecent(savedName);
     } catch (err) {
-      showToast(err.message || 'Could not clear recent requests', 'error');
+      toast.error("Couldn't clear the requests", { detail: err.message });
     } finally {
       if (button.isConnected) button.disabled = false;
     }

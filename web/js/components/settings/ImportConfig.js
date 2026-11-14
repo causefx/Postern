@@ -3,7 +3,7 @@ import { Button } from '../common/Button.js';
 import { Icon } from '../common/Icon.js';
 import { api } from '../../api.js';
 import { setState } from '../../state.js';
-import { showToast } from '../common/Toast.js';
+import { toast } from '../common/Toast.js';
 import {
   countChips,
   errorSummary,
@@ -213,11 +213,13 @@ export function ImportConfig({ onClose, onImported }) {
     if (!file || !result || importing || result.counts.error > 0 || !importable(result.counts)) return;
     importing = true;
     paint();
+    const planned = importable(result.counts);
+    const working = toast.progress(`Importing ${planned} ${planned === 1 ? 'service' : 'services'}…`, { detail: 'Applying all at once' });
     try {
       const res = await api.importConfig(file.parsed, { overwrite, dryRun: false });
-      if (stopped) return;
       const n = importable(res.counts);
-      showToast(`Imported ${n} ${n === 1 ? 'service' : 'services'}`);
+      working.success(`Imported ${n} ${n === 1 ? 'service' : 'services'}`, { detail: 'Logged to admin log' });
+      if (stopped) return;
       try {
         setState({ services: await api.listServices() });
       } catch {
@@ -228,7 +230,7 @@ export function ImportConfig({ onClose, onImported }) {
     } catch (err) {
       if (stopped) return;
       importing = false;
-      showToast(err.message || 'Could not import', 'error');
+      working.error("Couldn't import", { detail: err.message });
       // The file or the services may have changed since the check: look again.
       recheck();
     }

@@ -4,7 +4,7 @@ import { Icon } from '../common/Icon.js';
 import { api } from '../../api.js';
 import { setState, state } from '../../state.js';
 import { openUpdateDialog } from '../dialogs/UpdateDialog.js';
-import { showToast } from '../common/Toast.js';
+import { toast } from '../common/Toast.js';
 import { isMac } from '../../lib/serviceDisplay.js';
 import { SettingsRow, setSummary } from './SettingsRow.js';
 import { SettingControls } from './SettingControls.js';
@@ -259,11 +259,11 @@ function createController({ onReady, initialTab = 'settings' }) {
       oidcSession = !!next.oidcSession;
       draft = { ...saved, embedOrigins: [...saved.embedOrigins] };
       showEmbed();
-      showToast('Settings saved');
+      toast.success('Settings saved', { detail: 'Logged to admin log' });
       const log = await api.audit().catch(() => null);
       if (log) auditEntries = log.entries || [];
     } catch (err) {
-      showToast(err.message || 'Could not save settings');
+      toast.error("Couldn't save settings", { detail: err.message, retry: () => save() });
     } finally {
       saving = false;
       sync();

@@ -1,15 +1,17 @@
 import { api } from '../api.js';
 import { state, setState, clearSelection } from '../state.js';
 import { copyValue } from './clipboard.js';
-import { showToast } from '../components/common/Toast.js';
+import { toast } from '../components/common/Toast.js';
+
+const count = (n) => `${n} ${n === 1 ? 'service' : 'services'}`;
 
 export async function copyServiceToken(service) {
   if (!service?.token) {
-    showToast('No token', 'error');
+    toast.error('No token to copy', { detail: 'This service has no caller token yet.' });
     return;
   }
   try {
-    await copyValue(service.token);
+    await copyValue(service.token, 'Token copied');
   } catch {
     /* toast already shown */
   }
@@ -29,7 +31,7 @@ export async function toggleServiceEnabled(service) {
     setState({
       services: state.services.map((s) => (s.name === service.name ? { ...s, enabled: !next } : s)),
     });
-    showToast(err.message, 'error');
+    toast.error("Couldn't change the service", { detail: err.message });
   }
 }
 
@@ -47,8 +49,8 @@ export async function setManyEnabled(names, enabled) {
       fail++;
     }
   }
-  if (fail) showToast(`Updated ${ok}, ${fail} failed`, 'error');
-  else showToast(enabled ? `Turned on ${ok}` : `Turned off ${ok}`);
+  if (fail) toast.warning(`${ok} updated, ${fail} failed`, { detail: 'The others were left as they were.' });
+  else toast.success(enabled ? 'Services turned on' : 'Services turned off', { detail: count(ok) });
 }
 
 export async function rotateMany(names) {
@@ -65,8 +67,8 @@ export async function rotateMany(names) {
       fail++;
     }
   }
-  if (fail) showToast(`Rotated ${ok}, ${fail} failed`, 'error');
-  else showToast(`Rotated ${ok} token${ok === 1 ? '' : 's'}`);
+  if (fail) toast.warning(`${ok} rotated, ${fail} failed`, { detail: 'The others kept their old tokens.' });
+  else toast.success('Tokens rotated', { detail: `${count(ok)}. The old ones stop working` });
 }
 
 export async function deleteMany(names) {
@@ -82,6 +84,6 @@ export async function deleteMany(names) {
     }
   }
   clearSelection();
-  if (fail) showToast(`Deleted ${ok}, ${fail} failed`, 'error');
-  else showToast(`Deleted ${ok}`);
+  if (fail) toast.warning(`${ok} deleted, ${fail} failed`, { detail: 'The others are still there.' });
+  else toast.success('Services deleted', { detail: count(ok) });
 }

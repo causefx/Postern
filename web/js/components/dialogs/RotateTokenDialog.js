@@ -4,7 +4,7 @@ import { Modal, openModal, closeModal } from '../common/Modal.js';
 import { SecretField } from '../common/SecretField.js';
 import { CopyButton } from '../common/CopyButton.js';
 import { api } from '../../api.js';
-import { showToast } from '../common/Toast.js';
+import { toast } from '../common/Toast.js';
 
 export function openRotateDialog({ service, trigger, onRotated }) {
   const err = h('p', { className: 'text-danger text-sm m-0' });
@@ -61,7 +61,7 @@ export function openRotateDialog({ service, trigger, onRotated }) {
             dlg.querySelector('h2').textContent = `New token for ${service.name}`;
           } catch (e) {
             err.textContent = e.message;
-            showToast(e.message, 'error');
+            toast.error("Couldn't rotate the token", { detail: e.message });
           }
         },
       },

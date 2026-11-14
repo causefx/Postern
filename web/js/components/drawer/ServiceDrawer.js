@@ -14,7 +14,7 @@ import { authFromView, authToPayload, emptyAuth, isAuthNone } from '../../lib/au
 import { defaultGate, gateFromView } from '../../lib/callerGate.js';
 import { draftSnapshot, draftSaveBody, openPathCount } from '../../lib/drawerDraft.js';
 import { copyValue } from '../../lib/clipboard.js';
-import { showToast } from '../common/Toast.js';
+import { toast } from '../common/Toast.js';
 import { openDeleteDialog } from '../dialogs/DeleteServiceDialog.js';
 import { askUnsavedChanges } from '../dialogs/UnsavedChangesDialog.js';
 import { isMac } from '../../lib/serviceDisplay.js';
@@ -302,7 +302,7 @@ function createController({ mode, service, handlers }) {
       setState({
         services: state.services.map((s) => (s.name === savedName ? { ...s, enabled: prev } : s)),
       });
-      showToast(err.message || 'Could not update status', 'error');
+      toast.error("Couldn't change the status", { detail: err.message });
     }
   }
 
@@ -534,7 +534,7 @@ function createController({ mode, service, handlers }) {
       header.update({ name: saved.name, enabled: draft.enabled, ...pagerState() });
       tabs.refresh();
       handlers.onSaved?.(saved, { created: creating, renamed: !!(prevName && saved.name !== prevName) });
-      showToast(creating ? 'Service created' : 'Saved');
+      toast.success(creating ? 'Service created' : 'Service saved', { detail: savedName });
       setState({ drawer: { mode: 'edit', name: savedName } });
       renderActiveTab();
       return true;
