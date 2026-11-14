@@ -129,6 +129,36 @@ jobs:
             e2e/test-results/
           retention-days: 7
 
+  # The examples get copied into real setups, so check that they still parse. They are not started.
+  examples:
+    name: Example configs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compose files
+        working-directory: examples
+        env:
+          ADMIN_PASSWORD: ci
+          POSTERN_HOST: postern.example.com
+          ACME_EMAIL: ci@example.com
+        run: |
+          for d in . caddy traefik nginx; do
+            openssl rand -base64 32 > "$d/postern.key"
+            docker compose -f "$d/docker-compose.yml" config --quiet
+          done
+
+      - name: Caddyfile
+        run: |
+          docker run --rm -e POSTERN_HOST=postern.example.com             -v "$PWD/examples/caddy/Caddyfile:/etc/caddy/Caddyfile:ro"             caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
+
+      # nginx looks up the upstream name at start-up, so point it at loopback for the check.
+      - name: nginx.conf
+        run: |
+          mkdir certs
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=postern.example.com             -keyout certs/privkey.pem -out certs/fullchain.pem
+          docker run --rm --add-host postern:127.0.0.1             -v "$PWD/examples/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro"             -v "$PWD/certs:/etc/nginx/certs:ro"             nginx:1-alpine nginx -t
+
   docker:
     name: Docker build
     if: github.event_name == 'pull_request'

@@ -1,0 +1,23 @@
+{$POSTERN_HOST} {
+	# Tell browsers to use HTTPS only. Postern does not send this itself, because it never sees the TLS.
+	header Strict-Transport-Security "max-age=31536000"
+
+	# Callers: the proxy, open to the internet.
+	handle /p/* {
+		reverse_proxy postern:8080 {
+			# Send each chunk on as it arrives, for streaming responses.
+			flush_interval -1
+		}
+	}
+
+	# You: the admin UI, from your own networks only (loopback, 10/8, 172.16/12, 192.168/16, fc00::/7).
+	# Everyone else falls through to the 404 below.
+	@private remote_ip private_ranges
+	handle @private {
+		reverse_proxy postern:8081
+	}
+
+	handle {
+		respond "Not found" 404
+	}
+}

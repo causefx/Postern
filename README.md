@@ -66,6 +66,8 @@ docker run --rm -p 8080:8080 \
   ghcr.io/causefx/postern:latest
 ```
 
+For a real setup, see [docs/operations.md](docs/operations.md): Docker Compose, Caddy, Traefik and nginx examples (in [examples/](examples/)), upgrading, backup and restore, and everything Postern connects to.
+
 ## Security
 
 To report a vulnerability, use GitHub's private reporting; see [SECURITY.md](SECURITY.md).

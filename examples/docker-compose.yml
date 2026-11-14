@@ -1,0 +1,40 @@
+# Postern on its own: the proxy on port 8080 and the admin UI on this machine only.
+# For HTTPS in front of it, use the caddy/, traefik/ or nginx/ example instead. Guide: docs/operations.md
+#
+#   cp .env.example .env                      # then set ADMIN_PASSWORD in it
+#   openssl rand -base64 32 > postern.key     # the key that encrypts your upstream keys at rest.
+#                                             # Keep a copy somewhere else: without it a backup is useless.
+#   docker compose up -d
+#
+# Admin UI: http://127.0.0.1:8081/admin/   Proxy: http://<this machine>:8080/p/<name>/
+
+services:
+  postern:
+    # Pin a version once you are happy: ghcr.io/causefx/postern:1.0.0 (or :1.0 for fixes only).
+    # Do not run :edge in production. It is built from every push to main, released or not.
+    image: ghcr.io/causefx/postern:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"             # the proxy: this is the one callers reach
+      - "127.0.0.1:8081:8081"   # the admin UI: this machine only. Use an SSH tunnel or a VPN from elsewhere
+    environment:
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      # Two listeners, so the proxy port has no admin UI on it at all.
+      # Keep LISTEN on port 8080: the image's health check asks 127.0.0.1:8080.
+      LISTEN: ":8080"
+      ADMIN_LISTEN: ":8081"
+      # Encrypt the data file at rest. Remove this line, the secret below and the key file to run without it.
+      POSTERN_KEY_FILE: /run/secrets/postern_key
+      # Stop the daily check for new releases (the only call Postern makes on its own). See docs/operations.md.
+      # POSTERN_UPDATE_CHECK: "off"
+    secrets:
+      - postern_key
+    volumes:
+      - postern-data:/data      # the data file, the settings file and the logs
+
+secrets:
+  postern_key:
+    file: ./postern.key
+
+volumes:
+  postern-data:

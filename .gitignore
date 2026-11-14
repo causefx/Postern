@@ -17,3 +17,8 @@ node_modules/
 
 # Cursor
 .cursor/
+
+# Filled-in copies of the example stacks (keys and passwords)
+examples/**/.env
+examples/**/*.key
+examples/**/certs/

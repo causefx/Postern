@@ -1,0 +1,54 @@
+# Postern behind Caddy, which gets and renews the HTTPS certificate on its own.
+# Guide: docs/operations.md
+#
+#   cp ../.env.example .env                   # set ADMIN_PASSWORD and POSTERN_HOST in it
+#   openssl rand -base64 32 > postern.key     # keep a copy somewhere else
+#   docker compose up -d
+#
+# POSTERN_HOST must already point at this machine (DNS), with ports 80 and 443 reachable.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      POSTERN_HOST: ${POSTERN_HOST:?Set POSTERN_HOST in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data        # the certificates. Keep it, or Caddy asks for new ones on every start
+      - caddy-config:/config
+    depends_on:
+      - postern
+
+  postern:
+    image: ghcr.io/causefx/postern:latest   # pin a version once you are happy, e.g. :1.0.0
+    restart: unless-stopped
+    # No ports: only Caddy, on this Docker network, can reach Postern.
+    environment:
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      LISTEN: ":8080"
+      ADMIN_LISTEN: ":8081"
+      # Caddy ends HTTPS, so Postern must hand out Secure cookies and https:// addresses.
+      POSTERN_SECURE: "1"
+      # Believe the client address Caddy reports. "private" is every address on this Docker network,
+      # which holds only Caddy and Postern. Use Caddy's own address instead if you share the network.
+      POSTERN_TRUSTED_PROXIES: private
+      POSTERN_KEY_FILE: /run/secrets/postern_key
+      # POSTERN_UPDATE_CHECK: "off"
+    secrets:
+      - postern_key
+    volumes:
+      - postern-data:/data
+
+secrets:
+  postern_key:
+    file: ./postern.key
+
+volumes:
+  postern-data:
+  caddy-data:
+  caddy-config:

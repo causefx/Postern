@@ -1,0 +1,85 @@
+# Postern behind Traefik v3, which gets the HTTPS certificate from Let's Encrypt.
+# Guide: docs/operations.md
+#
+#   cp ../.env.example .env                   # set ADMIN_PASSWORD, POSTERN_HOST and ACME_EMAIL in it
+#   openssl rand -base64 32 > postern.key     # keep a copy somewhere else
+#   docker compose up -d
+#
+# Already running Traefik? Keep only the labels on the postern service, and put it on Traefik's network.
+# POSTERN_HOST must already point at this machine (DNS), with ports 80 and 443 reachable.
+
+services:
+  traefik:
+    image: traefik:v3
+    restart: unless-stopped
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.le.acme.email=${ACME_EMAIL:?Set ACME_EMAIL in .env}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.le.acme.tlschallenge=true
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Traefik reads the labels below through the Docker socket. That socket is root on this machine,
+      # so keep it read-only and think about a socket proxy if the host holds anything else of value.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-acme:/letsencrypt   # the certificates
+
+  postern:
+    image: ghcr.io/causefx/postern:latest   # pin a version once you are happy, e.g. :1.0.0
+    restart: unless-stopped
+    # No ports: only Traefik, on this Docker network, can reach Postern.
+    environment:
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      LISTEN: ":8080"
+      ADMIN_LISTEN: ":8081"
+      # Traefik ends HTTPS, so Postern must hand out Secure cookies and https:// addresses.
+      POSTERN_SECURE: "1"
+      # Believe the client address Traefik reports. "private" is every address on this Docker network,
+      # which holds only Traefik and Postern. Use Traefik's own address instead if you share the network.
+      POSTERN_TRUSTED_PROXIES: private
+      POSTERN_KEY_FILE: /run/secrets/postern_key
+      # POSTERN_UPDATE_CHECK: "off"
+    secrets:
+      - postern_key
+    volumes:
+      - postern-data:/data
+    labels:
+      - traefik.enable=true
+
+      # Callers: /p/... on the proxy listener, open to the internet.
+      - traefik.http.routers.postern-proxy.rule=Host(`${POSTERN_HOST}`) && PathPrefix(`/p/`)
+      - traefik.http.routers.postern-proxy.priority=20
+      - traefik.http.routers.postern-proxy.entrypoints=websecure
+      - traefik.http.routers.postern-proxy.tls.certresolver=le
+      - traefik.http.routers.postern-proxy.service=postern-proxy
+      - traefik.http.services.postern-proxy.loadbalancer.server.port=8080
+
+      # You: everything else on the same name goes to the admin listener, from your own networks only.
+      # Anyone else gets 403. Edit the ranges to match your network.
+      - traefik.http.routers.postern-admin.rule=Host(`${POSTERN_HOST}`)
+      - traefik.http.routers.postern-admin.priority=10
+      - traefik.http.routers.postern-admin.entrypoints=websecure
+      - traefik.http.routers.postern-admin.tls.certresolver=le
+      - traefik.http.routers.postern-admin.middlewares=postern-private,postern-hsts
+      - traefik.http.routers.postern-admin.service=postern-admin
+      - traefik.http.services.postern-admin.loadbalancer.server.port=8081
+      - traefik.http.middlewares.postern-private.ipallowlist.sourcerange=127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+
+      # Tell browsers to use HTTPS only. Postern does not send this itself, because it never sees the TLS.
+      - traefik.http.middlewares.postern-hsts.headers.stsseconds=31536000
+      - traefik.http.routers.postern-proxy.middlewares=postern-hsts
+
+secrets:
+  postern_key:
+    file: ./postern.key
+
+volumes:
+  postern-data:
+  traefik-acme:
