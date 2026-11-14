@@ -222,7 +222,17 @@ func TestOIDCSignatures(t *testing.T) {
 			t.Fatal(err)
 		}
 		token := signRS256(key, "k1", map[string]any{"sub": "s"})
-		token = token[:len(token)-2] + "aa"
+		// Change the signature itself. Swapping the last characters is not enough: the final
+		// base64 character of a 256-byte signature carries only 2 bits, so about 1 time in 256 the
+		// "tampered" text decodes to the very same signature, and accepting it is correct.
+		parts := strings.Split(token, ".")
+		sig, err := base64.RawURLEncoding.DecodeString(parts[2])
+		if err != nil {
+			t.Fatal(err)
+		}
+		sig[0] ^= 0xff
+		parts[2] = base64.RawURLEncoding.EncodeToString(sig)
+		token = strings.Join(parts, ".")
 		if _, err := verifyIDToken(token, map[string]oidcKey{"k1": rsaJWK("k1", &key.PublicKey)}); err == nil {
 			t.Fatal("tampered token was accepted")
 		}
