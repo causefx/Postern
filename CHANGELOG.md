@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.0](https://github.com/causefx/Postern/compare/v0.15.0...v0.16.0) (2026-11-14)
+
+
+### Features
+
+* add motion animations to enhance UI transitions ([5f86129](https://github.com/causefx/Postern/commit/5f861297961415f7a4be12ff53f3c6208a8abdea))
+* **e2e:** add end-to-end tests for account menu, backup, login, mobile layout, command palette, services, and settings ([f5876d5](https://github.com/causefx/Postern/commit/f5876d54b47de3a9bb03715dbcf26f651512000c))
+
 ## [0.15.0](https://github.com/causefx/Postern/compare/v0.14.0...v0.15.0) (2026-11-14)
 
 
