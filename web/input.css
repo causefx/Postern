@@ -2377,6 +2377,8 @@ button.acct-item:focus-visible { background: var(--bg-surface-2); }
   flex-shrink: 0;
 }
 .drawer-title {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: 1.15rem;
   font-weight: 700;
   color: var(--text);
@@ -2559,24 +2561,43 @@ button.acct-item:focus-visible { background: var(--bg-surface-2); }
   text-transform: uppercase;
   color: var(--text-muted);
 }
-.settings-card + .settings-group { margin-top: 1.15rem; }
-.settings-card {
+.settings-gcard + .settings-group { margin-top: 1.15rem; }
+.settings-gcard {
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--bg-sunken);
-  margin-bottom: 0.65rem;
+  overflow: hidden;
 }
-.settings-acc-head {
+.settings-row + .settings-row { border-top: 1px solid var(--line); }
+.settings-row-head {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.85rem;
   width: 100%;
-  padding: 0.95rem 1rem;
+  padding: 0.8rem 1rem;
   border: 0;
   background: transparent;
   color: inherit;
   text-align: left;
   cursor: pointer;
+}
+.settings-row-head:hover { background: var(--bg-hover); }
+.settings-row-head:focus-visible { outline: 2px solid var(--line-strong); outline-offset: -2px; }
+.settings-row-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-surface-2);
+  color: var(--text-soft);
+}
+.settings-row-icon.is-warn {
+  border-color: var(--dirty-line);
+  background: var(--warning-bg);
+  color: var(--warning);
 }
 .settings-acc-copy {
   display: flex;
@@ -2593,11 +2614,34 @@ button.acct-item:focus-visible { background: var(--bg-surface-2); }
   font: 400 12px/1.4 Inter, system-ui, sans-serif;
   color: var(--text-muted);
 }
-.settings-acc-summary {
+.settings-sum {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
   flex-shrink: 0;
-  font: 500 13px/1 Inter, system-ui, sans-serif;
-  color: var(--text-soft);
   white-space: nowrap;
+}
+.settings-sum-value { color: var(--text); font: 700 15px/1 Inter, system-ui, sans-serif; }
+.settings-sum-unit { color: var(--text-muted); font: 400 13px/1 Inter, system-ui, sans-serif; }
+.settings-sum-text { color: var(--text); font: 600 13.5px/1 Inter, system-ui, sans-serif; }
+.settings-sum-text.is-warn { color: var(--warning); }
+.settings-dot {
+  align-self: center;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  box-sizing: border-box;
+}
+.settings-dot.is-on { background: var(--success); }
+.settings-dot.is-warn { background: var(--warning); }
+.settings-dot.is-off { border: 1.5px solid var(--text-muted); }
+.settings-pill {
+  align-self: center;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--on-primary);
+  font: 600 12.5px/1 Inter, system-ui, sans-serif;
 }
 .settings-chevron {
   color: var(--text-muted);
@@ -2609,7 +2653,15 @@ button.acct-item:focus-visible { background: var(--bg-surface-2); }
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
-  padding: 0 1rem 1rem;
+  padding: 1rem;
+  border-top: 1px solid var(--line);
+}
+.settings-acc-hint code {
+  padding: 0.05rem 0.3rem;
+  border-radius: 5px;
+  background: var(--bg-surface-2);
+  color: var(--text-soft);
+  font: 500 11.5px/1.4 var(--font-mono);
 }
 .settings-controls {
   display: flex;
@@ -2732,63 +2784,7 @@ button.acct-item:focus-visible { background: var(--bg-surface-2); }
   font: 400 12px/1.4 var(--font-mono);
   color: var(--text-muted);
 }
-.settings-storage {
-  margin: 1.15rem 0 0;
-  padding: 0.65rem 0.85rem;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: var(--bg-sunken);
-  color: var(--text-muted);
-  font: 500 12px/1.5 Inter, system-ui, sans-serif;
-}
-.settings-storage strong {
-  color: var(--text);
-  font-weight: 700;
-}
-.settings-storage.is-encrypted strong {
-  color: var(--success);
-}
-.settings-storage + .settings-storage { margin-top: 0.5rem; }
-.settings-storage.is-update strong { color: var(--warning); }
-.settings-inline-link {
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-weight: 700;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
-.settings-inline-link:hover { color: var(--primary); }
-
-/* —— Backup: action rows, Export and Import screens —— */
-.settings-action {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  width: 100%;
-  padding: 0.8rem 1rem;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.settings-action:hover { background: var(--bg-hover); }
-.settings-action:focus-visible { outline: 2px solid var(--line-strong); outline-offset: 2px; }
-.settings-action-icon {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 2.5rem;
-  height: 2.5rem;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--bg-surface);
-  color: var(--text-soft);
-}
-.drawer-title { flex: 1 1 auto; min-width: 0; }
-
+/* —— Backup: Export and Import screens —— */
 .bk-host {
   flex: 1 1 auto;
   min-height: 0;

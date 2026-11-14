@@ -6,14 +6,13 @@ import { setState, state } from '../../state.js';
 import { openUpdateDialog } from '../dialogs/UpdateDialog.js';
 import { showToast } from '../common/Toast.js';
 import { isMac } from '../../lib/serviceDisplay.js';
-import { SettingsAccordion } from './SettingsAccordion.js';
+import { SettingsRow, setSummary } from './SettingsRow.js';
 import { SettingControls } from './SettingControls.js';
 import { SettingsTabs } from './SettingsTabs.js';
 import { AuditPanel } from './AuditPanel.js';
 import { RequestsPanel } from './RequestsPanel.js';
 import { PasswordLoginSetting } from './PasswordLoginSetting.js';
 import { EmbedSetting } from './EmbedSetting.js';
-import { SettingsActionRow } from './SettingsActionRow.js';
 import { ExportConfig } from './ExportConfig.js';
 import { ImportConfig } from './ImportConfig.js';
 import {
@@ -27,6 +26,7 @@ import {
   MAX_RATE_LIMIT,
   RATE_PRESETS,
   SETTING_DEFS,
+  SETTING_GROUPS,
   activitySummary,
   clampActivity,
   clampAudit,
@@ -38,6 +38,8 @@ import {
   rateSummary,
   sameList,
   settingVisible,
+  storageSummary,
+  versionSummary,
 } from '../../lib/settings.js';
 
 let root = null;
@@ -126,7 +128,7 @@ function createController({ onReady, initialTab = 'settings' }) {
   let sub = null;
   let auditEntries = [];
   let auditService = 'all';
-  const open = new Set(['rate']);
+  const open = new Set();
   let saving = false;
   let loaded = false;
   /** Whether the data file is encrypted at rest. Read-only: it is set by an environment variable. */
@@ -270,12 +272,7 @@ function createController({ onReady, initialTab = 'settings' }) {
   }
 
   function sync() {
-    const rateSum = listHost.querySelector('[data-summary="rate"]');
-    if (rateSum) rateSum.textContent = rateSummary(draft.rateLimit);
-    const actSum = listHost.querySelector('[data-summary="activity"]');
-    if (actSum) actSum.textContent = activitySummary(draft.activityLimit);
-    const auditSum = listHost.querySelector('[data-summary="audit"]');
-    if (auditSum) auditSum.textContent = activitySummary(draft.auditLimit);
+    listHost.querySelectorAll('[data-summary]').forEach((el) => setSummary(el, summaryFor(el.dataset.summary)));
     const rateInput = listHost.querySelector('[data-input="rate"]');
     if (rateInput && document.activeElement !== rateInput) rateInput.value = String(draft.rateLimit);
     const actInput = listHost.querySelector('[data-input="activity"]');
@@ -306,8 +303,6 @@ function createController({ onReady, initialTab = 'settings' }) {
     if (actDefault) actDefault.disabled = draft.activityLimit === DEFAULT_ACTIVITY_LIMIT;
     const auditDefault = listHost.querySelector('[data-default="audit"]');
     if (auditDefault) auditDefault.disabled = draft.auditLimit === DEFAULT_AUDIT_LIMIT;
-    const embedSum = listHost.querySelector('[data-summary="embed"]');
-    if (embedSum) embedSum.textContent = embedSummary(draft.embedOrigins);
     listHost.querySelector('[data-embed]')?._set?.({ error: embedError, origins: draft.embedOrigins });
     // A half-typed list is not a change yet, but it must not look saved either.
     const dirty = isDirty() || !!embedError;
@@ -316,99 +311,130 @@ function createController({ onReady, initialTab = 'settings' }) {
     resetBtn.disabled = saving || !loaded;
   }
 
+  /** What a row shows on its right, from the current draft. */
+  function summaryFor(id) {
+    switch (id) {
+      case 'rate':
+        return rateSummary(draft.rateLimit);
+      case 'activity':
+        return activitySummary(draft.activityLimit);
+      case 'audit':
+        return activitySummary(draft.auditLimit);
+      case 'password':
+        return passwordSummary(oidcConfigured ? draft.passwordLogin : true);
+      case 'embed':
+        return embedSummary(draft.embedOrigins);
+      case 'storage':
+        return storageSummary(encrypted);
+      case 'version':
+        return versionSummary(state.update);
+      default:
+        return null;
+    }
+  }
+
+  /** The line under a row's name. Most are fixed text from the definition. */
+  function hintFor(def) {
+    if (def.id === 'storage') {
+      return encrypted
+        ? 'Upstream keys and tokens are encrypted at rest'
+        : h('span', {}, 'Set ', h('code', {}, 'POSTERN_KEY'), ' or ', h('code', {}, 'POSTERN_KEY_FILE'), ' and restart to encrypt keys and tokens');
+    }
+    if (def.id === 'version') {
+      const v = state.update?.current || state.meta?.version || '';
+      return v ? `Postern v${v}` : 'Postern';
+    }
+    return def.hint;
+  }
+
+  function bodyFor(id) {
+    switch (id) {
+      case 'rate':
+        return rateBody();
+      case 'audit':
+        return auditBody();
+      case 'password':
+        return passwordBody();
+      case 'embed':
+        return embedBody();
+      case 'storage':
+        return storageBody();
+      case 'version':
+        return versionBody();
+      default:
+        return activityBody();
+    }
+  }
+
   function paintList() {
     listHost.replaceChildren();
     if (!loaded) {
       listHost.append(h('p', { className: 'settings-empty' }, loadError || 'Loading settings…'));
       return;
     }
-    let shown = 0;
-    let lastGroup = '';
+    // Rows that match the search and the chip, gathered into one card per group.
+    const groups = [];
     for (const def of SETTING_DEFS) {
       if (group !== 'all' && def.group !== group) continue;
       if (!settingVisible(query, def)) continue;
-      if (def.group !== lastGroup) {
-        listHost.append(h('h3', { className: 'settings-group' }, def.groupLabel));
-        lastGroup = def.group;
-      }
-      if (def.kind === 'action') {
-        listHost.append(SettingsActionRow({ icon: def.icon, title: def.title, hint: def.hint, onClick: () => showView(def.id) }));
-        shown += 1;
-        continue;
-      }
-      const isOpen = open.has(def.id);
-      const body =
-        def.id === 'rate'
-          ? rateBody()
-          : def.id === 'audit'
-            ? auditBody()
-            : def.id === 'password'
-              ? passwordBody()
-              : def.id === 'embed'
-                ? embedBody()
-                : activityBody();
-      listHost.append(
-        SettingsAccordion(
-          {
-            id: def.id,
-            title: def.title,
-            hint: def.hint,
-            summary:
-              def.id === 'rate'
-                ? rateSummary(draft.rateLimit)
-                : def.id === 'password'
-                  ? passwordSummary(oidcConfigured ? draft.passwordLogin : true)
-                  : def.id === 'embed'
-                    ? embedSummary(draft.embedOrigins)
-                    : activitySummary(def.id === 'audit' ? draft.auditLimit : draft.activityLimit),
-            open: isOpen,
-            onToggle: () => {
-              if (open.has(def.id)) open.delete(def.id);
-              else open.add(def.id);
-              paintList();
-            },
-          },
-          isOpen ? body : null,
-        ),
-      );
-      shown += 1;
+      let g = groups.find((x) => x.id === def.group);
+      if (!g) groups.push((g = { id: def.group, label: def.groupLabel, rows: [] }));
+      g.rows.push(def);
     }
-    if (!shown) listHost.append(h('p', { className: 'settings-empty' }, 'No matching settings.'));
-    else if (group === 'all' && !query.trim()) listHost.append(storageNote(), versionNote());
+    for (const g of groups) {
+      listHost.append(h('h3', { className: 'settings-group' }, g.label), h('div', { className: 'settings-gcard' }, ...g.rows.map(rowFor)));
+    }
+    if (!groups.length) listHost.append(h('p', { className: 'settings-empty' }, 'No matching settings.'));
     sync();
   }
 
-  /** Read-only: the running version and whether the server has seen a newer release. */
-  function versionNote() {
-    const u = state.update;
-    const current = u?.current || state.meta?.version || '';
-    let status = '';
-    let action = 'Check for updates';
-    if (u?.enabled === false) status = u.reason === 'dev' ? 'development build, update checks skipped' : 'update checks are off';
-    else if (u?.available) {
-      status = `v${u.latest} is available`;
-      action = 'What’s new';
-    } else if (u?.latest) status = 'up to date';
-    return h(
-      'p',
-      { className: `settings-storage${u?.available ? ' is-update' : ''}` },
-      h('strong', {}, 'Version: '),
-      `${current ? `v${current}` : 'unknown'}${status ? ` · ${status}` : ''}. `,
-      u?.enabled === false
-        ? null
-        : h('button', { type: 'button', className: 'settings-inline-link', onClick: (e) => openUpdateDialog({ trigger: e.currentTarget }) }, action),
+  function rowFor(def) {
+    const common = { id: def.id, icon: def.icon, title: def.title, hint: hintFor(def), summary: summaryFor(def.id) };
+    if (def.kind === 'action') return SettingsRow({ ...common, onClick: () => showView(def.id) });
+    const toggle = () => {
+      if (open.has(def.id)) open.delete(def.id);
+      else open.add(def.id);
+      paintList();
+    };
+    // The version row opens the update dialog, unless update checks are off and there is only a reason to read.
+    if (def.id === 'version' && state.update?.enabled !== false) {
+      return SettingsRow({ ...common, onClick: (e) => openUpdateDialog({ trigger: e.currentTarget }) });
+    }
+    const isOpen = open.has(def.id);
+    return SettingsRow(
+      { ...common, tone: def.id === 'storage' && !encrypted ? 'warn' : '', open: isOpen, onClick: toggle },
+      isOpen ? bodyFor(def.id) : null,
     );
   }
 
   /** Read-only: whether the file holding upstream keys and tokens is encrypted. */
-  function storageNote() {
+  function storageBody() {
     return h(
-      'p',
-      { className: `settings-storage${encrypted ? ' is-encrypted' : ''}` },
-      h('strong', {}, 'Stored data: '),
-      encrypted
-        ? 'encrypted at rest.'
-        : 'not encrypted. Set POSTERN_KEY or POSTERN_KEY_FILE and restart to encrypt the file that holds your upstream keys and tokens.',
+      'div',
+      { className: 'settings-controls' },
+      h(
+        'p',
+        { className: 'settings-detail' },
+        encrypted
+          ? 'The file that holds your upstream keys and caller tokens is stored encrypted (AES-256-GCM). The key comes from POSTERN_KEY or POSTERN_KEY_FILE, which this screen cannot change.'
+          : 'The file that holds your upstream keys and caller tokens is stored as plain JSON. Set POSTERN_KEY or POSTERN_KEY_FILE and restart, and Postern encrypts it in place.',
+      ),
+    );
+  }
+
+  /** Only reached when update checks are off: say why, since there is no dialog to open. */
+  function versionBody() {
+    const u = state.update;
+    return h(
+      'div',
+      { className: 'settings-controls' },
+      h(
+        'p',
+        { className: 'settings-detail' },
+        u?.reason === 'dev'
+          ? 'This is a development build, so update checks are skipped.'
+          : 'Update checks are off. Remove POSTERN_UPDATE_CHECK=off and restart to turn them on.',
+      ),
     );
   }
 
@@ -529,7 +555,7 @@ function createController({ onReady, initialTab = 'settings' }) {
     subHost.replaceChildren(...(sub ? [sub.body] : []));
     paintHeader();
     paintChrome();
-    if (!sub) listHost.querySelector('.settings-action')?.scrollIntoView?.({ block: 'nearest' });
+    if (!sub) listHost.querySelector('[data-summary="export"]')?.closest('.settings-row')?.scrollIntoView?.({ block: 'nearest' });
     else drawerBody.scrollTop = 0;
   }
 
@@ -603,14 +629,7 @@ function createController({ onReady, initialTab = 'settings' }) {
   const chipRow = h(
     'div',
     { className: 'settings-chips', role: 'group', 'aria-label': 'Setting groups' },
-    ...[
-      ['all', 'All'],
-      ['traffic', 'Traffic'],
-      ['activity', 'Logs'],
-      ['signin', 'Sign-in'],
-      ['security', 'Security'],
-      ['backup', 'Backup'],
-    ].map(([id, label]) =>
+    ...SETTING_GROUPS.map(([id, label]) =>
       h(
         'button',
         {
@@ -705,7 +724,7 @@ function createController({ onReady, initialTab = 'settings' }) {
         sessionStorage.removeItem('postern-password-off');
         draft.passwordLogin = false;
         open.add('password');
-        group = 'signin';
+        group = 'security';
         for (const chip of chipRow.querySelectorAll('[data-group]')) {
           const on = chip.dataset.group === group;
           chip.classList.toggle('is-active', on);

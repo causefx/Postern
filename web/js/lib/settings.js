@@ -27,9 +27,15 @@ export const AUDIT_PRESETS = [
   { value: 500, label: '500' },
 ];
 
+/**
+ * The rows of the settings list, in the order they are shown. `kind` is 'action' for a row that opens
+ * its own screen, 'info' for a read-only fact, 'about' for the version row, and otherwise a setting
+ * that expands in place and is saved with the Save button.
+ */
 export const SETTING_DEFS = [
   {
     id: 'rate',
+    icon: 'gauge',
     group: 'traffic',
     groupLabel: 'Traffic',
     title: 'Rate limit',
@@ -38,22 +44,34 @@ export const SETTING_DEFS = [
   },
   {
     id: 'activity',
+    icon: 'pulse',
     group: 'activity',
     groupLabel: 'Logs',
     title: 'Request log',
-    hint: 'How many proxied requests to keep per service',
+    hint: 'Proxied requests kept per service',
     keywords: 'settings.activityLimit entries history requests traffic proxy activity',
   },
   {
     id: 'audit',
+    icon: 'history',
     group: 'activity',
     groupLabel: 'Logs',
     title: 'Admin log',
-    hint: 'How many admin changes to keep, such as edits, token changes and settings',
+    hint: 'Edits, token changes and settings',
     keywords: 'settings.auditLimit entries history audit changes admin',
   },
   {
+    id: 'password',
+    icon: 'key',
+    group: 'security',
+    groupLabel: 'Security',
+    title: 'Admin password',
+    hint: 'Allow signing in with the admin password',
+    keywords: 'settings.passwordLogin oidc sso sign in login',
+  },
+  {
     id: 'embed',
+    icon: 'frame',
     group: 'security',
     groupLabel: 'Security',
     title: 'Embedding',
@@ -61,14 +79,15 @@ export const SETTING_DEFS = [
     keywords: 'settings.embedOrigins iframe frame embed dashboard organizr homepage heimdall frame-ancestors clickjacking',
   },
   {
-    id: 'password',
-    group: 'signin',
-    groupLabel: 'Sign-in',
-    title: 'Admin password',
-    hint: 'Allow signing in with the admin password',
-    keywords: 'settings.passwordLogin oidc sso',
+    id: 'storage',
+    kind: 'info',
+    icon: 'lock',
+    group: 'security',
+    groupLabel: 'Security',
+    title: 'Stored data',
+    hint: '',
+    keywords: 'encrypted encryption at rest POSTERN_KEY POSTERN_KEY_FILE keys tokens secrets data file',
   },
-  // Actions, not values: they open a screen of their own and are never saved with the rest.
   {
     id: 'export',
     kind: 'action',
@@ -89,6 +108,26 @@ export const SETTING_DEFS = [
     hint: 'Validate and add services from a file',
     keywords: 'backup import restore upload load json dry run overwrite migrate',
   },
+  {
+    id: 'version',
+    kind: 'about',
+    icon: 'cube',
+    group: 'about',
+    groupLabel: 'About',
+    title: 'Version',
+    hint: '',
+    keywords: 'version update upgrade release latest available changelog',
+  },
+];
+
+/** The group chips above the list: [id, label]. */
+export const SETTING_GROUPS = [
+  ['all', 'All'],
+  ['traffic', 'Traffic'],
+  ['activity', 'Logs'],
+  ['security', 'Security'],
+  ['backup', 'Backup'],
+  ['about', 'About'],
 ];
 
 export function clampRate(n) {
@@ -110,17 +149,20 @@ export function clampAudit(n) {
   return Math.min(MAX_AUDIT_LIMIT, v);
 }
 
+// Summaries are small descriptions of what a row shows on its right (see SettingsRow.js):
+// { value, unit } a number with a unit, { dot, text } a status, { text, tone } a plain label,
+// { pill } a highlighted tag.
 export function rateSummary(n) {
-  if (!n) return 'Off';
-  return `${n} req / min`;
+  if (!n) return { text: 'Off' };
+  return { value: String(n), unit: 'req/min' };
 }
 
 export function activitySummary(n) {
-  return `${n} ${n === 1 ? 'entry' : 'entries'}`;
+  return { value: String(n), unit: n === 1 ? 'entry' : 'entries' };
 }
 
 export function passwordSummary(on) {
-  return on ? 'On' : 'Off';
+  return { dot: on ? 'on' : 'off', text: on ? 'On' : 'Off' };
 }
 
 export function perSecondLabel(n) {
@@ -164,9 +206,21 @@ export function parseEmbedOrigins(text) {
 
 export function embedSummary(origins) {
   const list = origins || [];
-  if (!list.length) return 'Off';
-  if (list.includes('*')) return 'Any site';
-  return list.length === 1 ? '1 site' : `${list.length} sites`;
+  if (!list.length) return { dot: 'off', text: 'Off' };
+  if (list.includes('*')) return { dot: 'warn', text: 'Any site' };
+  return { dot: 'on', text: list.length === 1 ? '1 site' : `${list.length} sites` };
+}
+
+export function storageSummary(encrypted) {
+  return encrypted ? { dot: 'on', text: 'Encrypted' } : { text: 'Not encrypted', tone: 'warn' };
+}
+
+/** The Version row's right side, from the server's update status. */
+export function versionSummary(update) {
+  if (update?.enabled === false) return { text: update.reason === 'dev' ? 'Dev build' : 'Checks off' };
+  if (update?.available) return { pill: `v${update.latest} available` };
+  if (update?.latest) return { text: 'Up to date' };
+  return null;
 }
 
 export function sameList(a, b) {
