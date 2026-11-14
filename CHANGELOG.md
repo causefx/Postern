@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.15.0](https://github.com/causefx/Postern/compare/v0.14.0...v0.15.0) (2026-11-14)
+
+
+### Features
+
+* change settings UI ([c792cfa](https://github.com/causefx/Postern/commit/c792cfabbaf0f732e86db4055103b5890bb8bc55))
+* export and import services from Settings ([89efcf7](https://github.com/causefx/Postern/commit/89efcf7d4edf84331c293a5cef993186dd554e3f))
+* toast notifications to a new system ([dfb1ebd](https://github.com/causefx/Postern/commit/dfb1ebdb04ff95e229e09de4c6d924e79ce5c2cb))
+
 ## [0.14.0](https://github.com/causefx/Postern/compare/v0.13.0...v0.14.0) (2026-11-13)
 
 
