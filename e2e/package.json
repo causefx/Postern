@@ -6,7 +6,9 @@
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",
-    "install:browser": "playwright install --with-deps chromium"
+    "install:browser": "playwright install --with-deps chromium",
+    "screenshots": "node screenshots/shoot.mjs",
+    "screenshots:publish": "node screenshots/publish.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.65.1"
