@@ -35,13 +35,16 @@ var iconFiles = map[string]string{
 }
 
 type App struct {
-	store     *Store
-	sessions  *sessionStore
-	logins    *loginLimiter
-	activity  *activityLog
-	usage     *tokenUsage
-	hits      *proxyLimiter
-	audit     *auditLog
+	store    *Store
+	sessions *sessionStore
+	logins   *loginLimiter
+	activity *activityLog
+	usage    *tokenUsage
+	hits     *proxyLimiter
+	audit    *auditLog
+	icons    *iconStore
+	// apps is every app in apps/, checked at start-up.
+	apps      *appRegistry
 	updates   *updateChecker
 	adminPass string
 	oidc      *oidcClient
@@ -113,6 +116,7 @@ func main() {
 		usage:     openTokenUsage(dataPath + ".usage"),
 		hits:      configuredProxyLimiter(store.RateLimit()),
 		audit:     newAuditLog(dataPath + ".audit"),
+		icons:     newIconStore(iconDirFor(dataPath)),
 		updates:   newUpdateChecker(Version, updateCheckOff()),
 		adminPass: os.Getenv("ADMIN_PASSWORD"),
 	}
@@ -126,12 +130,16 @@ func main() {
 		go app.updates.run(ctx)
 	}
 	app.audit.setLimit(store.AuditLimit())
+	app.sweepIcons()
 	if app.adminPass == "" {
 		app.adminPass = newToken()[:16]
 		log.Printf("ADMIN_PASSWORD not set; generated one for this run: %s", app.adminPass)
 		app.sessions = newSessionStore(app.adminPass)
 	}
 	app.oidc = loadOIDC()
+	if app.apps, err = embeddedApps(); err != nil {
+		log.Fatal(err)
+	}
 	if envTruthy("POSTERN_DEV") {
 		dir, err := filepath.Abs("web")
 		if err != nil {
@@ -141,6 +149,10 @@ func main() {
 			log.Fatalf("POSTERN_DEV: web dir not found at %s (run from repo root)", dir)
 		}
 		app.staticDir = dir
+		// Read apps/ from disk too, so a new app folder shows after a restart without a rebuild.
+		if app.apps, err = loadApps(os.DirFS(filepath.Join(filepath.Dir(dir), "apps"))); err != nil {
+			log.Fatal(err)
+		}
 		log.Printf("POSTERN_DEV: serving UI from %s (hard-refresh; run npm run dev to rebuild the stylesheet too)", dir)
 	}
 	log.Printf("postern %s", Version)
@@ -192,6 +204,10 @@ func main() {
 	adminMux.HandleFunc("GET /admin/api/services", app.listServices)
 	adminMux.HandleFunc("POST /admin/api/services", app.createService)
 	adminMux.HandleFunc("POST /admin/api/services/test", app.testConnection)
+	adminMux.HandleFunc("POST /admin/api/services/detect", app.detectService)
+	adminMux.HandleFunc("POST /admin/api/icons", app.uploadIcon)
+	adminMux.HandleFunc("GET /admin/icons/{file}", app.serveUploadedIcon)
+	adminMux.HandleFunc("GET /admin/app-icons/{file}", app.serveAppIcon)
 	adminMux.HandleFunc("PUT /admin/api/services/{name}", app.updateService)
 	adminMux.HandleFunc("PATCH /admin/api/services/{name}", app.patchService)
 	adminMux.HandleFunc("POST /admin/api/services/{name}/duplicate", app.duplicateService)

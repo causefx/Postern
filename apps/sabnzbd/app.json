@@ -1,0 +1,26 @@
+{
+  "$schema": "../schema.json",
+  "label": "SABnzbd",
+  "auth": {
+    "query": "apikey"
+  },
+  "keyHint": "Config → General → Security → API Key",
+  "match": {
+    "title": [
+      "sabnzbd"
+    ]
+  },
+  "probe": {
+    "path": "api?mode=version&output=json",
+    "discover": true,
+    "jsonKeys": [
+      "version"
+    ],
+    "version": {
+      "json": "version"
+    }
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

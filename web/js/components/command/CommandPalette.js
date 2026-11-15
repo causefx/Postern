@@ -1,5 +1,6 @@
 import { h } from '../../lib/h.js';
 import { Icon } from '../common/Icon.js';
+import { ServiceIcon } from '../common/ServiceIcon.js';
 import { state, setState } from '../../state.js';
 import { commandSections } from '../../lib/commands.js';
 
@@ -99,7 +100,9 @@ export function CommandPalette({ onAdd, onReload, onEdit, onSettings, onUpdate }
             },
             onClick: () => run(item),
           },
-          Icon(item.icon || 'search', { size: 16, className: 'shrink-0 text-muted' }),
+          item.service
+            ? ServiceIcon({ name: item.service.name, app: item.service.app, icon: item.service.icon, size: 'sm' }).el
+            : Icon(item.icon || 'search', { size: 16, className: 'shrink-0 text-muted' }),
           h('span', { className: 'flex-1 text-left truncate' }, item.label),
         );
         rows[idx] = row;

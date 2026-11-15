@@ -1,6 +1,7 @@
 import { h } from '../../lib/h.js';
 import { Button } from '../common/Button.js';
 import { Icon } from '../common/Icon.js';
+import { ServiceIcon } from '../common/ServiceIcon.js';
 import { setState, isSelected, toggleSelect } from '../../state.js';
 import { accessLabel, credBits, recentLabel, recentTitle, upstreamHost } from '../../lib/serviceDisplay.js';
 import { copyServiceToken } from '../../lib/serviceActions.js';
@@ -65,6 +66,7 @@ export function ServiceRow({ service, index, focused, onOpen }) {
       h(
         'span',
         { className: 'inline-flex items-center gap-2 min-w-0' },
+        ServiceIcon({ name: service.name, app: service.app, icon: service.icon, size: 'row' }).el,
         h('span', { className: 'svc-name' }, service.name),
         showEdited ? h('span', { className: 'edited-chip' }, 'edited') : null,
       ),

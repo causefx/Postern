@@ -222,6 +222,22 @@ Per service you can list **open paths** that skip the caller token check (useful
 
 Open paths are reachable by anyone who can hit the proxy port. Keep the list short and specific.
 
+### App detection and icons
+
+**Test**, next to the upstream address in the service drawer, reaches the address and shows the result in a card under the field: whether it answered, the HTTP status, and which app it is (with its version when the app reports one). If the app or its key setup on the service does not match yet, the card says how the app takes its key and where to find the key in that app, and **Set up for <app>** sets the service's app and adds each way the app takes its key to the upstream credentials, for you to fill in. It also names the service after the app if the name is still empty. Nothing changes until you click. When everything already matches, the card is just the status line. When the address does not answer, the card says why (timed out, connection refused, address not found, certificate not trusted).
+
+The apps Postern knows are the folders in [apps/](apps/): one per app, with an `app.json` that says how to recognise it and how it takes its key, and an `icon.svg`. Adding an app needs no code; see [apps/README.md](apps/README.md). An app Postern can recognise but cannot send a key to, such as qBittorrent, which signs in with a session cookie, gets a note instead of a suggestion.
+
+Detection first scores every app against the page the address already returns: a response header beats an exact string in the page, which beats the page title. Only when that names no app does it try the few public endpoints apps mark for discovery (at most six, each asked once). Those requests never carry the upstream credential and never follow a redirect to another host. The API is `POST /admin/api/services/detect` with `{"url": "..."}`.
+
+Each service shows an icon in the list, the drawer, the command palette and the request log. In order, it is:
+
+1. an icon you uploaded for the service (**App and icon → Upload icon…**),
+2. the bundled icon of the service's app, or
+3. a letter tile in a colour taken from the service name.
+
+Uploads must be PNG, JPEG or WebP, at most 512×512 pixels and 256 KB. SVG is refused because it can carry script, and every icon is served with a sandboxing `Content-Security-Policy` in case one is opened on its own. Uploaded icons are stored in an `icons/` folder beside the data file, named by the SHA-256 of their contents. An icon no service uses is removed an hour after it was uploaded.
+
 ### Data file
 
 Postern keeps its state in a few files in one directory (`data/` by default, `/data` in Docker):
@@ -233,6 +249,7 @@ Postern keeps its state in a few files in one directory (`data/` by default, `/d
 | `postern-data.json.audit` | admin changes | no |
 | `postern-data.json.activity` | recent requests | no |
 | `postern-data.json.usage` | when each token last authenticated | no |
+| `icons/` | uploaded service icons | no |
 
 Treat the data file like a secrets store; back it up privately.
 
@@ -331,7 +348,7 @@ This protects the file at rest: copies, backups, disk images, a leaked volume. I
 - **Redacted** has no secrets and is safe to commit or share. Upstream keys are written as empty strings (`"secret": ""`) and caller tokens are listed by name only.
 - **Full backup** includes every upstream key and every caller token in plain text, so it is as sensitive as an unencrypted data file. You must tick a box to build it, and each one is written to the admin log. It is not encrypted by Postern. If you want an encrypted backup, copy the data file itself while a `POSTERN_KEY` is set.
 
-The file holds services only: name, URL, upstream auth, caller gate, open paths and caller tokens (with their scope, pause and expiry). Settings and the log files are not included.
+The file holds services only: name, URL, upstream auth, caller gate, open paths, caller tokens (with their scope, pause and expiry), and each service's app and icon. Uploaded icons are carried in the file's `icons` map, base64 encoded, in both modes, since they are not secret. Settings and the log files are not included.
 
 ```json
 {
@@ -358,6 +375,7 @@ The file holds services only: name, URL, upstream auth, caller gate, open paths 
 - A **redacted** file has no upstream keys, so a new service that needs one is an error until you add the key to the file. When you overwrite an existing service from a redacted file, it keeps the key it has.
 - Caller tokens in a redacted file are matched by name. A token with the same name on the service being overwritten keeps its secret, so callers keep working. Any other token is created with a new secret, and tokens missing from the file are removed. A full backup brings its own secrets and token IDs back.
 - A token secret written in a file must be at least 16 characters. Leave it out and Postern makes one.
+- Icons in the file are checked like uploads and stored under the hash of their contents. A service that names an icon the file does not carry, and Postern does not already have, is imported without one. A file from before apps and icons existed leaves an overwritten service's app and icon as they are.
 
 The API is `POST /admin/api/export` (`{"mode":"redacted"}` or `{"mode":"full","confirm":true}`) and `POST /admin/api/import` (`{"config": <file>, "overwrite": false, "dryRun": true}`). Both need an admin session and the `X-Postern-Admin` header.
 
@@ -392,6 +410,8 @@ Set `POSTERN_UPDATE_CHECK=off` to turn it off: no request is ever made, and the 
 | `POSTERN_OIDC_ISSUER` | _(off)_ | OpenID Connect issuer. Also set `POSTERN_OIDC_CLIENT_ID`. See above |
 
 ## License
+
+The app icons in `apps/` come from [Dashboard Icons](https://github.com/homarr-labs/dashboard-icons) and are used under the Apache License 2.0; see [apps/LICENSES/dashboard-icons.txt](apps/LICENSES/dashboard-icons.txt). Each app's `app.json` names where its icon comes from. The logos are trademarks of their projects and are shown only to identify each app.
 
 Postern is **source-available** under the [PolyForm Shield License 1.0.0](LICENSE), not an open-source license. In plain terms:
 

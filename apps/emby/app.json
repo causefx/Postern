@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "label": "Emby",
+  "auth": {
+    "header": "X-Emby-Token"
+  },
+  "keyHint": "Server dashboard → API Keys → New API Key",
+  "match": {
+    "title": [
+      "emby"
+    ]
+  },
+  "probe": {
+    "path": "System/Info/Public",
+    "discover": true,
+    "json": {
+      "ProductName": {
+        "contains": "Emby"
+      }
+    },
+    "version": {
+      "json": "Version"
+    }
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

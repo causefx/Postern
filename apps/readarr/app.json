@@ -1,0 +1,20 @@
+{
+  "$schema": "../schema.json",
+  "label": "Readarr",
+  "auth": {
+    "header": "X-Api-Key",
+    "query": "apikey"
+  },
+  "keyHint": "Settings → General → Security → API Key",
+  "match": {
+    "title": [
+      "readarr"
+    ],
+    "body": [
+      "window.Readarr"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "../schema.json",
+  "label": "qBittorrent",
+  "auth": null,
+  "note": "It signs in with a session cookie, which Postern cannot send. Its API cannot be reached with a key.",
+  "match": {
+    "title": [
+      "qbittorrent"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

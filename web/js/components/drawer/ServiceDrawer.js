@@ -11,7 +11,18 @@ import { ServiceDrawerTabs } from './ServiceDrawerTabs.js';
 import { api } from '../../api.js';
 import { rise } from '../../lib/motion.js';
 import { slugify } from '../../lib/slug.js';
-import { authFromView, authToPayload, emptyAuth, isAuthNone } from '../../lib/authPresets.js';
+import {
+  addAppAuth,
+  authFromView,
+  authToPayload,
+  describeAddedSlots,
+  describeAppAuth,
+  emptyAuth,
+  isAuthNone,
+  missingAppAuth,
+} from '../../lib/authPresets.js';
+import { appInfo, appList } from '../../lib/apps.js';
+import { ServiceIcon } from '../common/ServiceIcon.js';
 import { defaultGate, gateFromView } from '../../lib/callerGate.js';
 import { draftSnapshot, draftSaveBody, openPathCount } from '../../lib/drawerDraft.js';
 import { copyValue } from '../../lib/clipboard.js';
@@ -136,7 +147,12 @@ function createController({ mode, service, handlers }) {
       : [],
     auth: isEdit ? authFromView(service.auth) : emptyAuth(),
     gate: isEdit ? gateFromView(service.gate) : defaultGate(),
+    app: isEdit ? service.app || '' : '',
+    icon: isEdit ? service.icon || '' : '',
   };
+  // The last Test: null until one runs; { testing: true } while it runs; then { res } or { error }.
+  let test = null;
+  let testSeq = 0;
 
   function snapshot() {
     return draftSnapshot(draft);
@@ -182,7 +198,8 @@ function createController({ mode, service, handlers }) {
 
   // Hidden while empty so it does not hold a blank line (plus the panel gap) under every tab.
   const errBox = h('p', { className: 'text-danger text-sm m-0 min-h-5 px-1 empty:hidden' });
-  const testResult = h('p', { className: 'text-sm m-0 min-h-5' });
+  // The Test result, attached under the upstream URL field. Empty until a test runs.
+  const testCard = h('div', { className: 'test-card-host', 'aria-live': 'polite' });
   const wasUrl = h('p', { className: 'm-0 text-xs text-muted' });
   const renameHint = h('p', { className: 'm-0 text-xs text-muted leading-relaxed' });
   const dirtyLabel = h('span', { className: 'drawer-dirty-label' }, '');
@@ -220,6 +237,8 @@ function createController({ mode, service, handlers }) {
 
   const header = ServiceDrawerHeader({
     name: isEdit ? service.name : 'New service',
+    app: draft.app,
+    icon: draft.icon,
     enabled: draft.enabled,
     ...pagerState(),
     onToggle: (on) => setLive(on),
@@ -268,6 +287,8 @@ function createController({ mode, service, handlers }) {
       draft.url = e.target.value;
       updateHints();
       markDirty();
+      // A result belongs to the address that was tested.
+      if (test) clearTest();
     },
   });
   const urlTestBtn = h(
@@ -338,6 +359,213 @@ function createController({ mode, service, handlers }) {
     }
   }
 
+  // ---------- Test result ----------
+
+  function clearTest() {
+    test = null;
+    testSeq++;
+    urlField.classList.remove('has-test-card');
+    testCard.replaceChildren();
+  }
+
+  /** What Set up would still change for the detected app: { app, missing }, or null. */
+  function pendingSetup(info, appId) {
+    const missing = missingAppAuth(draft.auth, info.auth);
+    const needsApp = draft.app !== appId;
+    if (!needsApp && !Object.keys(missing).length) return null;
+    return { needsApp, missing };
+  }
+
+  function setUpApp(appId) {
+    const info = appInfo(appId);
+    if (!info) return;
+    addAppAuth(draft.auth, info.auth);
+    if (isAuthNone(draft.auth) && draft.access === 'upstream') draft.access = 'postern';
+    draft.app = appId;
+    if (!draft.name.trim() && !savedName) {
+      draft.name = appId;
+      nameInput.value = draft.name;
+      header.update({ name: draft.name });
+      updateHints();
+      proxyInput.value = publicBase();
+    }
+    header.update({ app: draft.app });
+    markDirty();
+    if (activeTab === 'connection') renderConnection();
+    else renderTestCard();
+  }
+
+  /** Why a test could not reach the address, from the server's errorKind: [title, detail]. */
+  function unreachable(res) {
+    switch (res?.errorKind) {
+      case 'timeout':
+        return ['No response · timed out after 5 s', 'Check the address, or that Postern can reach that network.'];
+      case 'refused':
+        return ['Connection refused', 'Nothing is listening at that address and port.'];
+      case 'dns':
+        return ['Address not found', 'Postern cannot resolve that host name.'];
+      case 'tls':
+        return ['Certificate not trusted', 'Postern does not trust the HTTPS certificate at that address.'];
+      case 'redirect':
+        return ['Too many redirects', 'The address kept redirecting.'];
+      default:
+        return ['Could not reach it', res?.error || ''];
+    }
+  }
+
+  function renderTestCard() {
+    if (!test) {
+      urlField.classList.remove('has-test-card');
+      testCard.replaceChildren();
+      return;
+    }
+    urlField.classList.add('has-test-card');
+    const status = (tone, icon, ...text) =>
+      h('div', { className: `test-card-status is-${tone}` }, icon ? Icon(icon, { size: 14 }) : null, h('span', {}, ...text));
+
+    if (test.testing) {
+      testCard.replaceChildren(h('div', { className: 'test-card' }, status('muted', null, 'Testing…')));
+      return;
+    }
+    if (test.error || !test.res?.ok) {
+      const [title, detail] = test.error ? ['Could not test', test.error] : unreachable(test.res);
+      testCard.replaceChildren(
+        h(
+          'div',
+          { className: 'test-card' },
+          status('danger', 'alert', title),
+          detail ? h('p', { className: 'test-card-detail' }, detail) : null,
+        ),
+      );
+      return;
+    }
+
+    const res = test.res;
+    const d = res.detected;
+    const info = d ? appInfo(d.app) : null;
+    const appName = info ? `${info.label}${d.version ? ' ' + d.version : ''}` : '';
+    const setup = info ? pendingSetup(info, d.app) : null;
+    const line = res.authRejected
+      ? status('warning', 'alert', `Reached${appName ? ' ' + appName : ''}, but it rejected the key · HTTP ${res.status}`)
+      : status(
+          'success',
+          'check',
+          ['Reachable', `HTTP ${res.status}`, appName].filter(Boolean).join(' · '),
+          info && !setup ? h('span', { className: 'test-card-aside' }, ' · app and key match') : null,
+        );
+    const card = h('div', { className: 'test-card' }, line);
+
+    if (info && setup) {
+      const lead = info.auth
+        ? [`${info.label} takes its key as `, h('strong', {}, describeAppAuth(info.auth)), '.']
+        : [info.note || `${info.label} cannot be used with a key.`];
+      const added = describeAddedSlots(setup.missing);
+      const effect = [
+        setup.needsApp ? `Sets the app to ${info.label}` : '',
+        added ? `${setup.needsApp ? 'and adds' : 'Adds'} ${added} for you to fill in` : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
+      card.append(
+        h(
+          'div',
+          { className: 'test-card-body' },
+          ServiceIcon({ name: info.label, app: d.app, size: 'md' }).el,
+          h(
+            'div',
+            { className: 'test-card-text' },
+            h('span', {}, ...lead),
+            info.auth && info.keyHint
+              ? h('span', { className: 'test-card-hint' }, `Find it in ${info.label}: ${info.keyHint}`)
+              : null,
+          ),
+          Button({ size: 'sm', variant: 'primary', onClick: () => setUpApp(d.app) }, `Set up for ${info.label}`),
+        ),
+        effect ? h('p', { className: 'test-card-foot' }, `${effect}.`) : null,
+      );
+    }
+    testCard.replaceChildren(card);
+  }
+
+  const iconFileInput = h('input', {
+    type: 'file',
+    accept: 'image/png,image/jpeg,image/webp',
+    hidden: true,
+    onChange: async (e) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      if (file.size > 256 * 1024) {
+        toast.error('That image is too large', { detail: 'Use a PNG, JPEG or WebP of 256 KB or less.' });
+        return;
+      }
+      try {
+        const res = await api.uploadIcon(file);
+        draft.icon = res.icon;
+        header.update({ icon: draft.icon });
+        markDirty();
+        if (activeTab === 'connection') renderConnection();
+      } catch (err) {
+        toast.error("Couldn't use that image", { detail: err.errors?.icon || err.message });
+      }
+    },
+  });
+
+  function iconPicker() {
+    const preview = ServiceIcon({ name: draft.name || savedName || '?', app: draft.app, icon: draft.icon, size: 'lg' });
+    const select = h(
+      'select',
+      {
+        className: 'auth-row-select',
+        id: 'svc-app',
+        onChange: (e) => {
+          draft.app = e.target.value;
+          header.update({ app: draft.app });
+          preview.update({ app: draft.app });
+          markDirty();
+          renderTestCard();
+        },
+      },
+      h('option', { value: '', selected: !draft.app }, 'None'),
+      ...appList().map((a) => h('option', { value: a.id, selected: draft.app === a.id }, a.label)),
+      // An app this version does not list (from a newer Postern's file) stays selectable.
+      draft.app && !appInfo(draft.app) ? h('option', { value: draft.app, selected: true }, draft.app) : null,
+    );
+    const actions = h(
+      'div',
+      { className: 'icon-picker-actions' },
+      Button({ size: 'sm', onClick: () => iconFileInput.click() }, draft.icon ? 'Replace icon…' : 'Upload icon…'),
+      draft.icon
+        ? Button(
+            {
+              size: 'sm',
+              variant: 'ghost',
+              onClick: () => {
+                draft.icon = '';
+                header.update({ icon: '' });
+                markDirty();
+                renderConnection();
+              },
+            },
+            'Remove custom icon',
+          )
+        : null,
+    );
+    return h(
+      'div',
+      { className: 'flex flex-col gap-1.5' },
+      h('label', { className: 'field-label', htmlFor: 'svc-app' }, 'App and icon'),
+      h('div', { className: 'icon-picker' }, preview.el, select, actions, iconFileInput),
+      h(
+        'p',
+        { className: 'm-0 text-xs text-muted leading-relaxed' },
+        draft.icon
+          ? 'The custom icon shows instead of the app’s.'
+          : 'The app sets the icon. Upload a PNG, JPEG or WebP (up to 512×512, 256 KB) to use your own.',
+      ),
+    );
+  }
+
   function renderActiveTab() {
     if (activeTab === 'connection') renderConnection();
     else if (activeTab === 'access') renderAccess();
@@ -375,19 +603,22 @@ function createController({ mode, service, handlers }) {
           h('label', { className: 'field-label', htmlFor: 'svc-upstream-url' }, 'Upstream URL'),
           (() => {
             urlInput.id = 'svc-upstream-url';
-            return urlField;
+            // The result card hangs off the field, so the two sit together with no gap. It is
+            // redrawn with the tab, since what is left to set up may have changed.
+            renderTestCard();
+            return h('div', { className: 'flex flex-col' }, urlField, testCard);
           })(),
           wasUrl,
-          testResult,
         ),
+        iconPicker(),
         AuthRowsEditor({
           auth: draft.auth,
           editing: !!savedName,
-          showPresets: !savedName,
           serviceLabel: serviceLabel(),
           onChange: () => {
             if (isAuthNone(draft.auth) && draft.access === 'upstream') draft.access = 'postern';
             markDirty();
+            renderTestCard();
           },
         }),
         errBox,
@@ -482,28 +713,25 @@ function createController({ mode, service, handlers }) {
   }
 
   async function runTest() {
-    testResult.textContent = 'Testing…';
-    testResult.className = 'text-sm m-0 min-h-5 text-muted';
+    const seq = ++testSeq;
+    test = { testing: true };
+    renderTestCard();
     try {
-      const res = await api.testConnection({
-        url: draft.url,
-        auth: authToPayload(draft.auth),
-        name: savedName || undefined,
+      // Leave out slots with no key yet (typed or stored), such as ones Set up just added: the test
+      // should still say whether the address answers, not that a key is missing.
+      const auth = authToPayload({
+        header: draft.auth.header?.secret || draft.auth.header?.stored ? draft.auth.header : null,
+        query: draft.auth.query?.secret || draft.auth.query?.stored ? draft.auth.query : null,
+        authz: draft.auth.authz?.secret || draft.auth.authz?.stored ? draft.auth.authz : null,
       });
-      if (res.authRejected) {
-        testResult.className = 'text-sm m-0 min-h-5 text-warning';
-        testResult.textContent = res.warning || `Reached the service, but it rejected the credential (HTTP ${res.status})`;
-      } else if (res.ok) {
-        testResult.className = 'text-sm m-0 min-h-5 text-success';
-        testResult.textContent = `✓ Reachable · HTTP ${res.status}`;
-      } else {
-        testResult.className = 'text-sm m-0 min-h-5 text-danger';
-        testResult.textContent = res.error || 'Unreachable';
-      }
+      const res = await api.testConnection({ url: draft.url, auth, name: savedName || undefined });
+      if (seq !== testSeq) return;
+      test = { res };
     } catch (e) {
-      testResult.className = 'text-sm m-0 min-h-5 text-danger';
-      testResult.textContent = e.message;
+      if (seq !== testSeq) return;
+      test = { error: e.message };
     }
+    renderTestCard();
   }
 
   async function save() {
@@ -524,6 +752,8 @@ function createController({ mode, service, handlers }) {
       tokens = saved.tokens || tokens;
       draft.name = saved.name;
       draft.enabled = !!saved.enabled;
+      draft.app = saved.app || '';
+      draft.icon = saved.icon || '';
       nameInput.value = saved.name;
       baseline = snapshot();
       markDirty();
@@ -533,7 +763,7 @@ function createController({ mode, service, handlers }) {
       origUrl = saved.url || draft.url;
       updateHints();
       panel.setAttribute('aria-label', `Edit ${savedName}`);
-      header.update({ name: saved.name, enabled: draft.enabled, ...pagerState() });
+      header.update({ name: saved.name, app: draft.app, icon: draft.icon, enabled: draft.enabled, ...pagerState() });
       tabs.refresh();
       handlers.onSaved?.(saved, { created: creating, renamed: !!(prevName && saved.name !== prevName) });
       toast.success(creating ? 'Service created' : 'Service saved', { detail: savedName });
@@ -565,17 +795,19 @@ function createController({ mode, service, handlers }) {
     }));
     draft.auth = authFromView(svc.auth);
     draft.gate = gateFromView(svc.gate);
+    draft.app = svc.app || '';
+    draft.icon = svc.icon || '';
+    clearTest();
     nameInput.value = draft.name;
     urlInput.value = draft.url;
     panel.setAttribute('aria-label', `Edit ${svc.name}`);
     baseline = snapshot();
     errBox.textContent = '';
-    testResult.textContent = '';
     proxyInput.value = publicBase();
     updateHints();
     renderDelete();
     paintChrome();
-    header.update({ name: svc.name, enabled: draft.enabled, ...pagerState() });
+    header.update({ name: svc.name, app: draft.app, icon: draft.icon, enabled: draft.enabled, ...pagerState() });
     tabs.refresh();
     renderActiveTab();
   }

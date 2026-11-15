@@ -1,6 +1,7 @@
 import { api } from '../api.js';
 import { state, setState, clearSelection, filteredServices, toggleSelect } from '../state.js';
 import { copyServiceToken, toggleServiceEnabled, setManyEnabled } from './serviceActions.js';
+import { appInfo } from './apps.js';
 import { THEME_OPTIONS, getThemePreference, resolveTheme, setThemePreference } from './theme.js';
 import { openBulkRotateDialog } from '../components/dialogs/BulkRotateDialog.js';
 import { openBulkDeleteDialog } from '../components/dialogs/BulkDeleteDialog.js';
@@ -184,8 +185,10 @@ export function commandSections({ query = '', onAdd, onReload, onEdit, onSetting
 
   const svcItems = [];
   for (const s of state.services.slice().sort((a, b) => a.name.localeCompare(b.name))) {
+    // Typing the app's name ("sonarr") finds a service named something else ("tv").
+    const app = appInfo(s.app);
     const cmds = [
-      { id: `edit-${s.name}`, label: `Edit — ${s.name}`, icon: 'chevron', run: () => onEdit?.(s) },
+      { id: `edit-${s.name}`, label: `Edit — ${s.name}`, icon: 'chevron', service: s, run: () => onEdit?.(s) },
       { id: `copy-${s.name}`, label: `Copy token — ${s.name}`, icon: 'copy', run: () => copyServiceToken(s) },
       {
         id: `toggle-${s.name}`,
@@ -225,7 +228,7 @@ export function commandSections({ query = '', onAdd, onReload, onEdit, onSetting
       },
     ];
     for (const c of cmds) {
-      if (matches(query, c.label) || matches(query, s.name)) {
+      if (matches(query, c.label) || matches(query, s.name) || (app && matches(query, app.label))) {
         svcItems.push({ ...c, section: 'services' });
       }
     }

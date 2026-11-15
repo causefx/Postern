@@ -1,0 +1,25 @@
+{
+  "$schema": "../schema.json",
+  "label": "Plex",
+  "auth": {
+    "query": "X-Plex-Token"
+  },
+  "keyHint": "Your X-Plex-Token: open any item → ⋯ → Get Info → View XML, and copy it from the address",
+  "match": {
+    "header": "X-Plex-Protocol"
+  },
+  "probe": {
+    "path": "identity",
+    "discover": true,
+    "text": [
+      "<MediaContainer",
+      "machineIdentifier="
+    ],
+    "version": {
+      "regex": "<MediaContainer\\b[^>]*\\sversion=\"([0-9]+(?:\\.[0-9]+){0,2})"
+    }
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

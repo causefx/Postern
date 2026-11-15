@@ -16,7 +16,7 @@ import {
   sortResults,
 } from '../../lib/configFile.js';
 
-const MAX_BYTES = 1024 * 1024;
+const MAX_BYTES = 8 * 1024 * 1024;
 const MARK_ICON = { create: 'plus', overwrite: 'rotate', skip: 'minus', error: 'alert' };
 /** The first check never flashes past: the "Checking" screen stays at least this long. */
 const MIN_WAIT_MS = 450;

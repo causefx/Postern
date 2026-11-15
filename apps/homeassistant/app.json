@@ -1,0 +1,19 @@
+{
+  "$schema": "../schema.json",
+  "label": "Home Assistant",
+  "auth": {
+    "authz": "bearer"
+  },
+  "keyHint": "Your profile → Security → Long-lived access tokens → Create token",
+  "match": {
+    "title": [
+      "home assistant"
+    ],
+    "body": [
+      "home-assistant-main"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

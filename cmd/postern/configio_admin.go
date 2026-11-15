@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -34,6 +35,7 @@ func (a *App) exportConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	doc, stats := a.store.ExportConfig(full, time.Now())
+	a.attachIcons(&doc)
 	if full {
 		a.record(auditEvent{
 			Action: "export",
@@ -76,6 +78,19 @@ func (a *App) importConfig(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err.Error())
 		return
 	}
+	icons, err := a.resolveImportIcons(&doc)
+	if err != nil {
+		writeErr(w, 400, err.Error())
+		return
+	}
+	if !in.DryRun {
+		for _, b := range icons {
+			if _, err := a.icons.save(b); err != nil {
+				writeErr(w, 500, "could not save the icons in the file")
+				return
+			}
+		}
+	}
 
 	out, err := a.store.ImportConfig(doc, in.Overwrite, in.DryRun)
 	body := map[string]any{
@@ -107,6 +122,7 @@ func (a *App) importConfig(w http.ResponseWriter, r *http.Request) {
 			mode = "redacted"
 		}
 		a.record(auditEvent{Action: "import", Mode: mode, Detail: importDetail(out.Counts)})
+		a.sweepIcons()
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, 200, body)
@@ -129,4 +145,68 @@ func plural(n int, word string) string {
 		return fmt.Sprintf("1 %s", word)
 	}
 	return fmt.Sprintf("%d %ss", n, word)
+}
+
+// attachIcons copies the uploaded icons the exported services use into the file. A service whose
+// icon file has gone missing is exported without one.
+func (a *App) attachIcons(doc *configFile) {
+	for i := range doc.Services {
+		cs := &doc.Services[i]
+		if cs.Icon == nil {
+			continue
+		}
+		name := *cs.Icon
+		if _, done := doc.Icons[name]; done {
+			continue
+		}
+		b, err := a.icons.read(name)
+		if err != nil {
+			cs.Icon = nil
+			continue
+		}
+		if doc.Icons == nil {
+			doc.Icons = map[string]string{}
+		}
+		doc.Icons[name] = base64.StdEncoding.EncodeToString(b)
+	}
+}
+
+// resolveImportIcons checks the icons carried in an import file and returns the ones to store.
+// Each is renamed after its own contents, and the services follow the new name, so an edited file
+// cannot store an image under another image's name. A service pointing at an icon that is neither
+// in the file nor already stored loses the icon rather than failing the import: icons are only
+// decoration.
+func (a *App) resolveImportIcons(doc *configFile) ([][]byte, error) {
+	if len(doc.Icons) > maxImportIcons {
+		return nil, fmt.Errorf("The file has more than %d icons", maxImportIcons)
+	}
+	rename := map[string]string{}
+	var blobs [][]byte
+	for name, enc := range doc.Icons {
+		b, err := base64.StdEncoding.DecodeString(enc)
+		if err != nil {
+			return nil, fmt.Errorf("Icon %q in the file is not valid base64", name)
+		}
+		ext, err := checkIcon(b)
+		if err != nil {
+			return nil, fmt.Errorf("Icon %q in the file cannot be used: %v", name, err)
+		}
+		rename[name] = iconName(b, ext)
+		blobs = append(blobs, b)
+	}
+	for i := range doc.Services {
+		cs := &doc.Services[i]
+		if cs.Icon == nil || *cs.Icon == "" {
+			continue
+		}
+		if to, ok := rename[*cs.Icon]; ok {
+			cs.Icon = &to
+			continue
+		}
+		if !a.icons.exists(*cs.Icon) {
+			none := ""
+			cs.Icon = &none
+		}
+	}
+	return blobs, nil
 }

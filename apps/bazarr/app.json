@@ -1,0 +1,17 @@
+{
+  "$schema": "../schema.json",
+  "label": "Bazarr",
+  "auth": {
+    "header": "X-Api-Key",
+    "query": "apikey"
+  },
+  "keyHint": "Settings → General → Security → API Key",
+  "match": {
+    "title": [
+      "bazarr"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

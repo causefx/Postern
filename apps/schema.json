@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/causefx/Postern/apps/schema.json",
+  "title": "Postern app",
+  "description": "One self-hosted app Postern knows. The folder name is the app id.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["label", "auth", "icon"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "label": {
+      "description": "The app's name as people write it.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40
+    },
+    "auth": {
+      "description": "How the app takes its key. Give each way it accepts. null when Postern cannot send its key (then give a note).",
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "header": {
+          "description": "The header the key goes in, such as X-Api-Key.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9-]{2,60}$"
+        },
+        "query": {
+          "description": "The URL parameter the key goes in, such as apikey.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9-]{2,60}$"
+        },
+        "authz": {
+          "description": "An Authorization header scheme: bearer for a token, basic for a user name and password.",
+          "enum": ["bearer", "basic"]
+        }
+      }
+    },
+    "keyHint": {
+      "description": "Where the key is found in the app, as a menu path: 'Settings → General → Security → API Key'.",
+      "type": "string",
+      "maxLength": 200
+    },
+    "note": {
+      "description": "Shown instead of a key suggestion, for an app Postern can recognise but not send a key to.",
+      "type": "string",
+      "maxLength": 200
+    },
+    "match": {
+      "description": "How the app's own page gives it away. Checked against the page the upstream address returns, with no extra request.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "description": "Lower-case words found in the page <title>, as whole words.",
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[^A-Z]{2,60}$" }
+        },
+        "body": {
+          "description": "Exact strings found in the page, such as 'window.Sonarr'. At least 6 characters, so they do not match other apps.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 6, "maxLength": 100 }
+        },
+        "header": {
+          "description": "A response header only this app sends.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9-]{2,60}$"
+        }
+      }
+    },
+    "probe": {
+      "description": "A public endpoint that confirms the app and reports its version. It is sent without the upstream key.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": {
+        "path": {
+          "description": "Relative to the upstream address, without a leading slash. May carry a query.",
+          "type": "string",
+          "pattern": "^[^/][^\\s]*$",
+          "maxLength": 200
+        },
+        "discover": {
+          "description": "Also try this probe when the page named no app. Only a few paths may do this, so keep it for endpoints that answer without a key and that several installs leave unbranded.",
+          "type": "boolean"
+        },
+        "json": {
+          "description": "Top-level fields of a JSON answer, each with one test.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "minProperties": 1,
+            "maxProperties": 1,
+            "properties": {
+              "contains": { "type": "string", "minLength": 1 },
+              "equals": { "type": "string" },
+              "present": { "const": true }
+            }
+          }
+        },
+        "jsonKeys": {
+          "description": "The JSON answer must have exactly these top-level keys.",
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "text": {
+          "description": "Strings the answer must contain.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "version": {
+          "description": "Where the version is: a top-level JSON field, or a regex whose first group is the version.",
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "maxProperties": 1,
+          "properties": {
+            "json": { "type": "string", "minLength": 1 },
+            "regex": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "icon": {
+      "description": "Where icon.svg comes from. LICENSES/<source>.txt must hold its licence.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source"],
+      "properties": {
+        "source": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$" }
+      }
+    }
+  }
+}

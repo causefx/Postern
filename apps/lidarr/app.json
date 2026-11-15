@@ -1,0 +1,20 @@
+{
+  "$schema": "../schema.json",
+  "label": "Lidarr",
+  "auth": {
+    "header": "X-Api-Key",
+    "query": "apikey"
+  },
+  "keyHint": "Settings → General → Security → API Key",
+  "match": {
+    "title": [
+      "lidarr"
+    ],
+    "body": [
+      "window.Lidarr"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

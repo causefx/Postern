@@ -53,6 +53,10 @@ Some conventions:
 - Animation goes through `web/js/lib/motion.js` (`rise`, `reveal`, `expand`, `slideIn`, `pop`), which builds on a vendored copy of [Motion](https://motion.dev)'s mini build in `web/js/vendor/`. It does nothing for people who prefer reduced motion. The dashboard repaints itself on every state change, so play an entrance once per item with `reveal` and a stable key, never from a render function directly. To upgrade Motion, bump `motion` in `package.json` and run `npm run vendor:motion`.
 - Keep user-facing text plain and short.
 
+## Adding an app
+
+Each app Postern recognises is a folder in [apps/](apps/) with an `app.json` and an `icon.svg`. Adding one needs no Go or JavaScript: follow [apps/README.md](apps/README.md), then run `go test ./cmd/postern/`, which checks every app folder. One app per pull request is easiest to review.
+
 ## Pull requests
 
 - Use a [Conventional Commit](https://www.conventionalcommits.org/) title, for example `fix: refuse dot segments in proxied paths` or `feat: add a per-service IP allowlist`. The title is the commit on `main` after a squash merge, and it decides the next version (`fix:` patch, `feat:` minor). CI checks it.

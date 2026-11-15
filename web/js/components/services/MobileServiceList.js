@@ -1,5 +1,6 @@
 import { h } from '../../lib/h.js';
 import { Icon } from '../common/Icon.js';
+import { ServiceIcon } from '../common/ServiceIcon.js';
 import { filteredServices, state, setState, isSelected, toggleSelect } from '../../state.js';
 import { credBits, recentLabel } from '../../lib/serviceDisplay.js';
 import { copyServiceToken, toggleServiceEnabled } from '../../lib/serviceActions.js';
@@ -58,6 +59,7 @@ function mobileRow(service, index, onOpen) {
       className: `mobile-status-dot${service.enabled ? ' is-live' : ''}`,
       'aria-hidden': 'true',
     }),
+    ServiceIcon({ name: service.name, app: service.app, icon: service.icon, size: 'md' }).el,
     h(
       'div',
       { className: 'flex-1 min-w-0 flex flex-col gap-0.5' },

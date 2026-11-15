@@ -1,0 +1,20 @@
+{
+  "$schema": "../schema.json",
+  "label": "Prowlarr",
+  "auth": {
+    "header": "X-Api-Key",
+    "query": "apikey"
+  },
+  "keyHint": "Settings → General → Security → API Key",
+  "match": {
+    "title": [
+      "prowlarr"
+    ],
+    "body": [
+      "window.Prowlarr"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

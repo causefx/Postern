@@ -1,0 +1,20 @@
+{
+  "$schema": "../schema.json",
+  "label": "Sonarr",
+  "auth": {
+    "header": "X-Api-Key",
+    "query": "apikey"
+  },
+  "keyHint": "Settings → General → Security → API Key",
+  "match": {
+    "title": [
+      "sonarr"
+    ],
+    "body": [
+      "window.Sonarr"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

@@ -2,10 +2,12 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -209,7 +211,9 @@ func (a *App) ui(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	w.Write(withVersion(b))
+	// The app list rides in the page as data, so the UI never waits for it. It is JSON with < > &
+	// escaped, inside a non-script type, so it cannot close the element or run.
+	w.Write(bytes.ReplaceAll(withVersion(b), []byte("{{APPS}}"), a.appReg().browser))
 }
 
 func (a *App) css(w http.ResponseWriter, r *http.Request) {
@@ -418,6 +422,8 @@ type view struct {
 	Token      string      `json:"token"`
 	Tokens     []tokenView `json:"tokens"`
 	Enabled    bool        `json:"enabled"`
+	App        string      `json:"app,omitempty"`
+	Icon       string      `json:"icon,omitempty"`
 	PublicBase string      `json:"publicBase"`
 	Requests   int         `json:"requests,omitempty"`
 	LastStatus int         `json:"lastStatus,omitempty"`
@@ -456,6 +462,8 @@ func toView(s Service, origin string) view {
 		Token:      s.Token,
 		Tokens:     tokens,
 		Enabled:    s.Enabled,
+		App:        s.App,
+		Icon:       s.Icon,
 		PublicBase: strings.TrimRight(origin, "/") + "/p/" + s.Name + "/",
 	}
 }
@@ -515,6 +523,24 @@ type serviceInput struct {
 	Gate      *CallerGate  `json:"gate"`
 	OpenPaths []OpenPath   `json:"openPaths"`
 	Enabled   *bool        `json:"enabled"`
+	// App and Icon are optional: left out, an update keeps what the service has. "" clears them.
+	App  *string `json:"app"`
+	Icon *string `json:"icon"`
+}
+
+func strOr(p *string, def string) string {
+	if p == nil {
+		return def
+	}
+	return strings.TrimSpace(*p)
+}
+
+// checkIconRef makes sure an icon name sent with a service is one that was uploaded.
+func (a *App) checkIconRef(name string) error {
+	if name == "" || a.icons.exists(name) {
+		return nil
+	}
+	return FieldError{"icon": "that icon is no longer stored; upload it again"}
 }
 
 func decodeJSON[T any](r *http.Request) (T, error) {
@@ -533,15 +559,21 @@ func (a *App) createService(w http.ResponseWriter, r *http.Request) {
 	if in.Enabled != nil {
 		enabled = *in.Enabled
 	}
+	icon := strOr(in.Icon, "")
+	if err := a.checkIconRef(icon); err != nil {
+		writeFieldErr(w, err)
+		return
+	}
 	svc, err := a.store.Create(Service{
 		Name: in.Name, URL: in.URL, Auth: in.Auth, Access: in.Access,
 		Gate: in.Gate, OpenPaths: in.OpenPaths, Enabled: enabled,
+		App: strOr(in.App, ""), Icon: icon,
 	})
 	if err != nil {
 		writeFieldErr(w, err)
 		return
 	}
-	a.record(auditEvent{Action: "create", Service: svc.Name, URL: svc.URL})
+	a.record(auditEvent{Action: "create", Service: svc.Name, URL: svc.URL, Detail: iconChange("", svc.Icon)})
 	writeJSON(w, 201, a.present(svc, requestOrigin(r)))
 }
 
@@ -555,9 +587,22 @@ func (a *App) updateService(w http.ResponseWriter, r *http.Request) {
 	if in.Enabled != nil {
 		enabled = *in.Enabled
 	}
+	cur, ok := a.store.Get(r.PathValue("name"))
+	if !ok {
+		writeErr(w, 404, "not found")
+		return
+	}
+	icon := strOr(in.Icon, cur.Icon)
+	if icon != cur.Icon {
+		if err := a.checkIconRef(icon); err != nil {
+			writeFieldErr(w, err)
+			return
+		}
+	}
 	svc, err := a.store.Update(r.PathValue("name"), Service{
 		Name: in.Name, URL: in.URL, Auth: in.Auth, Access: in.Access,
 		Gate: in.Gate, OpenPaths: in.OpenPaths, Enabled: enabled,
+		App: strOr(in.App, cur.App), Icon: icon,
 	})
 	if err != nil {
 		if errors.Is(err, errNotFound) {
@@ -567,7 +612,10 @@ func (a *App) updateService(w http.ResponseWriter, r *http.Request) {
 		writeFieldErr(w, err)
 		return
 	}
-	ev := auditEvent{Action: "update", Service: svc.Name, URL: svc.URL}
+	ev := auditEvent{Action: "update", Service: svc.Name, URL: svc.URL, Detail: iconChange(cur.Icon, svc.Icon)}
+	if ev.Detail != "" {
+		a.sweepIcons()
+	}
 	if prev := r.PathValue("name"); prev != svc.Name {
 		ev.From = prev
 		a.activity.rename(prev, svc.Name)
@@ -850,6 +898,7 @@ func (a *App) deleteService(w http.ResponseWriter, r *http.Request) {
 	a.usage.forget(tokenIDs...)
 	a.record(auditEvent{Action: "delete", Service: name})
 	a.activity.forget(name)
+	a.sweepIcons()
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -904,7 +953,9 @@ func (a *App) testConnection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		writeJSON(w, 200, map[string]any{"ok": false, "error": err.Error()})
 		return
@@ -924,12 +975,16 @@ func (a *App) testConnection(w http.ResponseWriter, r *http.Request) {
 	res, err := client.Do(req)
 	latency := time.Since(start).Milliseconds()
 	if err != nil {
-		writeJSON(w, 200, map[string]any{"ok": false, "error": err.Error()})
+		writeJSON(w, 200, map[string]any{"ok": false, "error": err.Error(), "errorKind": dialErrorKind(err)})
 		return
 	}
+	body, _ := io.ReadAll(io.LimitReader(res.Body, detectBodyLimit))
 	res.Body.Close()
 
 	msg := map[string]any{"ok": true, "status": res.StatusCode, "latencyMs": latency}
+	if d := a.appReg().fingerprint(ctx, u, res.Header, body); d != nil {
+		msg["detected"] = d
+	}
 	if res.StatusCode == 401 || res.StatusCode == 403 {
 		msg["ok"] = true
 		msg["warning"] = fmt.Sprintf("Reached the service, but it rejected the credential (HTTP %d)", res.StatusCode)

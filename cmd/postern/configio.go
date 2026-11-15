@@ -17,7 +17,11 @@ import (
 // Config export and import. The file is a versioned copy of the services: the same fields the data
 // file keeps, minus the legacy single token, plus a header that says whether the secrets are in it.
 //
-//	{ "version": 1, "exported": "2026-11-13T16:11:00Z", "redacted": true, "services": [ ... ] }
+//	{ "version": 1, "exported": "2026-11-13T16:11:00Z", "redacted": true, "services": [ ... ],
+//	  "icons": { "<sha256>.png": "<base64>" } }
+//
+// Uploaded service icons travel in the file, so a restore is complete. They are not secret and
+// are written in both kinds of file.
 //
 // A redacted file carries no secret. Upstream keys are written as empty strings and caller tokens
 // are left out, so importing it asks for the keys again and mints new tokens. A full file carries
@@ -26,9 +30,11 @@ import (
 const (
 	configFormat      = 1
 	maxImportServices = 200
-	// maxImportBytes caps the request body. A service is a couple of kilobytes at most. The screen
-	// refuses files over 1 MB; this leaves room for the request around them.
-	maxImportBytes = 2 << 20
+	// maxImportBytes caps the request body. A service is a couple of kilobytes at most, and an
+	// uploaded icon at most 256 KB before base64. The screen refuses files over 8 MB; this leaves
+	// room for the request around them.
+	maxImportBytes = 10 << 20
+	maxImportIcons = 50
 
 	minTokenSecret = 16
 	maxTokenSecret = 200
@@ -120,6 +126,10 @@ type configService struct {
 	Gate      *CallerGate   `json:"gate,omitempty"`
 	OpenPaths []OpenPath    `json:"openPaths,omitempty"`
 	Tokens    []configToken `json:"tokens,omitempty"`
+	// App and Icon are pointers so a file from before they existed leaves an overwritten
+	// service's app and icon alone.
+	App  *string `json:"app,omitempty"`
+	Icon *string `json:"icon,omitempty"`
 }
 
 type configFile struct {
@@ -127,6 +137,8 @@ type configFile struct {
 	Exported time.Time       `json:"exported"`
 	Redacted bool            `json:"redacted"`
 	Services []configService `json:"services"`
+	// Icons holds the uploaded icons the services use, base64 encoded, by stored name.
+	Icons map[string]string `json:"icons,omitempty"`
 }
 
 // configStats says what an export holds, for the screen that offers it.
@@ -157,6 +169,14 @@ func (s *Store) ExportConfig(full bool, now time.Time) (configFile, configStats)
 			Auth:      auth,
 			Gate:      cloneGate(svc.Gate),
 			OpenPaths: append([]OpenPath(nil), svc.OpenPaths...),
+		}
+		if svc.App != "" {
+			app := svc.App
+			cs.App = &app
+		}
+		if svc.Icon != "" {
+			icon := svc.Icon
+			cs.Icon = &icon
 		}
 		for _, t := range svc.Tokens {
 			ct := configToken{Name: t.Name, Paused: t.Paused, ExpiresAt: t.ExpiresAt, Scope: cloneScope(t.Scope)}
@@ -446,6 +466,22 @@ func buildImported(cs configService, cur Service, exists, redacted bool, owner m
 	paths, err := normalizeOpenPaths(cs.OpenPaths)
 	add(err)
 	svc.OpenPaths = paths
+
+	if exists {
+		svc.App, svc.Icon = cur.App, cur.Icon
+	}
+	if cs.App != nil {
+		svc.App = strings.TrimSpace(*cs.App)
+		if svc.App != "" && !appIDRe.MatchString(svc.App) {
+			errs["app"] = "app must be 1-32 chars: a-z, 0-9, dash"
+		}
+	}
+	if cs.Icon != nil {
+		svc.Icon = strings.TrimSpace(*cs.Icon)
+		if svc.Icon != "" && !iconNameRe.MatchString(svc.Icon) {
+			errs["icon"] = "icon is not a stored icon name"
+		}
+	}
 
 	svc.Tokens = importTokens(cs.Tokens, cur, exists, owner, errs)
 

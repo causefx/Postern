@@ -14,6 +14,7 @@ ARG VERSION=dev
 WORKDIR /src
 COPY go.mod ./
 COPY cmd ./cmd
+COPY apps ./apps
 COPY web ./web
 COPY --from=css /src/web/app.css ./web/app.css
 RUN test -f web/js/components/drawer/OpenPathsEditor.js \

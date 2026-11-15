@@ -5,6 +5,7 @@
     "dev": "node scripts/dev.mjs",
     "vendor:motion": "node scripts/vendor-motion.mjs",
     "build:css": "tailwindcss -i ./web/input.css -o ./web/app.css --minify",
+    "icons:optimize": "svgo --multipass -q -r -f apps",
     "dev:css": "tailwindcss -i ./web/input.css -o ./web/app.css --watch --poll"
   },
   "devDependencies": {
@@ -12,6 +13,7 @@
     "daisyui": "5.7.50",
     "esbuild": "0.28.2",
     "motion": "14.14.0",
+    "svgo": "4.1.0",
     "tailwindcss": "4.3.5"
   }
 }

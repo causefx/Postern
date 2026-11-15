@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "label": "Jellyfin",
+  "auth": {
+    "header": "X-Emby-Token"
+  },
+  "keyHint": "Dashboard → API Keys → +",
+  "match": {
+    "title": [
+      "jellyfin"
+    ]
+  },
+  "probe": {
+    "path": "System/Info/Public",
+    "discover": true,
+    "json": {
+      "ProductName": {
+        "contains": "Jellyfin"
+      }
+    },
+    "version": {
+      "json": "Version"
+    }
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

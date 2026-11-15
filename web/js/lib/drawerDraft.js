@@ -17,6 +17,8 @@ export function draftSnapshot(draft) {
     openPaths: cleanPaths(draft.openPaths),
     auth: authToPayload(draft.auth),
     gate: draft.access === 'postern' ? gateToPayload(draft.gate) : null,
+    app: draft.app || '',
+    icon: draft.icon || '',
   });
 }
 
@@ -30,6 +32,8 @@ export function draftSaveBody(draft) {
     gate: draft.access === 'postern' ? gateToPayload(draft.gate) : null,
     openPaths: cleanPaths(draft.openPaths),
     auth: authToPayload(draft.auth),
+    app: draft.app || '',
+    icon: draft.icon || '',
   };
 }
 

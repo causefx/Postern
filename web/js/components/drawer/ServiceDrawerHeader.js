@@ -1,7 +1,7 @@
 import { h } from '../../lib/h.js';
 import { Button } from '../common/Button.js';
 import { Icon } from '../common/Icon.js';
-import { nameTile } from '../../lib/serviceDisplay.js';
+import { ServiceIcon } from '../common/ServiceIcon.js';
 
 /**
  * Service drawer chrome: tile + name, Live|Off, pager, close.
@@ -9,6 +9,8 @@ import { nameTile } from '../../lib/serviceDisplay.js';
  */
 export function ServiceDrawerHeader({
   name,
+  app = '',
+  icon = '',
   enabled,
   index,
   total,
@@ -18,7 +20,7 @@ export function ServiceDrawerHeader({
   onNext,
   onClose,
 }) {
-  const tile = h('span', { className: 'svc-drawer-tile', 'aria-hidden': 'true' }, nameTile(name));
+  const tile = ServiceIcon({ name, app, icon, size: 'lg' });
   const title = h('h2', { className: 'svc-drawer-title font-display m-0' }, name || 'New service');
 
   const liveBtn = h(
@@ -94,7 +96,7 @@ export function ServiceDrawerHeader({
     h(
       'div',
       { className: 'svc-drawer-header-top' },
-      h('div', { className: 'svc-drawer-identity min-w-0' }, tile, title),
+      h('div', { className: 'svc-drawer-identity min-w-0' }, tile.el, title),
       closeBtn,
     ),
     h('div', { className: 'svc-drawer-header-controls' }, mode, pager),
@@ -103,8 +105,13 @@ export function ServiceDrawerHeader({
   function update(next = {}) {
     if (next.name != null) {
       name = next.name;
-      tile.textContent = nameTile(name);
       title.textContent = name || 'New service';
+    }
+    if (next.name != null || next.app !== undefined || next.icon !== undefined) {
+      const iconProps = { name };
+      if (next.app !== undefined) iconProps.app = next.app;
+      if (next.icon !== undefined) iconProps.icon = next.icon;
+      tile.update(iconProps);
     }
     if (next.enabled != null) enabled = next.enabled;
     if (next.index != null) index = next.index;

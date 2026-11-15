@@ -43,6 +43,11 @@ type Service struct {
 	Token     string        `json:"token"`
 	Tokens    []CallerToken `json:"tokens,omitempty"`
 	Enabled   bool          `json:"enabled"`
+	// App names the app behind the service, such as "sonarr", for its icon and setup hints. Empty
+	// means unknown.
+	App string `json:"app,omitempty"`
+	// Icon is the name of an uploaded icon in the icons folder. It wins over the app's icon.
+	Icon string `json:"icon,omitempty"`
 }
 
 // CallerToken is one named secret a caller may present.
@@ -178,6 +183,8 @@ type legacyService struct {
 	Token     string          `json:"token"`
 	Tokens    []CallerToken   `json:"tokens,omitempty"`
 	Enabled   bool            `json:"enabled"`
+	App       string          `json:"app,omitempty"`
+	Icon      string          `json:"icon,omitempty"`
 }
 
 var nameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,31}$`)
@@ -191,6 +198,12 @@ func (s *Service) validate(requireAuthSecret bool) error {
 		return errors.New("url must be a valid http(s) URL")
 	}
 	s.Access = normalizeAccess(s.Access)
+	if s.App != "" && !appIDRe.MatchString(s.App) {
+		return FieldError{"app": "app must be 1-32 chars: a-z, 0-9, dash"}
+	}
+	if s.Icon != "" && !iconNameRe.MatchString(s.Icon) {
+		return FieldError{"icon": "icon is not a stored icon name"}
+	}
 	if err := s.Auth.Validate(requireAuthSecret); err != nil {
 		return err
 	}
@@ -559,6 +572,8 @@ func (s *Store) Duplicate(name, newName string) (Service, error) {
 		Gate:      cloneGate(src.Gate),
 		OpenPaths: append([]OpenPath(nil), src.OpenPaths...),
 		Enabled:   src.Enabled,
+		App:       src.App,
+		Icon:      src.Icon,
 	}
 	if err := dup.validate(false); err != nil {
 		return Service{}, err
@@ -660,6 +675,8 @@ func serviceFromLegacy(leg legacyService) (Service, bool, error) {
 		Token:     leg.Token,
 		Tokens:    leg.Tokens,
 		Enabled:   leg.Enabled,
+		App:       leg.App,
+		Icon:      leg.Icon,
 	}
 	if paths, err := normalizeOpenPaths(svc.OpenPaths); err == nil {
 		svc.OpenPaths = paths
@@ -735,6 +752,8 @@ func cloneGate(g *CallerGate) *CallerGate {
 
 // Update patches an existing service. Empty auth.secret keeps the stored secret.
 // If in.Name is set and differs from name, the service is renamed (token preserved).
+// App and Icon are replaced as given; the handler fills them from the stored service when the
+// request leaves them out.
 func (s *Store) Update(name string, in Service) (Service, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -761,6 +780,8 @@ func (s *Store) Update(name string, in Service) (Service, error) {
 		return prev, errors.New("url must be a valid http(s) URL")
 	}
 	cur.Enabled = in.Enabled
+	cur.App = in.App
+	cur.Icon = in.Icon
 	if in.Access != "" {
 		cur.Access = normalizeAccess(in.Access)
 	}

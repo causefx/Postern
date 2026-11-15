@@ -76,6 +76,9 @@ export const api = {
       body: JSON.stringify({ name: newName }),
     }),
   testConnection: (body) => request('services/test', { method: 'POST', body: JSON.stringify(body) }),
+  /** Stores an image file as a service icon: { icon: '<name>' }, sent with the service on save. */
+  uploadIcon: (file) =>
+    request('icons', { method: 'POST', body: file, headers: { 'Content-Type': file.type || 'application/octet-stream' } }),
   logout: () => request('logout', { method: 'POST', body: '{}' }),
   settings: () => request('settings'),
   saveSettings: (body) => request('settings', { method: 'PUT', body: JSON.stringify(body) }),

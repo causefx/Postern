@@ -1,0 +1,20 @@
+{
+  "$schema": "../schema.json",
+  "label": "Whisparr",
+  "auth": {
+    "header": "X-Api-Key",
+    "query": "apikey"
+  },
+  "keyHint": "Settings → General → Security → API Key",
+  "match": {
+    "title": [
+      "whisparr"
+    ],
+    "body": [
+      "window.Whisparr"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

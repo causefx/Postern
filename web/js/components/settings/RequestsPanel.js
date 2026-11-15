@@ -2,6 +2,8 @@ import { h } from '../../lib/h.js';
 import { api } from '../../api.js';
 import { Icon } from '../common/Icon.js';
 import { StatusBadge } from '../common/StatusBadge.js';
+import { ServiceIcon } from '../common/ServiceIcon.js';
+import { state } from '../../state.js';
 import {
   activityErrorCount,
   groupActivityByDay,
@@ -61,6 +63,11 @@ export function RequestsPanel() {
     );
   }
 
+  function svcIcon(name) {
+    const svc = state.services.find((s) => s.name === name);
+    return ServiceIcon({ name, app: svc?.app, icon: svc?.icon, size: 'xs' }).el;
+  }
+
   function row(ev, older, zebra) {
     const { who, reason } = splitActivity(ev);
     const line = `${ev.method || ''} ${ev.path || ''}`.trim() || '—';
@@ -75,7 +82,7 @@ export function RequestsPanel() {
       h(
         'span',
         { className: 'req-path', title: `${ev.service} · ${line}` },
-        h('span', { className: 'req-svc' }, ev.service),
+        h('span', { className: 'req-svc' }, svcIcon(ev.service), ev.service),
         line,
       ),
       h('span', { className: 'req-time', title: ev.time || '' }, older ? requestWhen(ev.time) : requestClock(ev.time)),

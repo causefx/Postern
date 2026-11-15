@@ -94,7 +94,9 @@ export function auditChips(ev) {
   }
   if (ev.action === 'token_scope') return ev.scope ? [ev.scope] : [];
   if (ev.action === 'export' || ev.action === 'import') return ev.detail ? [ev.detail] : [];
-  return ev.url ? [`url → ${ev.url}`] : [];
+  const bits = ev.url ? [`url → ${ev.url}`] : [];
+  if ((ev.action === 'update' || ev.action === 'create') && ev.detail) bits.push(ev.detail);
+  return bits;
 }
 
 /** Icon name and tint for an entry. tone: 'success' | 'warning' | 'off' | 'neutral'. */

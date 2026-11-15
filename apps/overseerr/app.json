@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "label": "Overseerr",
+  "auth": {
+    "header": "X-Api-Key"
+  },
+  "keyHint": "Settings → General → API Key",
+  "match": {
+    "title": [
+      "overseerr"
+    ]
+  },
+  "probe": {
+    "path": "api/v1/status",
+    "discover": true,
+    "json": {
+      "commitTag": {
+        "present": true
+      }
+    },
+    "version": {
+      "json": "version"
+    }
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

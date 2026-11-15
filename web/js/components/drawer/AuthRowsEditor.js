@@ -1,7 +1,7 @@
 import { h } from '../../lib/h.js';
 import { Button } from '../common/Button.js';
 import { Icon } from '../common/Icon.js';
-import { AUTH_PRESETS, isAuthNone } from '../../lib/authPresets.js';
+import { isAuthNone } from '../../lib/authPresets.js';
 
 const TYPES = [
   { id: 'header', label: 'Header' },
@@ -14,19 +14,13 @@ const TYPES = [
  * Compact multi-slot auth editor for the slide-out.
  * Mutates `auth` in place; calls onChange after edits.
  */
-export function AuthRowsEditor({ auth, editing, onChange, serviceLabel = 'service', showPresets = true }) {
+export function AuthRowsEditor({ auth, editing, onChange, serviceLabel = 'service' }) {
   const wrap = h('div', { className: 'flex flex-col gap-2.5' });
   const hadSecret = {
     header: !!auth.header?.stored,
     query: !!auth.query?.stored,
     authz: !!auth.authz?.stored,
   };
-
-  function rememberStored() {
-    if (auth.header) auth.header.stored = hadSecret.header;
-    if (auth.query) auth.query.stored = hadSecret.query;
-    if (auth.authz) auth.authz.stored = hadSecret.authz;
-  }
 
   function secretMissing(row) {
     return !hadSecret[slotKey(row.type)] && !String(row.secret || '').trim();
@@ -121,14 +115,6 @@ export function AuthRowsEditor({ auth, editing, onChange, serviceLabel = 'servic
     bump();
   }
 
-  function applyPreset(p) {
-    auth.header = p.auth.header ? { ...p.auth.header, secret: auth.header?.secret || '' } : null;
-    auth.query = p.auth.query ? { ...p.auth.query, secret: auth.query?.secret || '' } : null;
-    auth.authz = p.auth.authz ? { ...p.auth.authz, secret: auth.authz?.secret || '' } : null;
-    rememberStored();
-    bump();
-  }
-
   function redraw() {
     const rows = rowsFromAuth();
     const head = h(
@@ -136,22 +122,6 @@ export function AuthRowsEditor({ auth, editing, onChange, serviceLabel = 'servic
       { className: 'flex flex-wrap items-center justify-between gap-2' },
       h('span', { className: 'field-label' }, 'Upstream credentials'),
     );
-    if (showPresets) {
-      const sel = h(
-        'select',
-        {
-          className: 'auth-row-select max-w-[11rem]',
-          onChange: (e) => {
-            const p = AUTH_PRESETS[Number(e.target.value)];
-            if (p) applyPreset(p);
-            e.target.selectedIndex = 0;
-          },
-        },
-        h('option', { value: '', selected: true, disabled: true }, 'Fill from preset'),
-        ...AUTH_PRESETS.map((p, i) => h('option', { value: String(i) }, p.label)),
-      );
-      head.append(sel);
-    }
     const nodes = [head, ...rows.map((row, idx) => rowEl(row, idx, rows))];
     if (rows.length < 3) {
       nodes.push(
