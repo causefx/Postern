@@ -1,0 +1,319 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Postern promo stage</title>
+<!--
+  The promo's motion-graphics scenes. Each scene is a pure function of time, so render.mjs can seek
+  to any frame and screenshot it. Open compose.html#dash?t=2.5 in a browser to look at one frame.
+-->
+<style>
+  @font-face { font-family: Inter; src: url(../web/fonts/Inter-Variable.woff2) format('woff2'); font-weight: 100 900; }
+  @font-face { font-family: Grotesk; src: url(../web/fonts/SpaceGrotesk-Variable.woff2) format('woff2'); font-weight: 300 700; }
+  @font-face { font-family: Mono; src: url(../web/fonts/JetBrainsMono-Variable.woff2) format('woff2'); font-weight: 100 800; }
+  :root { --bg: #0d1015; --fg: #f1f3f5; --muted: #8b95a3; --accent: #7fd1a8; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); color: var(--fg); font-family: Inter, sans-serif; }
+  body.clear, html:has(body.clear) { background: transparent; }
+  .scene { position: absolute; inset: 0; display: none; overflow: hidden; }
+  .scene.on { display: block; }
+  .stage-bg { position: absolute; inset: 0;
+    background:
+      radial-gradient(1200px 700px at 50% 120%, rgba(127,209,168,.10), transparent 60%),
+      radial-gradient(900px 600px at 15% -10%, rgba(120,150,255,.08), transparent 60%),
+      var(--bg); }
+  .grid { position: absolute; inset: -200px; opacity: .35;
+    background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+    background-size: 64px 64px; }
+  .cap { position: absolute; left: 140px; top: 88px; }
+  .kicker { font-family: Mono; font-size: 22px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+  .headline { font-family: Grotesk; font-weight: 600; font-size: 64px; letter-spacing: -.02em; line-height: 1.05; margin-top: 14px; }
+  .shot { position: absolute; border-radius: 18px; overflow: hidden; box-shadow: 0 40px 120px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.08); }
+  .shot img { display: block; width: 100%; height: 100%; }
+  .layer { position: absolute; inset: 0; }
+  .phone { position: absolute; width: 400px; height: 866px; border-radius: 58px; padding: 13px; background: #0a0b0d;
+    box-shadow: 0 50px 120px rgba(0,0,0,.6), inset 0 0 0 2px #2a2e35; }
+  .phone img { width: 100%; height: 100%; border-radius: 46px; display: block; object-fit: cover; object-position: top; }
+  .key { display: inline-block; font-family: Mono; font-size: 40px; padding: 6px 18px; border-radius: 12px; margin-right: 10px;
+    background: #1b2028; border: 1px solid #333b47; box-shadow: 0 6px 0 #0a0c10; }
+  .shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(13,16,21,.97) 0%, rgba(13,16,21,.9) 34%, rgba(13,16,21,0) 52%); }
+  .ring { position: absolute; border-radius: 14px; border: 3px solid var(--accent); box-shadow: 0 0 40px rgba(127,209,168,.6); }
+  .bar { position: absolute; border-radius: 10px; background: linear-gradient(90deg, rgba(255,120,120,.0), rgba(255,140,120,.28), rgba(255,120,120,0)); }
+  .logo { width: 150px; height: 150px; }
+  .word { font-family: Grotesk; font-weight: 600; font-size: 150px; letter-spacing: -.04em; display: inline-block; }
+  .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  .tag { font-size: 38px; color: var(--muted); margin-top: 26px; }
+  .url { font-family: Mono; font-size: 34px; margin-top: 30px; padding: 14px 30px; border-radius: 999px; border: 1px solid #2f3742; background: #141922; }
+  .wall { position: absolute; left: 50%; top: 50%; width: 3600px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 36px; transform-origin: 0 0; }
+  .wall img { width: 100%; border-radius: 14px; box-shadow: 0 20px 50px rgba(0,0,0,.5); }
+  .vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(13,16,21,.2) 0%, rgba(13,16,21,.85) 65%, var(--bg) 100%); }
+  .pill { position: absolute; font-family: Grotesk; font-weight: 600; font-size: 30px; padding: 12px 26px; border-radius: 999px;
+    background: rgba(13,16,21,.75); border: 1px solid rgba(255,255,255,.12); }
+  /* Caption cards laid over the Higgsfield clips: rendered to transparent PNGs. */
+  .overcap { position: absolute; left: 120px; bottom: 110px; padding: 28px 40px; border-radius: 22px;
+    background: rgba(10,12,16,.72); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,.1); }
+  .overcap.light { background: rgba(255,255,255,.8); color: #14181f; border-color: rgba(0,0,0,.08); }
+  .overcap.light .kicker { color: #1f7a52; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="mark" viewBox="0 0 64 64">
+    <rect width="64" height="64" rx="14" fill="#f1f3f5"/>
+    <g transform="translate(8 6) scale(2)" fill="none" stroke="#14181f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path class="arch" d="M6 21V11a6 6 0 0 1 12 0v10"/><path d="M3 21h18"/>
+      <circle cx="12" cy="13" r="1.6"/><path d="M12 14.6V17"/>
+    </g>
+  </symbol>
+</svg>
+
+<!-- Title -->
+<section class="scene" id="title">
+  <div class="stage-bg"></div><div class="grid" id="title-grid"></div>
+  <div class="center">
+    <svg class="logo" id="title-logo"><use href="#mark"/></svg>
+    <div style="margin-top:34px" id="title-word"></div>
+    <div class="tag" id="title-tag">A front door for your private services.</div>
+  </div>
+</section>
+
+<!-- Dashboard -->
+<section class="scene" id="dash">
+  <div class="stage-bg"></div><div class="grid"></div>
+  <div class="cap" id="dash-cap"><div class="kicker">The dashboard</div><div class="headline">Every private service.<br>One front door.</div></div>
+  <div class="shot" id="dash-shot" style="left:560px;top:250px;width:1240px;height:775px">
+    <img src="../e2e/screenshots/out/desktop-dark/05-dashboard.png" style="opacity:.28">
+    <div id="dash-rows"></div>
+  </div>
+</section>
+
+<!-- Command palette -->
+<section class="scene" id="palette">
+  <div class="stage-bg"></div><div class="grid"></div>
+  <div class="shot" id="pal-shot" style="left:240px;top:100px;width:1440px;height:900px">
+    <img src="../e2e/screenshots/out/desktop-dark/09-palette.png">
+    <img src="../e2e/screenshots/out/desktop-dark/10-palette-search.png" class="layer" id="pal-b">
+  </div>
+  <div class="cap" id="pal-cap" style="top:auto;bottom:70px;left:auto;right:110px;text-align:right">
+    <div><span class="key">Ctrl</span><span class="key" style="margin-right:0">K</span></div>
+    <div class="headline" style="font-size:54px">Run anything from the keyboard.</div>
+  </div>
+</section>
+
+<!-- Token scope -->
+<section class="scene" id="scope">
+  <div class="stage-bg"></div><div class="grid"></div>
+  <div class="shot" id="scope-shot" style="left:240px;top:90px;width:1440px;height:900px">
+    <img src="../e2e/screenshots/out/desktop-dark/17-edit-access.png">
+    <img src="../e2e/screenshots/out/desktop-dark/18-edit-access-scope.png" class="layer" id="scope-b">
+    <div class="ring" id="scope-ring" style="left:748px;top:374px;width:130px;height:38px"></div>
+    <div class="ring" id="scope-ring2" style="left:874px;top:498px;width:492px;height:50px"></div>
+  </div>
+  <div class="shade" id="scope-shade"></div><div class="cap" id="scope-cap"><div class="kicker">Caller tokens</div><div class="headline">Scoped to the methods<br>and paths you choose.</div></div>
+</section>
+
+<!-- Request log -->
+<section class="scene" id="requests">
+  <div class="stage-bg"></div><div class="grid"></div>
+  <div class="shot" id="req-shot" style="left:240px;top:90px;width:1440px;height:900px">
+    <img src="../e2e/screenshots/out/desktop-dark/21-edit-requests.png">
+    <div class="bar" id="req-bar1" style="left:740px;top:272px;width:680px;height:38px"></div>
+    <div class="bar" id="req-bar2" style="left:740px;top:347px;width:680px;height:38px"></div>
+  </div>
+  <div class="shade" id="req-shade"></div><div class="cap" id="req-cap"><div class="kicker">Request log</div><div class="headline">Every refusal,<br>and the reason why.</div></div>
+</section>
+
+<!-- Theme wipe -->
+<section class="scene" id="theme">
+  <div class="stage-bg" id="theme-bg"></div>
+  <div class="shot" id="theme-shot" style="left:240px;top:110px;width:1440px;height:900px">
+    <img src="../e2e/screenshots/out/desktop-light/05-dashboard.png">
+    <img src="../e2e/screenshots/out/desktop-dark/05-dashboard.png" class="layer" id="theme-dark">
+    <div id="theme-line" style="position:absolute;top:0;bottom:0;width:4px;background:#fff;box-shadow:0 0 30px 6px rgba(255,255,255,.7)"></div>
+  </div>
+  <div class="pill" id="theme-l" style="left:120px;top:40px">Dark</div>
+  <div class="pill" id="theme-r" style="right:120px;top:40px;background:rgba(255,255,255,.85);color:#14181f">Light</div>
+</section>
+
+<!-- Phones -->
+<section class="scene" id="mobile">
+  <div class="stage-bg"></div><div class="grid"></div>
+  <div class="phone" id="ph0"><img src="../e2e/screenshots/out/mobile-dark/05-dashboard.png"></div>
+  <div class="phone" id="ph1"><img src="../e2e/screenshots/out/mobile-light/07-palette-search.png"></div>
+  <div class="phone" id="ph2"><img src="../e2e/screenshots/out/mobile-dark/18-edit-requests.png"></div>
+  <div class="cap" id="mob-cap" style="left:0;right:0;text-align:center;top:36px"><div class="kicker">Phone-ready</div><div class="headline">Swipe, tap, done.</div></div>
+</section>
+
+<!-- Screenshot wall -->
+<section class="scene" id="wall">
+  <div class="stage-bg"></div>
+  <div class="wall" id="wall-grid"></div>
+  <div class="vignette"></div>
+  <div class="center" id="wall-cap">
+    <div class="kicker">And the rest</div>
+    <div class="headline" style="font-size:72px">Rate limits. Audit log.<br>Export &amp; import.</div>
+  </div>
+</section>
+
+<!-- End card -->
+<section class="scene" id="end">
+  <div class="stage-bg"></div><div class="grid"></div>
+  <div class="center">
+    <svg class="logo" id="end-logo" style="width:120px;height:120px"><use href="#mark"/></svg>
+    <div class="word" id="end-word" style="font-size:110px;margin-top:26px">Postern</div>
+    <div class="tag" id="end-tag" style="font-size:32px;margin-top:14px">Self-hosted. Open source. Your keys stay home.</div>
+    <div class="url" id="end-url">github.com/causefx/Postern</div>
+  </div>
+</section>
+
+<!-- Caption overlays for the generated clips (transparent) -->
+<section class="scene" id="cap-theme"><div class="overcap"><div class="kicker">Themes</div><div class="headline" style="font-size:54px">Dark or light. Your call.</div></div></section>
+<section class="scene" id="cap-mobile"><div class="overcap"><div class="kicker">Phone-ready</div><div class="headline" style="font-size:54px">The whole app,<br>in your pocket.</div></div></section>
+<section class="scene" id="cap-intro"><div class="overcap" style="left:auto;right:120px"><div class="headline" style="font-size:50px">Your services are private.</div><div class="tag" style="font-size:30px;margin-top:8px">Postern lets the right callers in.</div></div></section>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const clamp = (v) => Math.max(0, Math.min(1, v));
+const E = {
+  lin: (x) => x,
+  outExpo: (x) => (x === 1 ? 1 : 1 - Math.pow(2, -10 * x)),
+  outCubic: (x) => 1 - Math.pow(1 - x, 3),
+  inOut: (x) => (x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2),
+  outBack: (x) => { const c = 1.6; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); },
+};
+// Progress 0..1 of the window [a, b] at time t, eased.
+const p = (t, a, b, e = E.outExpo) => e(clamp((t - a) / (b - a)));
+const mix = (a, b, k) => a + (b - a) * k;
+const rise = (el, t, a, dur = .9, dy = 40) => { const k = p(t, a, a + dur); el.style.opacity = k; el.style.transform = `translateY(${mix(dy, 0, k)}px)`; };
+// Fade a whole scene out over its last half second, so cuts are soft even before ffmpeg crossfades.
+const out = (t, dur) => 1 - p(t, dur - .5, dur, E.lin);
+
+// Build per-letter wordmark and dashboard row bands once.
+$('title-word').innerHTML = [...'Postern'].map((c) => `<span class="word">${c}</span>`).join('');
+{
+  const rows = $('dash-rows'), scale = 1240 / 1440;
+  for (let i = 0; i < 8; i++) {
+    const top = (182 + i * 70.4) * scale, h = 66 * scale;
+    rows.insertAdjacentHTML('beforeend',
+      `<div class="layer dash-row" style="clip-path: inset(${top}px 0 ${775 - top - h}px 0)"><img src="../e2e/screenshots/out/desktop-dark/05-dashboard.png" style="width:100%;height:100%"></div>`);
+  }
+  rows.insertAdjacentHTML('afterbegin',
+    `<div class="layer" id="dash-head" style="clip-path: inset(0 0 ${775 - 170 * scale}px 0)"><img src="../e2e/screenshots/out/desktop-dark/05-dashboard.png" style="width:100%;height:100%"></div>`);
+}
+{
+  const pics = [];
+  const names = ['26-settings', '27-settings-rate-limit', '32-settings-admin-log-tab', '33-settings-export-redacted', '35-settings-import', '37-settings-import-review',
+    '29-settings-embedding', '31-settings-requests-tab', '39-dialog-bulk-rotate', '12-add-service', '16-edit-connection', '22-edit-how-to-use'];
+  for (let i = 0; i < 36; i++) pics.push(`../e2e/screenshots/out/desktop-${(i + Math.floor(i / 6)) % 2 ? 'light' : 'dark'}/${names[i % names.length]}.png`);
+  $('wall-grid').innerHTML = pics.map((s) => `<img src="${s}">`).join('');
+}
+
+const SCENES = {
+  title: { dur: 3.6, f(t) {
+    const k = p(t, 0, 1.1, E.outBack);
+    $('title-logo').style.transform = `scale(${mix(.4, 1, k)}) rotate(${mix(-12, 0, p(t, 0, 1.1))}deg)`;
+    $('title-logo').style.filter = `blur(${mix(14, 0, p(t, 0, .8))}px) drop-shadow(0 0 ${mix(0, 40, p(t, .4, 1.2))}px rgba(127,209,168,.45))`;
+    $('title-logo').style.opacity = p(t, 0, .4);
+    [...$('title-word').children].forEach((s, i) => rise(s, t, .45 + i * .06, .8, 70));
+    rise($('title-tag'), t, 1.35, 1, 24);
+    $('title-grid').style.transform = `translateY(${-t * 14}px)`;
+    $('title').style.opacity = out(t, this.dur);
+  } },
+  dash: { dur: 5.2, f(t) {
+    const k = p(t, 0, 1.4);
+    $('dash-shot').style.transform = `perspective(1800px) translateY(${mix(260, 0, k)}px) rotateX(${mix(28, 6, k)}deg) rotateY(${mix(-8, -4, p(t, 0, 5.2, E.inOut))}deg)`;
+    $('dash-shot').style.opacity = p(t, 0, .6);
+    $('dash-head').style.opacity = p(t, .6, 1.2);
+    document.querySelectorAll('.dash-row').forEach((r, i) => {
+      const q = p(t, 1 + i * .14, 1.7 + i * .14);
+      r.style.opacity = q; r.style.transform = `translateX(${mix(-40, 0, q)}px)`;
+    });
+    rise($('dash-cap'), t, .3, 1);
+    $('dash').style.opacity = out(t, this.dur);
+  } },
+  palette: { dur: 4.8, f(t) {
+    const z = p(t, .3, 4.6, E.inOut);
+    $('pal-shot').style.transformOrigin = '720px 294px';
+    $('pal-shot').style.transform = `scale(${mix(.86, 1.32, z)}) translateY(${mix(40, 90, z)}px)`;
+    $('pal-b').style.opacity = p(t, 1.6, 2.1, E.inOut);
+    rise($('pal-cap'), t, .5, 1);
+    const keys = $('pal-cap').querySelectorAll('.key');
+    keys.forEach((kel, i) => { const pr = p(t, 1 + i * .18, 1.25 + i * .18, E.lin) * (1 - p(t, 1.3 + i * .18, 1.55 + i * .18, E.lin)); kel.style.transform = `translateY(${pr * 6}px)`; kel.style.boxShadow = `0 ${6 - pr * 6}px 0 #0a0c10`; });
+    $('palette').style.opacity = out(t, this.dur);
+  } },
+  scope: { dur: 5.2, f(t) {
+    const z = p(t, .2, 2.6, E.inOut);
+    $('scope-shot').style.transformOrigin = '1080px 470px';
+    $('scope-shot').style.transform = `scale(${mix(.86, 1.15, z)}) translateX(${mix(0, 100, z)}px)`;
+    $('scope-b').style.opacity = p(t, 1.1, 1.6, E.inOut);
+    for (const [id, a] of [['scope-ring', 2.4], ['scope-ring2', 3.1]]) {
+      const q = p(t, a, a + .6, E.outBack); $(id).style.opacity = p(t, a, a + .3, E.lin);
+      $(id).style.transform = `scale(${mix(1.4, 1, q)})`;
+    }
+    rise($('scope-cap'), t, .3, 1); $('scope-shade').style.opacity = z;
+    $('scope').style.opacity = out(t, this.dur);
+  } },
+  requests: { dur: 5, f(t) {
+    const z = p(t, .2, 2.4, E.inOut);
+    $('req-shot').style.transformOrigin = '1080px 300px';
+    $('req-shot').style.transform = `scale(${mix(.86, 1.15, z)}) translateX(${mix(0, 100, z)}px)`;
+    for (const [id, a] of [['req-bar1', 2.2], ['req-bar2', 2.7]]) {
+      const q = p(t, a, a + .9); $(id).style.opacity = q; $(id).style.clipPath = `inset(0 ${mix(100, 0, q)}% 0 0)`;
+    }
+    rise($('req-cap'), t, .3, 1); $('req-shade').style.opacity = z;
+    $('requests').style.opacity = out(t, this.dur);
+  } },
+  theme: { dur: 4.4, f(t) {
+    const w = p(t, .9, 3.2, E.inOut);
+    $('theme-dark').style.clipPath = `inset(0 ${w * 100}% 0 0)`;
+    $('theme-line').style.left = `${(1 - w) * 1440 - 2}px`;
+    $('theme-line').style.opacity = w > 0 && w < 1 ? 1 : 0;
+    $('theme-shot').style.transform = `perspective(2000px) rotateY(${mix(-6, 6, p(t, 0, 4.4, E.inOut))}deg) scale(.92)`;
+    $('theme-bg').style.filter = `brightness(${mix(1, 2.2, w)})`;
+    rise($('theme-l'), t, .2, .7); rise($('theme-r'), t, 2.6, .7);
+    $('theme').style.opacity = out(t, this.dur);
+  } },
+  mobile: { dur: 5.4, f(t) {
+    const spots = [[460, -14, 0], [760, 0, .18], [1060, 14, .36]];
+    spots.forEach(([x, rot, d], i) => {
+      const k = p(t, .2 + d, 1.6 + d);
+      const el = $('ph' + i);
+      const drift = Math.sin((t + i) * 1.2) * 8;
+      el.style.left = `${x}px`; el.style.top = `${mix(1100, i === 1 ? 250 : 300, k) + drift}px`;
+      el.style.transform = `perspective(1600px) rotateY(${mix(rot * 2.4, rot, k)}deg) rotateZ(${rot * .25}deg) scale(${i === 1 ? 1.04 : .96})`;
+      el.style.zIndex = i === 1 ? 2 : 1;
+    });
+    rise($('mob-cap'), t, .1, .9);
+    $('mobile').style.opacity = out(t, this.dur);
+  } },
+  wall: { dur: 5, f(t) {
+    const s = t / 5;
+    $('wall-grid').style.transform = `translate(-1800px, -900px) perspective(2400px) rotateX(48deg) rotateZ(-28deg) translate(${mix(200, -500, s)}px, ${mix(-300, 300, s)}px)`;
+    $('wall-grid').style.opacity = p(t, 0, .8, E.lin);
+    const c = p(t, .8, 1.8); $('wall-cap').style.opacity = c; $('wall-cap').style.transform = `scale(${mix(.94, 1, c)})`;
+    $('wall').style.opacity = out(t, this.dur);
+  } },
+  end: { dur: 4.4, f(t) {
+    const k = p(t, 0, 1, E.outBack);
+    $('end-logo').style.transform = `scale(${mix(.5, 1, k)})`; $('end-logo').style.opacity = p(t, 0, .4);
+    rise($('end-word'), t, .3, .9, 50); rise($('end-tag'), t, .8, .9, 24); rise($('end-url'), t, 1.3, .9, 24);
+    $('end-url').style.boxShadow = `0 0 ${mix(0, 50, p(t, 1.8, 2.6))}px rgba(127,209,168,.35)`;
+  } },
+  'cap-theme': { dur: 0, f() {} }, 'cap-mobile': { dur: 0, f() {} }, 'cap-intro': { dur: 0, f() {} },
+};
+
+let current;
+window.setScene = (name) => {
+  document.querySelectorAll('.scene').forEach((s) => s.classList.toggle('on', s.id === name));
+  document.body.classList.toggle('clear', name.startsWith('cap-'));
+  current = name; window.seek(0); return SCENES[name].dur;
+};
+window.seek = (t) => SCENES[current].f.call(SCENES[current], t);
+window.ready = async () => { await document.fonts.ready; await Promise.all([...document.images].map((i) => i.decode().catch(() => {}))); };
+
+// For previewing by hand: compose.html#dash?t=2.5
+const m = location.hash.match(/^#([\w-]+)(?:\?t=([\d.]+))?/);
+if (m) { setScene(m[1]); seek(+(m[2] || 0)); }
+</script>
+</body>
+</html>
