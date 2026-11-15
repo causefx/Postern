@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.0](https://github.com/causefx/Postern/compare/v0.17.0...v0.18.0) (2026-11-15)
+
+
+### Features
+
+* add icon management for services ([181b107](https://github.com/causefx/Postern/commit/181b10763b8289fe8b8ec9f17c81bb60edf2cdd3))
+
 ## [0.17.0](https://github.com/causefx/Postern/compare/v0.16.0...v0.17.0) (2026-11-14)
 
 
