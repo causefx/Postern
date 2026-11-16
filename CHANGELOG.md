@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.1](https://github.com/causefx/Postern/compare/v0.18.0...v0.18.1) (2026-11-16)
+
+
+### Bug Fixes
+
+* iOS Safari zoom issue by enforcing 16px font-size on text-entry fields for touch devices ([8db3e58](https://github.com/causefx/Postern/commit/8db3e581507ef41efa55b0d5ed19f7e1d4548fd7))
+
 ## [0.18.0](https://github.com/causefx/Postern/compare/v0.17.0...v0.18.0) (2026-11-15)
 
 
