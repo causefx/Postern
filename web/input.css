@@ -3595,3 +3595,15 @@ button.acct-item:focus-visible { background: var(--bg-surface-2); }
 }
 .icon-picker select { flex: 1; min-width: 9rem; }
 .icon-picker-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+/* iOS Safari zooms the page when a focused field's font-size is under 16px. On touch devices,
+   force every text-entry field to 16px so tapping one never zooms. Kept last and !important so it
+   beats per-component sizes above. */
+@media (hover: none) and (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+  select,
+  textarea,
+  [contenteditable="true"] {
+    font-size: 16px !important;
+  }
+}
