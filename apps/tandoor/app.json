@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Tandoor Recipes",
+  "auth": {
+    "authz": "bearer"
+  },
+  "keyHint": "Settings → API → Generate a new token",
+  "match": {
+    "title": [
+      "tandoor"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

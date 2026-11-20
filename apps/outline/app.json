@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Outline",
+  "auth": {
+    "authz": "bearer"
+  },
+  "keyHint": "Settings → API & Apps → New API key",
+  "match": {
+    "title": [
+      "outline"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

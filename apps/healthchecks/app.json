@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Healthchecks",
+  "auth": {
+    "header": "X-Api-Key"
+  },
+  "keyHint": "Project Settings → API Access → Create API key",
+  "match": {
+    "title": [
+      "healthchecks"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

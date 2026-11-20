@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Portainer",
+  "auth": {
+    "header": "X-API-Key"
+  },
+  "keyHint": "My account → Access tokens → Add access token",
+  "match": {
+    "title": [
+      "portainer"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

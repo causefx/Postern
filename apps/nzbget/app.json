@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "NZBGet",
+  "auth": {
+    "authz": "basic"
+  },
+  "keyHint": "Settings → Security → ControlUsername and ControlPassword",
+  "match": {
+    "title": [
+      "nzbget"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

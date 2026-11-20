@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "RomM",
+  "auth": {
+    "authz": "basic"
+  },
+  "keyHint": "A RomM user name and password",
+  "match": {
+    "title": [
+      "romm"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

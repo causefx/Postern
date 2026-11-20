@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Mealie",
+  "auth": {
+    "authz": "bearer"
+  },
+  "keyHint": "Your profile → Manage Your API Tokens → Generate",
+  "match": {
+    "title": [
+      "mealie"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

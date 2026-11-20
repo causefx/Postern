@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Speedtest Tracker",
+  "auth": {
+    "authz": "bearer"
+  },
+  "keyHint": "Your profile → API Tokens → Create API token",
+  "match": {
+    "title": [
+      "speedtest tracker"
+    ]
+  },
+  "icon": {
+    "source": "selfhst-icons"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Karakeep",
+  "auth": {
+    "authz": "bearer"
+  },
+  "keyHint": "User Settings → API Keys → New API Key",
+  "match": {
+    "title": [
+      "karakeep"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

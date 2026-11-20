@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Unraid",
+  "auth": {
+    "header": "x-api-key"
+  },
+  "keyHint": "Settings → Management Access → API Keys → Create",
+  "match": {
+    "body": [
+      "/webGui/"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

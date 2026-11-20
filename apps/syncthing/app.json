@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Syncthing",
+  "auth": {
+    "header": "X-API-Key"
+  },
+  "keyHint": "Actions → Settings → General → API Key",
+  "match": {
+    "title": [
+      "syncthing"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

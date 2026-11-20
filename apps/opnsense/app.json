@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "OPNsense",
+  "auth": {
+    "authz": "basic"
+  },
+  "keyHint": "System → Access → Users → edit a user → API keys → +; the key is the user name, the secret the password",
+  "match": {
+    "title": [
+      "opnsense"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

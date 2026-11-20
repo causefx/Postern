@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Audiobookshelf",
+  "auth": {
+    "authz": "bearer"
+  },
+  "keyHint": "Settings → API Keys → Add API Key",
+  "match": {
+    "title": [
+      "audiobookshelf"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

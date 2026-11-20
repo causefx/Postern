@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Mylar3",
+  "auth": {
+    "query": "apikey"
+  },
+  "keyHint": "Settings → Web Interface → API → Generate",
+  "match": {
+    "title": [
+      "mylar"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

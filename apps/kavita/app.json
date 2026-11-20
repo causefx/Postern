@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Kavita",
+  "auth": {
+    "header": "x-api-key"
+  },
+  "keyHint": "User settings → Auth Keys → Create",
+  "match": {
+    "title": [
+      "kavita"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Wiki.js",
+  "auth": {
+    "authz": "bearer"
+  },
+  "keyHint": "Administration → API Access → Enable API → New API Key",
+  "match": {
+    "title": [
+      "wiki.js"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "GitLab",
+  "auth": {
+    "header": "PRIVATE-TOKEN"
+  },
+  "keyHint": "User settings → Access tokens → Add new token",
+  "match": {
+    "title": [
+      "gitlab"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

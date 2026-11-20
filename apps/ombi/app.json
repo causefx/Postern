@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Ombi",
+  "auth": {
+    "header": "ApiKey"
+  },
+  "keyHint": "Settings → Configuration → General → Api Key",
+  "match": {
+    "title": [
+      "ombi"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

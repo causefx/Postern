@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Stash",
+  "auth": {
+    "header": "ApiKey"
+  },
+  "keyHint": "Settings → Security → Authentication → API Key → Generate (needs a user name and password set first)",
+  "match": {
+    "title": [
+      "stash"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

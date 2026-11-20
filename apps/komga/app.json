@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Komga",
+  "auth": {
+    "header": "X-API-Key"
+  },
+  "keyHint": "My Account → API Keys → Generate API key",
+  "match": {
+    "title": [
+      "komga"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

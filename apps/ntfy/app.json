@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "ntfy",
+  "auth": {
+    "authz": "bearer"
+  },
+  "keyHint": "Account → Access tokens → Create access token",
+  "match": {
+    "title": [
+      "ntfy"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

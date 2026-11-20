@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Jackett",
+  "auth": {
+    "query": "apikey"
+  },
+  "keyHint": "The API Key at the top of the Jackett dashboard",
+  "match": {
+    "title": [
+      "jackett"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

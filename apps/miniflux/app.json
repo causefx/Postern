@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Miniflux",
+  "auth": {
+    "header": "X-Auth-Token"
+  },
+  "keyHint": "Settings → API Keys → Create a new API key",
+  "match": {
+    "title": [
+      "miniflux"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

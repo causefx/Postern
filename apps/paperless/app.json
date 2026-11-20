@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Paperless-ngx",
+  "auth": {
+    "authz": "basic"
+  },
+  "keyHint": "A Paperless-ngx user name and password",
+  "match": {
+    "title": [
+      "paperless"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

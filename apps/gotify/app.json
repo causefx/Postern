@@ -1,0 +1,17 @@
+{
+  "$schema": "../schema.json",
+  "label": "Gotify",
+  "auth": {
+    "header": "X-Gotify-Key",
+    "query": "token"
+  },
+  "keyHint": "Clients → Create Client to read messages, or Apps → Create Application to send them",
+  "match": {
+    "title": [
+      "gotify"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

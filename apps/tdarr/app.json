@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Tdarr",
+  "auth": {
+    "header": "x-api-key"
+  },
+  "keyHint": "Tools → API Keys (only needed when authentication is on)",
+  "match": {
+    "title": [
+      "tdarr"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

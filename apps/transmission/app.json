@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Transmission",
+  "auth": {
+    "authz": "basic"
+  },
+  "keyHint": "The rpc-username and rpc-password in settings.json",
+  "match": {
+    "title": [
+      "transmission"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

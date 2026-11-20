@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Memos",
+  "auth": {
+    "authz": "bearer"
+  },
+  "keyHint": "Settings → My Account → Access Tokens → Create",
+  "match": {
+    "title": [
+      "memos"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

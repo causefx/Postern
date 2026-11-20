@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Trilium",
+  "auth": {
+    "authz": "basic"
+  },
+  "keyHint": "Options → ETAPI → Create new ETAPI token; use the token as the password",
+  "match": {
+    "title": [
+      "trilium"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

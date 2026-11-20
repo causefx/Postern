@@ -1,0 +1,19 @@
+{
+  "$schema": "../schema.json",
+  "label": "Grafana",
+  "auth": {
+    "authz": "bearer"
+  },
+  "keyHint": "Administration → Users and access → Service accounts → Add service account → Add service account token",
+  "match": {
+    "title": [
+      "grafana"
+    ],
+    "body": [
+      "window.grafanaBootData"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

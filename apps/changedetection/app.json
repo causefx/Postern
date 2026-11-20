@@ -1,0 +1,17 @@
+{
+  "$schema": "../schema.json",
+  "label": "changedetection.io",
+  "auth": {
+    "header": "x-api-key"
+  },
+  "keyHint": "Settings → API → API Access key",
+  "match": {
+    "title": [
+      "change detection",
+      "changedetection.io"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

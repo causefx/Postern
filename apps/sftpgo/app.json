@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "SFTPGo",
+  "auth": {
+    "header": "X-SFTPGO-API-KEY"
+  },
+  "keyHint": "Profile → allow API key authentication, then API Keys → Add",
+  "match": {
+    "title": [
+      "sftpgo"
+    ]
+  },
+  "icon": {
+    "source": "selfhst-icons"
+  }
+}

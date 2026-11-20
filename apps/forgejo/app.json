@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Forgejo",
+  "auth": {
+    "authz": "bearer"
+  },
+  "keyHint": "Settings → Applications → Generate new token",
+  "match": {
+    "title": [
+      "forgejo"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

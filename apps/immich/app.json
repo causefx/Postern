@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Immich",
+  "auth": {
+    "header": "x-api-key"
+  },
+  "keyHint": "Account Settings → API Keys → New API Key",
+  "match": {
+    "title": [
+      "immich"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

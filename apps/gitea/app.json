@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "Gitea",
+  "auth": {
+    "authz": "bearer"
+  },
+  "keyHint": "Settings → Applications → Generate New Token",
+  "match": {
+    "title": [
+      "gitea"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

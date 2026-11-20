@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "n8n",
+  "auth": {
+    "header": "X-N8N-API-KEY"
+  },
+  "keyHint": "Settings → n8n API → Create an API key",
+  "match": {
+    "title": [
+      "n8n"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}

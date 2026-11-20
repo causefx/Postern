@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "label": "AdGuard Home",
+  "auth": {
+    "authz": "basic"
+  },
+  "keyHint": "Your AdGuard Home admin user name and password",
+  "match": {
+    "title": [
+      "adguard home"
+    ]
+  },
+  "icon": {
+    "source": "dashboard-icons"
+  }
+}
