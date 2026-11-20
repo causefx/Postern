@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.20.0](https://github.com/causefx/Postern/compare/v0.19.0...v0.20.0) (2026-11-20)
+
+
+### Features
+
+* implement custom confirmation dialog and update related components ([acead5d](https://github.com/causefx/Postern/commit/acead5d5664df1edbdcc4cf2d52a7fb52374ee73))
+
+
+### Bug Fixes
+
+* css build ([de5e49b](https://github.com/causefx/Postern/commit/de5e49b59a3a8b93e9240b03393f484472954bd0))
+
 ## [0.19.0](https://github.com/causefx/Postern/compare/v0.18.1...v0.19.0) (2026-11-20)
 
 
