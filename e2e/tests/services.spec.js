@@ -106,6 +106,45 @@ test('closing a drawer with unsaved changes asks, and Discard throws the edit aw
   expect((await stored(api, s.name)).url).toBe('https://upstream.invalid');
 });
 
+test('Discard on an edit asks in a modal, and Keep editing keeps the edit', async ({ page, api, svc }) => {
+  const s = await svc.create('discard');
+  await page.reload();
+  await tableRow(page, s.name).click();
+  const drawer = page.getByRole('dialog', { name: `Edit ${s.name}` });
+  await drawer.getByLabel('Upstream URL').fill('https://typed-but-not-saved.invalid');
+
+  await drawer.getByRole('button', { name: 'Discard', exact: true }).click();
+  const ask = modal(page, 'Discard your changes?');
+  await expect(ask).toBeVisible();
+  await expect(ask).toContainText(s.name);
+  await ask.getByRole('button', { name: 'Keep editing' }).click();
+  await expect(ask).toBeHidden();
+  await expect(drawer.getByLabel('Upstream URL')).toHaveValue('https://typed-but-not-saved.invalid');
+
+  await drawer.getByRole('button', { name: 'Discard', exact: true }).click();
+  await modal(page, 'Discard your changes?').getByRole('button', { name: 'Discard' }).click();
+  await expect(drawer.getByLabel('Upstream URL')).toHaveValue('https://upstream.invalid');
+  expect((await stored(api, s.name)).url).toBe('https://upstream.invalid');
+});
+
+test('Discard on a new service asks in a modal, then closes the drawer', async ({ page }) => {
+  await page.getByRole('button', { name: 'Add service' }).first().click();
+  const drawer = page.getByRole('dialog', { name: 'Add service' });
+  await drawer.getByLabel('Upstream URL').fill('https://never-saved.invalid');
+
+  await drawer.getByRole('button', { name: 'Discard', exact: true }).click();
+  const ask = modal(page, 'Discard this service?');
+  await expect(ask).toBeVisible();
+  // Escape answers Cancel and leaves the drawer open.
+  await page.keyboard.press('Escape');
+  await expect(ask).toBeHidden();
+  await expect(drawer).toBeVisible();
+
+  await drawer.getByRole('button', { name: 'Discard', exact: true }).click();
+  await modal(page, 'Discard this service?').getByRole('button', { name: 'Discard' }).click();
+  await expect(drawer).toBeHidden();
+});
+
 test('the Access tab shows the caller token, hidden until revealed', async ({ page, svc }) => {
   const s = await svc.create('token');
   await page.reload();
@@ -114,6 +153,32 @@ test('the Access tab shows the caller token, hidden until revealed', async ({ pa
   await drawer.getByRole('tab', { name: 'Access' }).click();
   await expect(drawer.getByRole('button', { name: /^Copy / }).first()).toBeVisible();
   await expect(drawer).not.toContainText(s.tokens[0].secret);
+});
+
+test('deleting a token asks in a modal first', async ({ page, api, svc }) => {
+  const s = await svc.create('deltok');
+  await api.post(`services/${s.name}/tokens`, { name: 'spare' });
+  await page.reload();
+  await tableRow(page, s.name).click();
+  const drawer = page.getByRole('dialog', { name: `Edit ${s.name}` });
+  await drawer.getByRole('tab', { name: 'Access' }).click();
+
+  const deleteSpare = async () => {
+    await drawer.getByRole('button', { name: 'More actions for spare' }).click();
+    await page.getByRole('menuitem', { name: 'Delete token…' }).click();
+  };
+
+  await deleteSpare();
+  const ask = modal(page, 'Delete token spare?');
+  await expect(ask).toContainText('401');
+  await ask.getByRole('button', { name: 'Cancel' }).click();
+  await expect(ask).toBeHidden();
+  expect((await stored(api, s.name)).tokens.map((t) => t.name)).toContain('spare');
+
+  await deleteSpare();
+  await modal(page, 'Delete token spare?').getByRole('button', { name: 'Delete token' }).click();
+  await expect(toast(page, 'Token deleted')).toBeVisible();
+  expect((await stored(api, s.name)).tokens.map((t) => t.name)).not.toContain('spare');
 });
 
 test('limiting a token to GET is saved on the server', async ({ page, api, svc }) => {

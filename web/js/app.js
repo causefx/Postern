@@ -74,7 +74,7 @@ async function openSettingsDrawer(tab) {
       setState({ commandOpen: false });
       showSettingsTab(tab);
     } else {
-      closeSettings();
+      await closeSettings();
     }
     return;
   }
@@ -102,15 +102,15 @@ async function loadUpdate() {
   }
 }
 
-function openCreate() {
-  if (isSettingsOpen() && !closeSettings()) return;
+async function openCreate() {
+  if (isSettingsOpen() && !(await closeSettings())) return;
   setState({ commandOpen: false });
   openServiceDrawer({ mode: 'create', handlers: drawerHandlers });
 }
 
-function openEdit(service) {
+async function openEdit(service) {
   if (!service) return;
-  if (isSettingsOpen() && !closeSettings()) return;
+  if (isSettingsOpen() && !(await closeSettings())) return;
   setState({ commandOpen: false });
   const items = filteredServices();
   const idx = items.findIndex((s) => s.name === service.name);
@@ -129,6 +129,9 @@ function typingTarget(el) {
 
 function onKeydown(e) {
   if (state.commandOpen) return;
+  // A modal (confirm, unsaved changes, delete...) owns the keyboard: Escape closes it, not the drawer
+  // behind it, and no shortcut acts on the page underneath.
+  if (document.querySelector('dialog[open]')) return;
 
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
     e.preventDefault();
@@ -144,7 +147,7 @@ function onKeydown(e) {
     }
     if (e.key === 'Escape') {
       e.preventDefault();
-      backOrCloseSettings();
+      void backOrCloseSettings();
       return;
     }
     return;

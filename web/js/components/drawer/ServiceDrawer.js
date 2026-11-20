@@ -28,6 +28,7 @@ import { draftSnapshot, draftSaveBody, openPathCount } from '../../lib/drawerDra
 import { copyValue } from '../../lib/clipboard.js';
 import { toast } from '../common/Toast.js';
 import { openDeleteDialog } from '../dialogs/DeleteServiceDialog.js';
+import { askConfirm } from '../dialogs/ConfirmDialog.js';
 import { askUnsavedChanges } from '../dialogs/UnsavedChangesDialog.js';
 import { isMac } from '../../lib/serviceDisplay.js';
 import { setState, state, filteredServices } from '../../state.js';
@@ -816,8 +817,20 @@ function createController({ mode, service, handlers }) {
   const discardBtn = Button(
     {
       size: 'sm',
-      onClick: () => {
-        if (isDirty() && !confirm('Discard unsaved changes?')) return;
+      onClick: async () => {
+        if (isDirty()) {
+          const ok = await askConfirm({
+            title: savedName ? 'Discard your changes?' : 'Discard this service?',
+            body: savedName
+              ? `Your edits to ${savedName} are thrown away, and it goes back to how it was last saved.`
+              : 'The new service has not been saved. What you entered is thrown away.',
+            confirmLabel: 'Discard',
+            cancelLabel: 'Keep editing',
+            danger: true,
+            trigger: discardBtn,
+          });
+          if (!ok) return;
+        }
         if (savedName) {
           const svc = state.services.find((s) => s.name === savedName);
           if (svc) loadService(svc);

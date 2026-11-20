@@ -4,6 +4,7 @@ import { Icon } from '../common/Icon.js';
 import { api } from '../../api.js';
 import { setState, state } from '../../state.js';
 import { openUpdateDialog } from '../dialogs/UpdateDialog.js';
+import { askConfirm } from '../dialogs/ConfirmDialog.js';
 import { toast } from '../common/Toast.js';
 import { isMac } from '../../lib/serviceDisplay.js';
 import { expand, rise, slideIn } from '../../lib/motion.js';
@@ -51,10 +52,24 @@ export function isSettingsOpen() {
   return !!root;
 }
 
-export function closeSettings({ skipConfirm = false } = {}) {
+// The pending answer while the discard question is open, so a second close shares it.
+let asking = null;
+
+/** Close the drawer. Resolves false when unsaved changes are kept. */
+export async function closeSettings({ skipConfirm = false } = {}) {
   if (!root) return true;
   if (!skipConfirm && ctrl?.isDirty?.()) {
-    if (!confirm('Discard unsaved changes?')) return false;
+    asking ??= askConfirm({
+      title: 'Discard your changes?',
+      body: 'Your settings changes have not been saved. They are thrown away if you close.',
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep editing',
+      danger: true,
+    }).finally(() => {
+      asking = null;
+    });
+    if (!(await asking)) return false;
+    if (!root) return true;
   }
   ctrl?.stop?.();
   generation += 1;
@@ -68,7 +83,7 @@ export function closeSettings({ skipConfirm = false } = {}) {
 }
 
 /** Escape and the back gesture: leave Export or Import first, then close the drawer. */
-export function backOrCloseSettings() {
+export async function backOrCloseSettings() {
   if (ctrl?.inSubview?.()) {
     ctrl.back();
     return true;
@@ -591,7 +606,7 @@ function createController({ onReady, initialTab = 'settings' }) {
     }
     parts.push(
       h('h2', { className: 'drawer-title font-display' }, titles[view] || 'Settings'),
-      Button({ variant: 'ghost', size: 'sm', square: true, 'aria-label': 'Close', onClick: () => closeSettings() }, Icon('close', { size: 16 })),
+      Button({ variant: 'ghost', size: 'sm', square: true, 'aria-label': 'Close', onClick: () => void closeSettings() }, Icon('close', { size: 16 })),
     );
     headerHost.replaceChildren(...parts);
   }
@@ -708,7 +723,7 @@ function createController({ onReady, initialTab = 'settings' }) {
     {
       className: 'drawer-root',
       onClick: (e) => {
-        if (e.target === el) closeSettings();
+        if (e.target === el) void closeSettings();
       },
     },
     panel,

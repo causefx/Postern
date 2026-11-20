@@ -92,30 +92,34 @@ test('Discard puts the saved values back', async ({ page }) => {
   await expect(saveButton(page)).toBeDisabled();
 });
 
-test('closing with unsaved changes asks first, and Cancel keeps the drawer open', async ({ page }) => {
+const askModal = (page) => page.locator('dialog[open]', { hasText: 'Discard your changes?' });
+
+test('closing with unsaved changes asks first, and Keep editing keeps the drawer open', async ({ page }) => {
   await row(page, 'Rate limit').click();
   await drawer(page).getByRole('button', { name: '300', exact: true }).click();
 
-  let asked = '';
-  page.once('dialog', (d) => {
-    asked = d.message();
-    void d.dismiss();
-  });
   await drawer(page).getByRole('button', { name: 'Close' }).click();
-  await expect.poll(() => asked).toMatch(/unsaved/i);
+  await expect(askModal(page)).toContainText('not been saved');
+  await askModal(page).getByRole('button', { name: 'Keep editing' }).click();
+  await expect(askModal(page)).toBeHidden();
   await expect(drawer(page)).toBeVisible();
 
-  page.once('dialog', (d) => void d.accept());
+  // Escape on the question answers Keep editing too, and leaves the drawer where it was.
   await drawer(page).getByRole('button', { name: 'Close' }).click();
+  await expect(askModal(page)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(askModal(page)).toBeHidden();
+  await expect(drawer(page)).toBeVisible();
+
+  await drawer(page).getByRole('button', { name: 'Close' }).click();
+  await askModal(page).getByRole('button', { name: 'Discard' }).click();
   await expect(drawer(page)).toBeHidden();
 });
 
 test('closing with nothing changed does not ask', async ({ page }) => {
-  page.on('dialog', () => {
-    throw new Error('no confirmation was expected');
-  });
   await drawer(page).getByRole('button', { name: 'Close' }).click();
   await expect(drawer(page)).toBeHidden();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
 });
 
 test('Escape closes the drawer', async ({ page }) => {

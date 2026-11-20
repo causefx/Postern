@@ -7,6 +7,7 @@ import { OpenPathsEditor } from './OpenPathsEditor.js';
 import { isAuthNone } from '../../lib/authPresets.js';
 import { copyValue } from '../../lib/clipboard.js';
 import { toast } from '../common/Toast.js';
+import { askConfirm } from '../dialogs/ConfirmDialog.js';
 import { api } from '../../api.js';
 import { pop } from '../../lib/motion.js';
 import {
@@ -379,7 +380,13 @@ export function AccessPanel({ draft, token, tokens = [], savedName, serviceLabel
 
   async function deleteToken(t, rows) {
     if (rows.length < 2 || !t.id) return;
-    if (!confirm(`Delete token ${t.name}? Callers using it will get 401.`)) return;
+    const ok = await askConfirm({
+      title: `Delete token ${t.name}?`,
+      body: 'It stops working straight away: callers still using it will get 401.',
+      confirmLabel: 'Delete token',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       const updated = await api.deleteToken(savedName, t.id);
       toast.success('Token deleted', { detail: `Callers using ${t.name} now get 401` });
