@@ -102,9 +102,15 @@ most 6 different paths may discover. Apps that share an endpoint, such as Jellyf
 ### Icons
 
 - SVG only, at most 64 KB. Keep it square and readable at 16 pixels.
-- No scripts, event handlers, `<foreignObject>`, external links or `<!DOCTYPE>`. The test refuses them.
+- No scripts, event handlers, `<foreignObject>`, external links, embedded images or `<!DOCTYPE>`. The
+  test refuses them. Illustrator exports often carry an empty `<foreignObject/>` inside a `<switch>`,
+  and some carry a hidden `<image>` preview; delete them.
+- It sits on a tile that follows the theme, so it must read on light and dark alike. An icon in one
+  colour (all black or all white) gets a tile of its own in the opposite colour, drawn as a `<rect>`
+  behind it, as `jackett` and `mylar` do.
 - Run `npm run icons:optimize` before committing.
 - Most icons come from [Dashboard Icons](https://github.com/homarr-labs/dashboard-icons) (Apache 2.0).
-  An icon from somewhere else needs its licence in `LICENSES/<source>.txt` and that `source` in
-  `app.json`.
+  When it has only a PNG, try [selfh.st icons](https://github.com/selfhst/icons) (CC BY 4.0, source
+  `selfhst-icons`). An icon from somewhere else needs its licence in `LICENSES/<source>.txt` and that
+  `source` in `app.json`.
 
