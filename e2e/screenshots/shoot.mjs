@@ -99,28 +99,28 @@ const inDays = (n) => new Date(Date.now() + n * 86400_000).toISOString();
 
 const SERVICES = [
   {
-    name: 'sonarr', pretty: 'http://sonarr:8989',
+    name: 'sonarr', app: 'sonarr', pretty: 'http://sonarr:8989',
     auth: { header: { name: 'X-Api-Key', secret: 'sonarr-api-key-0123456789' }, query: { name: 'apikey', secret: 'sonarr-api-key-0123456789' } },
     openPaths: [{ match: 'prefix', path: '/ping' }],
   },
-  { name: 'radarr', pretty: 'http://radarr:7878', auth: { header: { name: 'X-Api-Key', secret: 'radarr-api-key-0123456789' } } },
+  { name: 'radarr', app: 'radarr', pretty: 'http://radarr:7878', auth: { header: { name: 'X-Api-Key', secret: 'radarr-api-key-0123456789' } } },
   {
-    name: 'plex', pretty: 'http://192.168.1.20:32400',
+    name: 'plex', app: 'plex', pretty: 'http://192.168.1.20:32400',
     auth: { query: { name: 'X-Plex-Token', secret: 'plex-token-0123456789' } },
     openPaths: [{ match: 'prefix', path: '/identity' }, { match: 'regex', path: '^/web/[^/]+$' }],
   },
-  { name: 'home-assistant', pretty: 'http://homeassistant.local:8123', auth: { authz: { kind: 'bearer', username: '', secret: 'ha-long-lived-token-0123456789' } } },
+  { name: 'home-assistant', app: 'homeassistant', pretty: 'http://homeassistant.local:8123', auth: { authz: { kind: 'bearer', username: '', secret: 'ha-long-lived-token-0123456789' } } },
   { name: 'grafana', pretty: 'http://grafana:3000', auth: { authz: { kind: 'basic', username: 'viewer', secret: 'grafana-password-0123' } } },
   { name: 'paperless', pretty: 'http://paperless:8000', auth: { authz: { kind: 'bearer', username: '', secret: 'paperless-token-0123456789' } } },
-  { name: 'jellyfin', pretty: 'http://jellyfin:8096', auth: { header: { name: 'X-Emby-Token', secret: 'jellyfin-token-0123456789' } }, enabled: false },
-  { name: 'sabnzbd', pretty: 'http://sabnzbd:8080', auth: { query: { name: 'apikey', secret: 'sabnzbd-api-key-0123456789' } } },
+  { name: 'jellyfin', app: 'jellyfin', pretty: 'http://jellyfin:8096', auth: { header: { name: 'X-Emby-Token', secret: 'jellyfin-token-0123456789' } }, enabled: false },
+  { name: 'sabnzbd', app: 'sabnzbd', pretty: 'http://sabnzbd:8080', auth: { query: { name: 'apikey', secret: 'sabnzbd-api-key-0123456789' } } },
 ];
 
 async function seed() {
   const made = {};
   for (const s of SERVICES) {
     made[s.name] = await call('post', 'services', {
-      name: s.name, url: upstreamURL, auth: s.auth, openPaths: s.openPaths || [], enabled: s.enabled !== false,
+      name: s.name, url: upstreamURL, app: s.app, auth: s.auth, openPaths: s.openPaths || [], enabled: s.enabled !== false,
     });
   }
   // Extra tokens: one limited to reading, one paused, one that expires soon.

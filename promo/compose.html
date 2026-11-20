@@ -192,8 +192,10 @@ const out = (t, dur) => 1 - p(t, dur - .5, dur, E.lin);
 $('title-word').innerHTML = [...'Postern'].map((c) => `<span class="word">${c}</span>`).join('');
 {
   const rows = $('dash-rows'), scale = 1240 / 1440;
-  for (let i = 0; i < 8; i++) {
-    const top = (182 + i * 70.4) * scale, h = 66 * scale;
+  // Each row's top and bottom in 05-dashboard.png, measured; rows are not evenly spaced when a name wraps.
+  const bands = [[182, 248], [253, 333], [338, 405], [409, 476], [480, 548], [552, 620], [624, 692], [696, 764]];
+  for (const [y0, y1] of bands) {
+    const top = y0 * scale, h = (y1 - y0) * scale;
     rows.insertAdjacentHTML('beforeend',
       `<div class="layer dash-row" style="clip-path: inset(${top}px 0 ${775 - top - h}px 0)"><img src="../e2e/screenshots/out/desktop-dark/05-dashboard.png" style="width:100%;height:100%"></div>`);
   }
