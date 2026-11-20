@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.19.0](https://github.com/causefx/Postern/compare/v0.18.1...v0.19.0) (2026-11-20)
+
+
+### Features
+
+* add more app configurations with icons ([d13ccbb](https://github.com/causefx/Postern/commit/d13ccbb405e7d0bf5793c4834d312b6179b2eedc))
+
+
+### Bug Fixes
+
+* add 'app' property to services in shoot.mjs for better identification ([bb51578](https://github.com/causefx/Postern/commit/bb51578bb18b33c3539c91f94cc784257d31ec1c))
+
 ## [0.18.1](https://github.com/causefx/Postern/compare/v0.18.0...v0.18.1) (2026-11-16)
 
 
