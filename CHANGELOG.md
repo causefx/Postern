@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.21.0](https://github.com/causefx/Postern/compare/v0.20.0...v0.21.0) (2026-11-21)
+
+
+### Features
+
+* add README for rebuilding promo video after UI changes ([1dfe38e](https://github.com/causefx/Postern/commit/1dfe38e8b9eb39fdc5773927da883c277ecdcfc9))
+
+
+### Bug Fixes
+
+* update service definitions for grafana and paperless in screenshot script ([3407205](https://github.com/causefx/Postern/commit/3407205cc6fe8336d4c41fcc26d93596e40cf5d9))
+
 ## [0.20.0](https://github.com/causefx/Postern/compare/v0.19.0...v0.20.0) (2026-11-20)
 
 
