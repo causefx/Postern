@@ -110,8 +110,8 @@ const SERVICES = [
     openPaths: [{ match: 'prefix', path: '/identity' }, { match: 'regex', path: '^/web/[^/]+$' }],
   },
   { name: 'home-assistant', app: 'homeassistant', pretty: 'http://homeassistant.local:8123', auth: { authz: { kind: 'bearer', username: '', secret: 'ha-long-lived-token-0123456789' } } },
-  { name: 'grafana', pretty: 'http://grafana:3000', auth: { authz: { kind: 'basic', username: 'viewer', secret: 'grafana-password-0123' } } },
-  { name: 'paperless', pretty: 'http://paperless:8000', auth: { authz: { kind: 'bearer', username: '', secret: 'paperless-token-0123456789' } } },
+  { name: 'grafana', app: 'grafana', pretty: 'http://grafana:3000', auth: { authz: { kind: 'basic', username: 'viewer', secret: 'grafana-password-0123' } } },
+  { name: 'paperless', app: 'paperless', pretty: 'http://paperless:8000', auth: { authz: { kind: 'bearer', username: '', secret: 'paperless-token-0123456789' } } },
   { name: 'jellyfin', app: 'jellyfin', pretty: 'http://jellyfin:8096', auth: { header: { name: 'X-Emby-Token', secret: 'jellyfin-token-0123456789' } }, enabled: false },
   { name: 'sabnzbd', app: 'sabnzbd', pretty: 'http://sabnzbd:8080', auth: { query: { name: 'apikey', secret: 'sabnzbd-api-key-0123456789' } } },
 ];
