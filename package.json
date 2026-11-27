@@ -10,7 +10,7 @@
   },
   "devDependencies": {
     "@tailwindcss/cli": "4.3.5",
-    "daisyui": "5.8.1",
+    "daisyui": "5.8.2",
     "esbuild": "0.28.2",
     "motion": "14.14.0",
     "svgo": "4.1.0",
